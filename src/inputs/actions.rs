@@ -599,12 +599,22 @@ pub fn latch2(
     )>,
     globals: ResMut<Globals>,
     mut event_writer: EventWriter<OfficialLatch>,
+    // mut event_reader: EventReader<UiButton>,
+    button_query: Query<(&ButtonState, &UiButton)>,
 ) {
-    if keyboard_input.pressed(KeyCode::LShift)
-        && keyboard_input.pressed(KeyCode::LControl)
-        && !keyboard_input.pressed(KeyCode::Space)
-        && mouse_button_input.pressed(MouseButton::Left)
-        && !globals.do_spawn_curve
+    let mut latch_button_on = false;
+    for (button_state, ui_button) in button_query.iter() {
+        if ui_button == &UiButton::Latch {
+            latch_button_on = button_state == &ButtonState::On;
+        }
+    }
+
+    if !globals.do_spawn_curve
+        && (latch_button_on
+            || keyboard_input.pressed(KeyCode::LShift)
+                && keyboard_input.pressed(KeyCode::LControl)
+                && !keyboard_input.pressed(KeyCode::Space)
+                && mouse_button_input.pressed(MouseButton::Left))
     {
         let latching_distance = 5.0;
         // let mut partner_latch: Option<(Anchor, u128, AnchorEdge, Handle<Bezier>)> = None;
