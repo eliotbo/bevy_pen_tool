@@ -5,10 +5,13 @@ use bevy::prelude::*;
 #[derive(Clone, Copy, Debug)]
 pub enum ButtonInteraction {
     Clicked,
+    Pressed,
     Hovered,
+    Released,
     None,
 }
 
+// type for buttons that keep their state
 #[derive(PartialEq)]
 pub enum ButtonState {
     On,
@@ -26,6 +29,7 @@ pub enum UiButton {
     Selection,
     Detach,
     SpawnCurve,
+    Hide,
 }
 
 pub fn button_system(
@@ -50,7 +54,7 @@ pub fn button_system(
         let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
 
         match *interaction {
-            ButtonInteraction::Clicked => {
+            ButtonInteraction::Released => {
                 if let Some(mut button_state_mut) = button_state_option {
                     let button_state = button_state_mut.as_mut();
                     if button_state == &ButtonState::On {
@@ -62,21 +66,28 @@ pub fn button_system(
                         turn_other_buttons_off = true;
                         shader_params.t = 1.0;
                     }
-                    // println!("toggle");
 
                     // two UI buttons cannot be clicked simultaneously
                     break;
                 } else {
+                    // send event to actions.rs
                     event_writer.send(*ui_button);
                 }
             }
-            ButtonInteraction::Hovered => {
-                // println!("hovering");
+            ButtonInteraction::Pressed => {
+                // send pressed event to shader
+                shader_params.hovered = 0.8;
             }
-            ButtonInteraction::None => {}
+            ButtonInteraction::Hovered => {
+                shader_params.hovered = 1.0;
+            }
+            ButtonInteraction::Clicked => {}
+            ButtonInteraction::None => {
+                shader_params.hovered = 0.0;
+            }
         }
 
-        // TODO: send events
+        // TODO: send events, replacing the chunky if statements in actions.rs
         match (
             keyboard_input.pressed(KeyCode::LShift),
             keyboard_input.pressed(KeyCode::LControl),

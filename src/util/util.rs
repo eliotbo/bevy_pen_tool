@@ -390,6 +390,7 @@ pub struct MyShader {
     pub t: f32, // Bezier t-value for MiddleQuads, but is used for other purposes elsewhere
     pub zoom: f32,
     pub size: Vec2,
+    pub hovered: f32,
 }
 
 impl Default for MyShader {
@@ -400,6 +401,7 @@ impl Default for MyShader {
             zoom: 0.15,
             size: Vec2::new(1.0, 1.0),
             clearcolor: Color::hex("6e7f80").unwrap(),
+            hovered: 0.0,
         }
     }
 }

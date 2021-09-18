@@ -486,6 +486,7 @@ pub fn hide_bounding_boxes(
     keyboard_input: Res<Input<KeyCode>>,
     mut globals: ResMut<Globals>,
     mut query: Query<&mut Visible, (With<BoundingBoxQuad>,)>,
+    // mut event_reader: EventReader<UiButton>,
 ) {
     if keyboard_input.just_pressed(KeyCode::B) {
         globals.do_hide_bounding_boxes = !globals.do_hide_bounding_boxes;
@@ -499,8 +500,14 @@ pub fn hide_anchors(
     keyboard_input: Res<Input<KeyCode>>,
     mut globals: ResMut<Globals>,
     mut query: Query<&mut Visible, Or<(With<ControlPointQuad>, With<EndpointQuad>)>>,
+    mut event_reader: EventReader<UiButton>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::H) {
+    let mut pressed_hide_button = false;
+    for ui_button in event_reader.iter() {
+        pressed_hide_button = ui_button == &UiButton::Hide;
+        break;
+    }
+    if keyboard_input.just_pressed(KeyCode::H) || pressed_hide_button {
         globals.do_hide_anchors = !globals.do_hide_anchors;
         for mut visible in query.iter_mut() {
             visible.is_visible = !globals.do_hide_anchors;

@@ -106,15 +106,25 @@ pub fn check_mouse_on_ui(
             let bi = button_interaction.deref_mut();
             *bi = ButtonInteraction::Hovered;
 
+            // TODO: change to a match statement
+
             // Disallow the UI board to be dragged upon click
             if mouse_button_input.just_pressed(MouseButton::Left) {
+                *bi = ButtonInteraction::Clicked;
+                for (_t, mut ui_board) in ui_query.iter_mut() {
+                    ui_board.action = UiAction::PressedUiButton;
+                }
+            }
+
+            if mouse_button_input.pressed(MouseButton::Left) {
+                *bi = ButtonInteraction::Pressed;
                 for (_t, mut ui_board) in ui_query.iter_mut() {
                     ui_board.action = UiAction::PressedUiButton;
                 }
             }
 
             if mouse_button_input.just_released(MouseButton::Left) {
-                *bi = ButtonInteraction::Clicked;
+                *bi = ButtonInteraction::Released;
 
                 button_interaction.set_changed(); // probably not necessary
             }

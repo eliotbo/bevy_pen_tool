@@ -188,6 +188,7 @@ pub fn spawn_bezier(
         zoom: globals.camera_scale,
         size: bb_size,
         clearcolor: clearcolor.clone(),
+        ..Default::default()
     });
 
     // TODO: make the depth deterministic
@@ -316,6 +317,7 @@ pub fn spawn_bezier(
             zoom: globals.camera_scale,
             size: Vec2::new(1.0, 1.0),
             clearcolor: clearcolor.clone(),
+            ..Default::default()
         });
 
         x = x + 2.0;

@@ -25,6 +25,7 @@ pub fn spawn_selection_bounding_box(
         zoom: globals.camera_scale,
         size: bb_group_size,
         clearcolor: clearcolor_struct.0.clone(),
+        ..Default::default()
     });
     let visible_bb_group = Visible {
         is_visible: false,
@@ -73,6 +74,7 @@ pub fn spawn_group_bounding_box(
             zoom: globals.camera_scale,
             size: bb_group_size,
             clearcolor: clearcolor_struct.0.clone(),
+            ..Default::default()
         });
         let visible_bb_group = Visible {
             is_visible: false,
@@ -153,6 +155,7 @@ pub fn spawn_group_middle_quads(
                 zoom: globals.camera_scale,
                 size: Vec2::new(1.0, 1.0),
                 clearcolor: clearcolor_struct.0.clone(),
+                ..Default::default()
             });
 
             x = x + 2.0;
