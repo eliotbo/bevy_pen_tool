@@ -1,0 +1,16 @@
+[package]
+name = "pen_test3"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { version = "0.5", git = "https://github.com/bevyengine/bevy", rev="615d43b", default-features = true }
+strum  = "0.21.0"
+strum_macros = "0.21"
+flo_curves = "0.5"
+serde_json = "1.0.59"
+itertools = "0.10.1"
+serde = { version = "1", features = ["derive"] }
+rand = "0.8.0"
