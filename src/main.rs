@@ -12,14 +12,18 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 
 // TODO:
 // 0. Make everything scale dependent instead of absolute
-// 5. Add buttons for latching // spawning // latch spawning
+
 // 6. make a plugin
 // 8. add audio samples when latching / unlatching / grouping / ungrouping
 // 10. add hide button
 // 7. ungroup
-// 1. Contour the control points with a dark color
+// 1. Contour the control points with a dark color?
 // 4. Collapse the UI
 // 9. Compute higher quality lut for groups upon save
+// 11. reduce use of Globals
+// 12. make save/load preserve groups
+// 13. make whole group move when selected
+// 14. make undo/redo work for moving anchors and control points
 
 fn main() {
     App::new()

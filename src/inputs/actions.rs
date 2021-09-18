@@ -5,7 +5,7 @@ use crate::spawner::spawn_bezier;
 use crate::util::{
     get_close_anchor, get_close_anchor_entity, get_close_still_anchor, Anchor, AnchorEdge, Bezier,
     BoundingBoxQuad, ColorButton, ControlPointQuad, EndpointQuad, Globals, Group, LatchData,
-    MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, UiAction, UiBoard,
+    MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, SoundStruct, UiAction, UiBoard,
 };
 
 // use crate::util::*;
@@ -34,7 +34,6 @@ pub fn pick_color(
 
         let mut pressed_button = (false, 0);
         for (ui_transform, mut ui_board) in ui_query.iter_mut() {
-            // let clicked_on_color = false;
             // send info to global variable
 
             // TODO: fix scales
@@ -97,6 +96,7 @@ pub fn begin_move_on_mouseclick(
     globals: ResMut<Globals>,
     // mut my_shader_params: ResMut<Assets<MyShader>>,
     button_query: Query<(&ButtonState, &UiButton, &Handle<MyShader>)>,
+    audio: Res<Audio>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Left) && !globals.do_spawn_curve {
         let mut latch_partners: Vec<LatchData> = Vec::new();
@@ -155,6 +155,11 @@ pub fn begin_move_on_mouseclick(
                 //
                 if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
                     *latch_local = Vec::new();
+                    if globals.sound_on {
+                        if let Some(sound) = globals.sounds.get("unlatch") {
+                            audio.play(sound.clone());
+                        }
+                    }
                 }
             }
         }
@@ -218,8 +223,8 @@ pub fn selection(
             {
                 for group_handle in group_query.iter() {
                     let group = groups.get(group_handle).unwrap();
+                    //
                     if group.handles.contains(&selected_handle) {
-                        // println!("Working");
                         globals.selected = group.clone();
                         for mut visible in visible_selection_query.iter_mut() {
                             visible.is_visible = true;
@@ -260,26 +265,20 @@ pub fn selection(
             for mut visible in visible_selection_query.iter_mut() {
                 visible.is_visible = false;
             }
-            // for mut visible in query_set.q1().single_mut() {
-            //     visible.is_visible = false;
-            // }
         }
     }
 }
 
 pub fn groupy(
     mut commands: Commands,
-    // mut meshes: ResMut<Assets<Mesh>>,
-    // mut my_shader_params: ResMut<Assets<MyShader>>,
     mut groups: ResMut<Assets<Group>>,
     globals: ResMut<Globals>,
     keyboard_input: Res<Input<KeyCode>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    // clearcolor_struct: Res<ClearColor>,
     query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
-    // mut event_writer: EventWriter<Group>,
     mut event_reader: EventReader<UiButton>,
     mut event_writer: EventWriter<Handle<Group>>,
+    audio: Res<Audio>,
     // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 ) {
     let mut pressed_group_button = false;
@@ -297,23 +296,30 @@ pub fn groupy(
     {
         let id_handle_map: HashMap<u128, Handle<Bezier>> = globals.id_handle_map.clone();
 
-        let selected = globals.selected.clone();
+        let mut selected = globals.selected.clone();
 
-        let group_handle = groups.add(selected);
-        // println!("groups : {:?}", groups.len());
+        selected.find_connected_ends(&mut bezier_curves, id_handle_map.clone());
+        println!("connected ends: {:?}, ", selected.ends);
+        //
+        if selected.ends.is_none() {
+            return;
+        }
 
-        let group = groups.get_mut(group_handle.clone()).unwrap();
+        if globals.sound_on {
+            if let Some(sound) = globals.sounds.get("group") {
+                audio.play(sound.clone());
+            }
+        }
 
-        group.find_connected_ends(&mut bezier_curves, id_handle_map.clone());
-
-        group.group_lut(&mut bezier_curves, id_handle_map.clone());
+        selected.group_lut(&mut bezier_curves, id_handle_map.clone());
 
         for (entity, handle) in query.iter() {
-            if group.handles.contains(handle) {
+            if selected.handles.contains(handle) {
                 commands.entity(entity).despawn();
             }
         }
 
+        let group_handle = groups.add(selected);
         // spawn the middle quads and the bounding box
         event_writer.send(group_handle.clone());
     }
@@ -482,19 +488,19 @@ pub fn redo(
     }
 }
 
-pub fn hide_bounding_boxes(
-    keyboard_input: Res<Input<KeyCode>>,
-    mut globals: ResMut<Globals>,
-    mut query: Query<&mut Visible, (With<BoundingBoxQuad>,)>,
-    // mut event_reader: EventReader<UiButton>,
-) {
-    if keyboard_input.just_pressed(KeyCode::B) {
-        globals.do_hide_bounding_boxes = !globals.do_hide_bounding_boxes;
-        for mut visible in query.iter_mut() {
-            visible.is_visible = !globals.do_hide_bounding_boxes;
-        }
-    }
-}
+// pub fn hide_bounding_boxes(
+//     keyboard_input: Res<Input<KeyCode>>,
+//     mut globals: ResMut<Globals>,
+//     mut query: Query<&mut Visible, (With<BoundingBoxQuad>,)>,
+
+// ) {
+// if keyboard_input.just_pressed(KeyCode::B) {
+//     globals.do_hide_bounding_boxes = !globals.do_hide_bounding_boxes;
+//     for mut visible in query.iter_mut() {
+//         visible.is_visible = !globals.do_hide_bounding_boxes;
+//     }
+// }
+// }
 
 pub fn hide_anchors(
     keyboard_input: Res<Input<KeyCode>>,
@@ -515,14 +521,54 @@ pub fn hide_anchors(
     }
 }
 
+pub fn toggle_sound(
+    asset_server: Res<AssetServer>,
+    mut globals: ResMut<Globals>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut query: Query<(&mut Handle<ColorMaterial>, &mut SoundStruct)>,
+    mut event_reader: EventReader<UiButton>,
+) {
+    for ui_button in event_reader.iter() {
+        //
+        if ui_button == &UiButton::Sound {
+            //
+            globals.sound_on = !globals.sound_on;
+            //
+            for (mut material_handle, mut soundstruct) in query.iter_mut() {
+                // toggle sprite
+                use std::ops::DerefMut;
+                let other_material = soundstruct.material.clone();
+                let current_material = material_handle.clone();
+                let mat = material_handle.deref_mut();
+                *mat = other_material.clone();
+                soundstruct.material = current_material;
+
+                // if globals.sound_on {
+                // } else {
+                // }
+            }
+        }
+    }
+}
+
 pub fn save(
     keyboard_input: Res<Input<KeyCode>>,
     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut event_reader: EventReader<UiButton>,
+    // mut event_writer: EventWriter<Handle<Group>>,
+    // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 ) {
-    if keyboard_input.pressed(KeyCode::LControl)
-        && keyboard_input.just_released(KeyCode::S)
-        && !keyboard_input.pressed(KeyCode::LShift)
+    let mut pressed_save_button = false;
+    for ui_button in event_reader.iter() {
+        pressed_save_button = ui_button == &UiButton::Save;
+        break;
+    }
+
+    if pressed_save_button
+        || (keyboard_input.pressed(KeyCode::LControl)
+            && keyboard_input.just_released(KeyCode::S)
+            && !keyboard_input.pressed(KeyCode::LShift))
     {
         let mut vec: Vec<Bezier> = Vec::new();
         for bezier_handle in query.iter() {
@@ -551,10 +597,20 @@ pub fn load(
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
+    mut event_reader: EventReader<UiButton>,
+    // mut event_writer: EventWriter<Handle<Group>>,
+    // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 ) {
-    if keyboard_input.pressed(KeyCode::LControl)
-        && keyboard_input.just_released(KeyCode::S)
-        && keyboard_input.pressed(KeyCode::LShift)
+    let mut pressed_load_button = false;
+    for ui_button in event_reader.iter() {
+        pressed_load_button = ui_button == &UiButton::Load;
+        break;
+    }
+
+    if pressed_load_button
+        || (keyboard_input.pressed(KeyCode::LControl)
+            && keyboard_input.just_released(KeyCode::S)
+            && keyboard_input.pressed(KeyCode::LShift))
     {
         let clearcolor = clearcolor_struct.0;
 
@@ -617,11 +673,6 @@ pub fn latch2(
                 && mouse_button_input.pressed(MouseButton::Left))
     {
         let latching_distance = 5.0;
-        // let mut partner_latch: Option<(Anchor, u128, AnchorEdge, Handle<Bezier>)> = None;
-        // let mut mover_latch: Option<(Anchor, u128, AnchorEdge, Handle<Bezier>)> = None;
-
-        // let mut partner_latch: Option<(LatchData, Handle<Bezier>)> = None;
-        // let mut mover_latch: Option<(LatchData, Handle<Bezier>)> = None;
 
         let mut potential_mover: Option<(Vec2, u128, AnchorEdge, Handle<Bezier>)> = None;
         let mut potential_partner: Option<(
@@ -662,6 +713,7 @@ pub fn latch2(
             {
                 let partner_bezier = bezier_curves.get_mut(partner_handle.clone()).unwrap();
 
+                // if the potential partner is free, continue
                 if partner_bezier.quad_is_latched(anchor_edge) {
                     return;
                 }
@@ -680,7 +732,6 @@ pub fn latch2(
                     partners_edge: mover_edge,
                 };
 
-                // partner_latch = Some((partner_latch_data, partner_handle.clone()));
                 event_writer.send(OfficialLatch(partner_latch_data, partner_handle.clone()));
             }
         }
@@ -697,8 +748,6 @@ pub fn latch2(
                 self_edge: mover_anchor,
                 partners_edge: pa_edge,
             };
-
-            // mover_latch = Some((mover_latch_data, mover_handle.clone()));
 
             // set the position of the latched moving quad and its control point
             if mover_anchor == AnchorEdge::Start {
@@ -718,12 +767,20 @@ pub fn officiate_latch_partnership(
     mouse_button_input: Res<Input<MouseButton>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut latch_event_reader: EventReader<OfficialLatch>,
+    globals: ResMut<Globals>,
+    audio: Res<Audio>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
             let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
             bezier.set_latch(latch.clone());
             println!("latched, {:?}", bezier.latches);
+
+            if globals.sound_on {
+                if let Some(sound) = globals.sounds.get("latch") {
+                    audio.play(sound.clone());
+                }
+            }
         }
     }
 }

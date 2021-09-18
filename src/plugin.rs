@@ -1,9 +1,8 @@
 use crate::cam::Cam;
 use crate::inputs::{
     begin_move_on_mouseclick, button_system, check_mouse_on_ui, delete, groupy, hide_anchors,
-    hide_bounding_boxes, latch2, load, officiate_latch_partnership, pick_color,
-    record_mouse_events_system, redo, save, selection, spawn_curve_order_on_mouseclick, undo,
-    Cursor, Latch, UiButton,
+    latch2, load, officiate_latch_partnership, pick_color, record_mouse_events_system, redo, save,
+    selection, spawn_curve_order_on_mouseclick, toggle_sound, undo, Cursor, Latch, UiButton,
 };
 use crate::moves::{
     move_bb_quads, move_control_quads, move_end_quads, move_group_middle_quads, move_middle_quads,
@@ -104,7 +103,7 @@ impl Plugin for PenPlugin {
             .add_system(groupy.system())
             .add_system(adjust_selection_attributes.system())
             .add_system(adjust_group_attributes.system())
-            .add_system(hide_bounding_boxes.system())
+            // .add_system(hide_bounding_boxes.system())
             .add_system(hide_anchors.system())
             .add_system(do_long_lut.system().label("long_lut"))
             .add_system(save.system().after("long_lut"))
@@ -113,7 +112,8 @@ impl Plugin for PenPlugin {
             .add_system(delete.system().label("delete"))
             .add_system(tests.system())
             .add_system(button_system.after("mouse_color"))
-            .add_system(move_ui.system().label("move_ui").after("selection"));
+            .add_system(move_ui.system().label("move_ui").after("selection"))
+            .add_system(toggle_sound.system());
     }
 }
 
@@ -137,10 +137,22 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     mut render_graph: ResMut<RenderGraph>,
     mut globals: ResMut<Globals>,
+    // audio: Res<Audio>,
     // mut my_shader_params: ResMut<Assets<MyShader>>,
     // clearcolor_struct: Res<ClearColor>,
 ) {
     asset_server.watch_for_changes().unwrap();
+
+    let latch_sound: Handle<AudioSource> = asset_server.load("sounds/latch.mp3");
+    let unlatch_sound: Handle<AudioSource> = asset_server.load("sounds/unlatch.mp3");
+    let group_sound: Handle<AudioSource> = asset_server.load("sounds/group.mp3");
+    // audio.play(latch_sound);
+    // audio.play(unlatch_sound);
+    // audio.play(group_sound);
+
+    globals.sounds.insert("latch", latch_sound);
+    globals.sounds.insert("unlatch", unlatch_sound);
+    globals.sounds.insert("group", group_sound);
 
     let frag = asset_server.load::<Shader, _>("shaders/bezier.frag");
     let vert = asset_server.load::<Shader, _>("shaders/bezier.vert");

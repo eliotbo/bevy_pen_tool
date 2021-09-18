@@ -1,5 +1,5 @@
 use crate::inputs::{ButtonInteraction, ButtonState, UiButton};
-use crate::util::{ColorButton, Globals, MyShader, UiAction, UiBoard};
+use crate::util::{ColorButton, Globals, MyShader, SoundStruct, UiAction, UiBoard};
 
 use bevy::{
     prelude::*,
@@ -705,6 +705,50 @@ pub fn spawn_ui(
         .id();
 
     commands.entity(hide_button).push_children(&[hide_sprite]);
+
+    //
+    //
+    //
+    ///////////////////// sound button /////////////////////
+    let shader_params_sound = my_shader_params.add(MyShader {
+        color: Color::hex("4a4e4d").unwrap(),
+        size: button_size,
+        ..Default::default()
+    });
+    let sound_button = commands
+        .spawn_bundle(MeshBundle {
+            mesh: mesh_handle_button.clone(),
+            visible: visible_ui.clone(),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                button_pipeline_handle.clone(),
+            )]),
+            transform: Transform::from_translation(Vec3::new(-button_width * 0.5, 0.0, -430.0)),
+            ..Default::default()
+        })
+        .insert(ButtonInteraction::None)
+        .insert(shader_params_sound.clone())
+        .insert(UiButton::Sound)
+        .id();
+
+    commands.entity(main_ui).push_children(&[sound_button]);
+
+    let on_material = asset_server.load("textures/sound_on.png");
+    let off_material = asset_server.load("textures/sound_off.png");
+    let sound_sprite = commands
+        .spawn_bundle(SpriteBundle {
+            material: materials.add(on_material.into()),
+            // mesh: mesh_handle_button.clone(),
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 11.0)),
+            sprite: Sprite::new(button_size / 1.3),
+            ..Default::default()
+        })
+        .insert(UiButton::Sound)
+        .insert(SoundStruct {
+            material: materials.add(off_material.into()),
+        })
+        .id();
+
+    commands.entity(sound_button).push_children(&[sound_sprite]);
     /////////////////////// buttons ui ////////////////////////////
     /////////////////////// buttons ui ////////////////////////////
     //

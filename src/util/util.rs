@@ -57,6 +57,9 @@ impl AnchorEdge {
     }
 }
 
+pub struct SoundStruct {
+    pub material: Handle<ColorMaterial>,
+}
 pub struct EndpointQuad(pub AnchorEdge);
 
 pub struct ControlPointQuad(pub AnchorEdge);
@@ -135,7 +138,6 @@ impl Group {
     pub fn find_connected_ends(
         &mut self,
         bezier_curves: &mut ResMut<Assets<Bezier>>,
-        // globals: &mut ResMut<Globals>,
         id_handle_map: HashMap<u128, Handle<Bezier>>,
     ) {
         //
@@ -158,13 +160,20 @@ impl Group {
 
         let mut ends: Vec<(Handle<Bezier>, AnchorEdge)> = Vec::new();
 
-        if anchors.len() == 0 {
-            ends.push((handle.clone(), AnchorEdge::Start));
-            ends.push((handle.clone(), AnchorEdge::End));
-            // println!("Anchors len : 0");
-            self.ends = Some(ends.clone());
+        // if a curve is completely disconnected form other curves, a group cannot be created
+        if anchors.len() == 0 && handles.len() > 1 {
+            self.ends = None;
             return ();
-        } else if anchors.len() == 1 {
+        }
+        // // if a curve is by itself, return the sole curve as a group
+        // else if anchors.len() == 0 && handles.len() == 1 {
+        //     ends.push((handle.clone(), AnchorEdge::Start));
+        //     ends.push((handle.clone(), AnchorEdge::End));
+        //     // println!("Anchors len : 0");
+        //     self.ends = Some(ends.clone());
+        //     return ();
+        // }
+        else if anchors.len() == 1 {
             // println!("Anchors len : 1");
             ends.push((handle.clone(), anchors[0].clone().other()));
         }
@@ -193,8 +202,8 @@ impl Group {
             }
         }
 
-        // println!("num con : {}", num_con);
-        // println!("num curves: {}", num_curves);
+        println!("num con : {}", num_con);
+        println!("num curves: {}", num_curves);
 
         if num_con + 2 > num_curves {
             self.ends = Some(ends.clone());
@@ -339,6 +348,8 @@ pub struct Globals {
     pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
     pub id_handle_map: HashMap<u128, Handle<Bezier>>,
     pub selected: Group,
+    pub sounds: HashMap<&'static str, Handle<AudioSource>>,
+    pub sound_on: bool,
     // pub groups: Vec<Group>,
 }
 
@@ -361,6 +372,8 @@ impl Default for Globals {
                 lut: Vec::new(),
                 ends: None,
             },
+            sounds: HashMap::new(),
+            sound_on: true,
             // groups: Vec::new(),
         }
     }

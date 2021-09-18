@@ -30,6 +30,7 @@ pub enum UiButton {
     Detach,
     SpawnCurve,
     Hide,
+    Sound,
 }
 
 pub fn button_system(
