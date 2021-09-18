@@ -2,11 +2,12 @@ use crate::inputs::*;
 // use crate::spawner::*;
 
 use bevy::{
+    input::mouse::MouseWheel,
     prelude::*,
     reflect::TypeUuid,
     render::{
-        mesh::VertexAttributeValues::Float32x3, pipeline::PipelineDescriptor,
-        renderer::RenderResources,
+        camera::OrthographicProjection, mesh::VertexAttributeValues::Float32x3,
+        pipeline::PipelineDescriptor, renderer::RenderResources,
     },
 };
 
@@ -57,6 +58,7 @@ impl AnchorEdge {
     }
 }
 
+pub struct Icon;
 pub struct SoundStruct {
     pub material: Handle<ColorMaterial>,
 }
@@ -341,6 +343,7 @@ pub struct Globals {
     pub do_spawn_curve: bool,
     pub num_points: usize,
     pub camera_scale: f32,
+    pub scale: f32,
     pub picked_color: Option<Color>,
     pub history: Vec<Handle<Bezier>>,
     // pub bezier_handles: Vec<Handle<Bezier>>,
@@ -361,6 +364,7 @@ impl Default for Globals {
             do_spawn_curve: false,
             num_points: 25,
             camera_scale: 0.15,
+            scale: 1.0,
             picked_color: None,
             history: Vec::new(),
             mesh_handles: HashMap::new(),

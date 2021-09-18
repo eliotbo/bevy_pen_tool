@@ -4,13 +4,13 @@ use crate::spawner::spawn_bezier;
 
 use crate::util::{
     get_close_anchor, get_close_anchor_entity, get_close_still_anchor, Anchor, AnchorEdge, Bezier,
-    BoundingBoxQuad, ColorButton, ControlPointQuad, EndpointQuad, Globals, Group, LatchData,
+    BoundingBoxQuad, ColorButton, ControlPointQuad, EndpointQuad, Globals, Group, Icon, LatchData,
     MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, SoundStruct, UiAction, UiBoard,
 };
 
 // use crate::util::*;
 
-use bevy::prelude::*;
+use bevy::{input::mouse::MouseWheel, prelude::*, render::camera::OrthographicProjection};
 
 // use rand::prelude::*;
 use std::collections::HashMap;
@@ -183,7 +183,6 @@ pub fn begin_move_on_mouseclick(
 }
 
 pub fn selection(
-    // mut commands: Commands,
     mut globals: ResMut<Globals>,
     cursor: ResMut<Cursor>,
     mouse_button_input: Res<Input<MouseButton>>,
@@ -194,7 +193,7 @@ pub fn selection(
     group_query: Query<&Handle<Group>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
     button_query: Query<(&ButtonState, &UiButton)>,
-    mut ui_query: Query<&UiBoard>,
+    ui_query: Query<&UiBoard>,
 ) {
     let mut clicked_on_ui = false;
     for ui_board in ui_query.iter() {
@@ -299,8 +298,9 @@ pub fn groupy(
         let mut selected = globals.selected.clone();
 
         selected.find_connected_ends(&mut bezier_curves, id_handle_map.clone());
-        println!("connected ends: {:?}, ", selected.ends);
-        //
+        // println!("connected ends: {:?}, ", selected.ends);
+
+        // abort grouping if the selection is not completely connected with latches
         if selected.ends.is_none() {
             return;
         }
@@ -780,6 +780,38 @@ pub fn officiate_latch_partnership(
                 if let Some(sound) = globals.sounds.get("latch") {
                     audio.play(sound.clone());
                 }
+            }
+        }
+    }
+}
+
+pub fn rescale(
+    mut query: Query<
+        (&mut Transform, &Handle<MyShader>),
+        (
+            Without<OrthographicProjection>,
+            Without<UiButton>,
+            Without<ColorButton>,
+            Without<UiBoard>,
+            Without<Sprite>,
+            Without<Icon>,
+        ),
+    >,
+    mut my_shaders: ResMut<Assets<MyShader>>,
+    mut mouse_wheel_events: EventReader<MouseWheel>,
+    mut globals: ResMut<Globals>,
+    keyboard_input: Res<Input<KeyCode>>,
+    // entity_query: Query<(Entity, &Handle<MyShader>)>,
+    // mut res: ResMut<Assets<MyShader>>,
+) {
+    for event in mouse_wheel_events.iter() {
+        if keyboard_input.pressed(KeyCode::LControl) {
+            let zoom_factor = 1.0 + event.y * 0.1;
+            globals.scale = globals.scale * zoom_factor;
+            for (mut transform, shader_param_handle) in query.iter_mut() {
+                transform.scale = Vec2::new(globals.scale, globals.scale).extend(1.0);
+                let shader_param = my_shaders.get_mut(shader_param_handle).unwrap();
+                shader_param.zoom = 0.15 / globals.scale;
             }
         }
     }

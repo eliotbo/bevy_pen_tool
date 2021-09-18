@@ -1,5 +1,5 @@
 use crate::inputs::{ButtonInteraction, ButtonState, UiButton};
-use crate::util::{ColorButton, Globals, MyShader, SoundStruct, UiAction, UiBoard};
+use crate::util::{ColorButton, Globals, Icon, MyShader, SoundStruct, UiAction, UiBoard};
 
 use bevy::{
     prelude::*,
@@ -201,6 +201,7 @@ pub fn spawn_ui(
         })
         // .insert(ButtonInteraction::None)
         .insert(shader_params_icon1)
+        .insert(Icon)
         .id();
 
     let shader_params_icon2 = my_shader_params.add(MyShader {
@@ -222,6 +223,7 @@ pub fn spawn_ui(
         })
         // .insert(ButtonInteraction::None)
         .insert(shader_params_icon2)
+        .insert(Icon)
         .id();
 
     commands.entity(button).push_children(&[icon1, icon2]);
@@ -271,6 +273,7 @@ pub fn spawn_ui(
         })
         // .insert(ButtonInteraction::None)
         .insert(shader_params_icon1.clone())
+        .insert(Icon)
         .id();
 
     let shader_params_icon2 = my_shader_params.add(MyShader {
@@ -292,6 +295,7 @@ pub fn spawn_ui(
         })
         // .insert(ButtonInteraction::None)
         .insert(shader_params_icon2.clone())
+        .insert(Icon)
         .id();
 
     commands.entity(button).push_children(&[icon1, icon2]);
@@ -344,9 +348,10 @@ pub fn spawn_ui(
         })
         // .insert(ButtonInteraction::None)
         .insert(shader_params_icon1.clone())
+        .insert(Icon)
         .id();
 
-    let mut icon2_transform = Transform::from_translation(Vec3::new(button_width / 5.0, 0.0, 20.1));
+    let icon2_transform = Transform::from_translation(Vec3::new(button_width / 5.0, 0.0, 20.1));
     // icon2_transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
     let icon2 = commands
         .spawn_bundle(MeshBundle {
@@ -360,6 +365,7 @@ pub fn spawn_ui(
         })
         // .insert(ButtonInteraction::None)
         .insert(shader_params_icon1.clone())
+        .insert(Icon)
         .id();
 
     commands.entity(button).push_children(&[icon1, icon2]);
@@ -468,6 +474,7 @@ pub fn spawn_ui(
         })
         // .insert(ButtonInteraction::None)
         .insert(shader_params_icon1.clone())
+        .insert(Icon)
         .id();
 
     let mut icon2_transform = Transform::from_translation(Vec3::new(button_width / 8.0, 0.0, 20.1));
@@ -484,6 +491,7 @@ pub fn spawn_ui(
         })
         // .insert(ButtonInteraction::None)
         .insert(shader_params_icon2.clone())
+        .insert(Icon)
         .id();
 
     // commands.entity(button).push_children(&[icon1, icon2]);

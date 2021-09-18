@@ -27,8 +27,8 @@ pub struct CamPlugin;
 
 impl Plugin for CamPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(camera_movevement_system.system())
-            .add_system(zoom_camera.system());
+        app.add_system(camera_movevement_system.system());
+        // .add_system(zoom_camera.system());
     }
 }
 

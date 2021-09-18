@@ -1,8 +1,9 @@
-use crate::cam::Cam;
+// use crate::cam::Cam;
 use crate::inputs::{
     begin_move_on_mouseclick, button_system, check_mouse_on_ui, delete, groupy, hide_anchors,
-    latch2, load, officiate_latch_partnership, pick_color, record_mouse_events_system, redo, save,
-    selection, spawn_curve_order_on_mouseclick, toggle_sound, undo, Cursor, Latch, UiButton,
+    latch2, load, officiate_latch_partnership, pick_color, record_mouse_events_system, redo,
+    rescale, save, selection, spawn_curve_order_on_mouseclick, toggle_sound, undo, Cursor, Latch,
+    UiButton,
 };
 use crate::moves::{
     move_bb_quads, move_control_quads, move_end_quads, move_group_middle_quads, move_middle_quads,
@@ -21,7 +22,7 @@ use crate::util::*;
 use bevy::{
     prelude::*,
     render::{
-        camera::OrthographicProjection,
+        // camera::OrthographicProjection,
         // mesh::VertexAttributeValues::Float32x3,
         pipeline::PipelineDescriptor,
         render_graph::{base, AssetRenderResourcesNode, RenderGraph},
@@ -51,6 +52,7 @@ impl Plugin for PenPlugin {
             // .add_system(camera_movevement_system.system())
             .add_system(record_mouse_events_system.system().label("input"))
             // .add_system(zoom_camera.system().label("zoom").after("input"))
+            .add_system(rescale.system().before("mouse_ui"))
             .add_system(check_mouse_on_ui.system().label("mouse_ui").after("input"))
             .add_system(pick_color.system().label("mouse_color").after("mouse_ui"))
             .add_system(
