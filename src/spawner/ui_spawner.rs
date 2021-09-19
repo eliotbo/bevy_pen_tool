@@ -331,11 +331,6 @@ pub fn spawn_ui(
 
     commands.entity(main_ui).push_children(&[button]);
 
-    // let shader_params_icon1 = my_shader_params.add(MyShader {
-    //     color: Color::hex("f6abb6").unwrap(),
-    //     size: icon_size,
-    //     ..Default::default()
-    // });
     let mut icon1_transform =
         Transform::from_translation(Vec3::new(-button_width / 5.0, 0.0, 20.1));
     icon1_transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);

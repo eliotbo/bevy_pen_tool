@@ -37,7 +37,7 @@ fn camera_setup(mut commands: Commands) {
             transform: Transform::from_translation(Vec3::new(00.0, 0.0, 10.0))
                 .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
             orthographic_projection: OrthographicProjection {
-                scale: 0.15, //view.camera_scale,
+                scale: 0.3, //view.camera_scale,
                 far: 100000.0,
                 near: -100000.0,
                 // top: 115.0,

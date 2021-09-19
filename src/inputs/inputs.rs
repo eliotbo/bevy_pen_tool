@@ -68,6 +68,7 @@ pub fn record_mouse_events_system(
 
         let cam_transform = cam_transform_query.iter().next().unwrap();
 
+        // this variable currently has no effect
         let mut scale = 1.0;
 
         for ortho in cam_ortho_query.iter() {
@@ -133,7 +134,10 @@ pub fn check_mouse_on_ui(
             if mouse_button_input.just_released(MouseButton::Left) {
                 *bi = ButtonInteraction::Released;
 
-                button_interaction.set_changed(); // probably not necessary
+                // button_interaction.set_changed(); // probably not necessary
+                for (_t, mut ui_board) in ui_query.iter_mut() {
+                    ui_board.action = UiAction::None;
+                }
             }
         } else {
             let bi = button_interaction.deref_mut();
@@ -169,6 +173,8 @@ pub fn spawn_curve_order_on_mouseclick(
             }
         }
 
+        // println!("ui_action: {:?}", ui_action);
+
         if !ui_action
             && ((keyboard_input.pressed(KeyCode::LShift)
                 && !keyboard_input.pressed(KeyCode::LControl)
@@ -183,7 +189,7 @@ pub fn spawn_curve_order_on_mouseclick(
                 //
                 if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
                     //
-                    let max_click_distance = 5.0;
+                    let max_click_distance = 5.0 * globals.scale;
 
                     let start_close_enough =
                         (bezier.positions.start - cursor.position).length() < max_click_distance;
@@ -191,14 +197,14 @@ pub fn spawn_curve_order_on_mouseclick(
                         (bezier.positions.end - cursor.position).length() < max_click_distance;
 
                     if start_close_enough && !bezier.quad_is_latched(AnchorEdge::Start) {
-                        // bezier.send_latch_on_spawn(AnchorEdge::Start, &mut cursor);
+                        //
                         bezier.send_latch_on_spawn(AnchorEdge::Start, &mut event_writer);
-                        println!("latched on start point");
+                        // println!("latched on start point");
                         break;
                     } else if end_close_enough && !bezier.quad_is_latched(AnchorEdge::End) {
-                        // bezier.send_latch_on_spawn(AnchorEdge::End, &mut cursor);
+                        //
                         bezier.send_latch_on_spawn(AnchorEdge::End, &mut event_writer);
-                        println!("latched on end point");
+                        // println!("latched on end point");
                         break;
                     }
                 }

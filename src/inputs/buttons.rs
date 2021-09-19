@@ -49,6 +49,7 @@ pub fn button_system(
 ) {
     let mut turn_other_buttons_off = false;
 
+    // dummy value
     let mut ui_button_that_was_turned_on = UiButton::Undo;
     for (interaction, shader_handle, ui_button, button_state_option) in interaction_query.iter_mut()
     {
@@ -58,6 +59,7 @@ pub fn button_system(
             ButtonInteraction::Released => {
                 if let Some(mut button_state_mut) = button_state_option {
                     let button_state = button_state_mut.as_mut();
+                    // toggle button
                     if button_state == &ButtonState::On {
                         *button_state = ButtonState::Off;
                         shader_params.t = 0.0;
@@ -89,71 +91,66 @@ pub fn button_system(
         }
 
         // TODO: send events, replacing the chunky if statements in actions.rs
-        match (
-            keyboard_input.pressed(KeyCode::LShift),
-            keyboard_input.pressed(KeyCode::LControl),
-            keyboard_input.pressed(KeyCode::Space),
-        ) {
-            (true, false, false) => {
-                if ui_button == &UiButton::SpawnCurve {
-                    shader_params.t = 1.0;
-                } else {
-                    shader_params.t = 0.0;
-                    if let Some(mut button_state_mut) = button_state_option {
-                        let button_state = button_state_mut.as_mut();
+        if let Some(mut button_state_mut) = button_state_option {
+            let button_state = button_state_mut.as_mut();
+            match (
+                keyboard_input.pressed(KeyCode::LShift),
+                keyboard_input.pressed(KeyCode::LControl),
+                keyboard_input.pressed(KeyCode::Space),
+            ) {
+                (true, false, false) => {
+                    if ui_button == &UiButton::SpawnCurve {
+                        shader_params.t = 1.0;
+                    } else {
+                        shader_params.t = 0.0;
                         *button_state = ButtonState::Off;
                     }
                 }
-            }
-            (true, true, false) => {
-                if ui_button == &UiButton::Latch {
-                    shader_params.t = 1.0;
-                } else {
-                    shader_params.t = 0.0;
-                    if let Some(mut button_state_mut) = button_state_option {
-                        let button_state = button_state_mut.as_mut();
+                (true, true, false) => {
+                    if ui_button == &UiButton::Latch {
+                        shader_params.t = 1.0;
+                    } else {
+                        shader_params.t = 0.0;
                         *button_state = ButtonState::Off;
                     }
                 }
-            }
-            (false, false, true) => {
-                if ui_button == &UiButton::Detach {
-                    shader_params.t = 1.0;
-                } else {
-                    shader_params.t = 0.0;
-                    if let Some(mut button_state_mut) = button_state_option {
-                        let button_state = button_state_mut.as_mut();
+                (false, false, true) => {
+                    if ui_button == &UiButton::Detach {
+                        shader_params.t = 1.0;
+                    } else {
+                        shader_params.t = 0.0;
+                        *button_state = ButtonState::Off;
+                        // }
+                    }
+                }
+                (false, true, false) => {
+                    if ui_button == &UiButton::Selection {
+                        shader_params.t = 1.0;
+                    } else {
+                        shader_params.t = 0.0;
                         *button_state = ButtonState::Off;
                     }
                 }
-            }
-            (false, true, false) => {
-                if ui_button == &UiButton::Selection {
-                    shader_params.t = 1.0;
-                } else {
-                    shader_params.t = 0.0;
-                    if let Some(mut button_state_mut) = button_state_option {
-                        let button_state = button_state_mut.as_mut();
-                        *button_state = ButtonState::Off;
-                    }
-                }
-            }
-            _ => {}
-        };
+                _ => {}
+            };
 
-        if keyboard_input.just_released(KeyCode::LShift) {
-            if ui_button == &UiButton::SpawnCurve || ui_button == &UiButton::Latch {
-                shader_params.t = 0.0;
+            if keyboard_input.just_released(KeyCode::LShift) {
+                if ui_button == &UiButton::SpawnCurve || ui_button == &UiButton::Latch {
+                    shader_params.t = 0.0;
+                    *button_state = ButtonState::Off;
+                }
             }
-        }
-        if keyboard_input.just_released(KeyCode::LControl) {
-            if ui_button == &UiButton::Selection || ui_button == &UiButton::Latch {
-                shader_params.t = 0.0;
+            if keyboard_input.just_released(KeyCode::LControl) {
+                if ui_button == &UiButton::Selection || ui_button == &UiButton::Latch {
+                    shader_params.t = 0.0;
+                    *button_state = ButtonState::Off;
+                }
             }
-        }
-        if keyboard_input.just_released(KeyCode::Space) {
-            if ui_button == &UiButton::Detach {
-                shader_params.t = 0.0;
+            if keyboard_input.just_released(KeyCode::Space) {
+                if ui_button == &UiButton::Detach {
+                    shader_params.t = 0.0;
+                    *button_state = ButtonState::Off;
+                }
             }
         }
     }

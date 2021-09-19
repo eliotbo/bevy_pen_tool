@@ -1,7 +1,7 @@
 use crate::inputs::Cursor;
 use crate::util::{
     interpolate, AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals,
-    Group, GroupMiddleQuad, MiddlePointQuad, MyShader, UiAction, UiBoard,
+    GrandParent, Group, GroupMiddleQuad, MiddlePointQuad, MyShader, UiAction, UiBoard,
 };
 
 use bevy::prelude::*;
@@ -9,7 +9,7 @@ use bevy::prelude::*;
 pub fn move_ui(
     cursor: ResMut<Cursor>,
     mouse_button_input: Res<Input<MouseButton>>,
-    mut ui_query: Query<(&mut Transform, &mut UiBoard)>,
+    mut ui_query: Query<(&mut Transform, &mut UiBoard), With<GrandParent>>,
     // mut globals: ResMut<Globals>,
 ) {
     for (mut transform, mut ui_board) in ui_query.iter_mut() {

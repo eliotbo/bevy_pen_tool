@@ -31,7 +31,7 @@ pub fn pick_color(
     mut my_shader_params: ResMut<Assets<MyShader>>,
     mouse_button_input: Res<Input<MouseButton>>,
     query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
-    mut ui_query: Query<(&Transform, &mut UiBoard)>,
+    mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
     mut globals: ResMut<Globals>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Left) {
@@ -60,15 +60,6 @@ pub fn pick_color(
                 }
             }
 
-            if ui_board.action == UiAction::None
-                && cursor.within_rect(
-                    ui_transform.translation.truncate(),
-                    ui_board.size * cam_scale,
-                )
-            {
-                ui_board.action = UiAction::MovingUi;
-            }
-
             // send selected color to shaders so that it shows the selected color with a white contour
             if pressed_button.0 {
                 //
@@ -85,8 +76,22 @@ pub fn pick_color(
                     }
                 }
             }
+
+            if ui_board.action == UiAction::None
+                && cursor.within_rect(
+                    ui_transform.translation.truncate(),
+                    ui_board.size * globals.scale,
+                )
+            {
+                ui_board.action = UiAction::MovingUi;
+            }
         }
     }
+    // else if mouse_button_input.just_released(MouseButton::Left) {
+    //     for (_ui_transform, mut ui_board) in ui_query.iter_mut() {
+    //         ui_board.action = UiAction::None;
+    //     }
+    // }
 }
 
 pub fn begin_move_on_mouseclick(
@@ -119,6 +124,7 @@ pub fn begin_move_on_mouseclick(
                 bezier.do_compute_lut = true;
                 bezier.update_previous_pos();
 
+                // retrieve the detach (unlatch) button state
                 let mut detach_button_on = false;
                 for (button_state, ui_button, _my_shader_handle) in button_query.iter() {
                     if ui_button == &UiButton::Detach {
@@ -149,8 +155,6 @@ pub fn begin_move_on_mouseclick(
                     }
                 }
             }
-
-            // add to selected
         }
 
         // unlatch partner
