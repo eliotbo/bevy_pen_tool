@@ -22,6 +22,7 @@ use crate::util::*;
 use bevy::{
     prelude::*,
     render::{
+        camera::OrthographicProjection,
         // camera::OrthographicProjection,
         // mesh::VertexAttributeValues::Float32x3,
         pipeline::PipelineDescriptor,
@@ -139,10 +140,16 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     mut render_graph: ResMut<RenderGraph>,
     mut globals: ResMut<Globals>,
+    query: Query<&OrthographicProjection>,
     // audio: Res<Audio>,
     // mut my_shader_params: ResMut<Assets<MyShader>>,
     // clearcolor_struct: Res<ClearColor>,
 ) {
+    for ortho in query.iter() {
+        globals.scale = ortho.scale;
+        println!("right order");
+    }
+
     asset_server.watch_for_changes().unwrap();
 
     let latch_sound: Handle<AudioSource> = asset_server.load("sounds/latch.mp3");

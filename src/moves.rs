@@ -170,6 +170,7 @@ pub fn move_bb_quads(
 pub fn move_end_quads(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &EndpointQuad)>,
+    globals: Res<Globals>,
 ) {
     for (mut transform, bezier_handle, endpoint_quad_id) in query.iter_mut() {
         //
@@ -183,7 +184,8 @@ pub fn move_end_quads(
                 || bezier.just_created
             {
                 let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
-                    bezier.ends_displacement();
+                    bezier.ends_displacement(globals.scale);
+                // println!("{}", globals.scale);
 
                 if *point == AnchorEdge::Start {
                     transform.translation = (bezier.positions.start + start_displacement)

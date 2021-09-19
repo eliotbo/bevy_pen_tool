@@ -1,5 +1,7 @@
 use crate::inputs::{ButtonInteraction, ButtonState, UiButton};
-use crate::util::{ColorButton, Globals, Icon, MyShader, SoundStruct, UiAction, UiBoard};
+use crate::util::{
+    ColorButton, Globals, GrandParent, Icon, MyShader, SoundStruct, UiAction, UiBoard,
+};
 
 use bevy::{
     prelude::*,
@@ -121,6 +123,7 @@ pub fn spawn_ui(
             ..Default::default()
         })
         .insert(shader_params_button_ui)
+        .insert(GrandParent)
         .insert(UiBoard {
             expanded: true,
             size: button_ui_size,
@@ -766,7 +769,7 @@ pub fn spawn_ui(
     //
     //////////////////////////// color ui /////////////////////////
 
-    let color_ui_position = Vec3::new(-70.0, -15.0, -500.0);
+    let color_ui_position = Vec3::new(0.0, -55.0 * globals.scale, -500.0);
 
     let shader_params_color_ui = my_shader_params.add(MyShader {
         color: Color::hex("131B23").unwrap(),
@@ -794,7 +797,9 @@ pub fn spawn_ui(
         })
         .id();
 
-    let color_button_size = Vec2::new(6., 6.);
+    commands.entity(main_ui).push_children(&[parent]);
+
+    let color_button_size = Vec2::new(6. * globals.scale, 6. * globals.scale);
     let mesh_handle_color_button = meshes.add(Mesh::from(shape::Quad {
         size: color_button_size,
         flip: false,

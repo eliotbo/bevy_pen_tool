@@ -2,6 +2,7 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 use crate::cam::Cam;
 use crate::util::{AnchorEdge, Bezier, BoundingBoxQuad, Globals, MyShader, UiAction, UiBoard};
 
+use bevy::render::camera::OrthographicProjection;
 use bevy::{prelude::*, window::CursorMoved};
 
 use std::ops::DerefMut;
@@ -53,6 +54,7 @@ pub fn record_mouse_events_system(
     mut windows: ResMut<Windows>,
     // mut cam_query: Query<(&Cam, &Transform)>,
     cam_transform_query: Query<&Transform, With<Cam>>,
+    cam_ortho_query: Query<&OrthographicProjection>,
     globals: Res<Globals>,
 ) {
     for event in cursor_moved_events.iter() {
@@ -65,11 +67,16 @@ pub fn record_mouse_events_system(
         let screen_position = cursor_in_pixels - window_size / 2.0;
 
         let cam_transform = cam_transform_query.iter().next().unwrap();
+
+        let mut scale = 1.0;
+
+        for ortho in cam_ortho_query.iter() {
+            scale = ortho.scale;
+        }
+
         let cursor_vec4: Vec4 = cam_transform.compute_matrix()
-            * screen_position
-                .extend(0.0)
-                .extend(1.0 / globals.camera_scale)
-            * globals.camera_scale;
+            * screen_position.extend(0.0).extend(1.0 / (scale))
+            * scale;
 
         let cursor_pos = Vec2::new(cursor_vec4.x, cursor_vec4.y);
         cursor_res.position = cursor_pos;
@@ -97,8 +104,8 @@ pub fn check_mouse_on_ui(
 ) {
     for (global_transform, shader_handle, mut button_interaction, ui_button) in query.iter_mut() {
         let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
-        // TODO: fix scales
-        let cam_scale = globals.camera_scale / 0.15;
+        //
+        let cam_scale = globals.scale * globals.scale;
         if cursor.within_rect(
             global_transform.translation.truncate(),
             shader_params.size * 0.95 * cam_scale,

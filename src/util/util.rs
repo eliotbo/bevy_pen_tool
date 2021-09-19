@@ -58,6 +58,7 @@ impl AnchorEdge {
     }
 }
 
+pub struct GrandParent;
 pub struct Icon;
 pub struct SoundStruct {
     pub material: Handle<ColorMaterial>,
@@ -553,8 +554,8 @@ impl Bezier {
         !self.latches[&anchor_edge].is_empty()
     }
 
-    pub fn ends_displacement(&self) -> ((Vec2, Vec2), (Quat, Quat)) {
-        let quad_width = 1.0;
+    pub fn ends_displacement(&self, scale: f32) -> ((Vec2, Vec2), (Quat, Quat)) {
+        let quad_width = 1.0 * scale;
         let mut angles_vec = Vec::new();
 
         for anchor in vec![AnchorEdge::Start, AnchorEdge::End] {
@@ -802,11 +803,13 @@ pub fn get_close_anchor(
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
     query: &Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+    // mut globals: ResMut<Globals>,
+    scale: f32,
 ) -> Option<(f32, Anchor, Handle<Bezier>)> {
     for bezier_handle in query.iter() {
         if let Some(bezier) = bezier_curves.get(bezier_handle) {
             let ((start_displacement, end_displacement), (_start_rotation, _end_rotation)) =
-                bezier.ends_displacement();
+                bezier.ends_displacement(scale);
 
             let distance_to_control0 = (bezier.positions.control_start - position).length();
             let distance_to_control1 = (bezier.positions.control_end - position).length();
@@ -842,6 +845,7 @@ pub fn get_close_anchor_entity(
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
     query: &Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+    scale: f32,
 ) -> Option<(f32, Anchor, Entity, Handle<Bezier>)> {
     //
     for (entity, bezier_handle) in query.iter() {
@@ -849,7 +853,7 @@ pub fn get_close_anchor_entity(
         if let Some(bezier) = bezier_curves.get(bezier_handle) {
             //
             let ((start_displacement, end_displacement), (_start_rotation, _end_rotation)) =
-                bezier.ends_displacement();
+                bezier.ends_displacement(scale);
 
             let distance_to_control0 = (bezier.positions.control_start - position).length();
             let distance_to_control1 = (bezier.positions.control_end - position).length();
@@ -913,12 +917,9 @@ pub fn get_close_still_anchor(
     return None;
 }
 
+// change the selection mesh according to the bounding box of the selected curves
 pub fn adjust_selection_attributes(
-    // keyboard_input: Res<Input<KeyCode>>,
     mouse_button_input: Res<Input<MouseButton>>,
-    // cursor: ResMut<Cursor>,
-    // bezier_curves: ResMut<Assets<Bezier>>,
-    // query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
     mut query: Query<&Handle<Mesh>, With<SelectionBoxQuad>>,
     shader_query: Query<&Handle<MyShader>, With<SelectionBoxQuad>>,
@@ -928,10 +929,6 @@ pub fn adjust_selection_attributes(
 ) {
     // TODO: make this system run only when necessary
     if mouse_button_input.pressed(MouseButton::Left) {
-        //     && !keyboard_input.pressed(KeyCode::LShift)
-        // && !keyboard_input.pressed(KeyCode::LControl)
-        // && !keyboard_input.pressed(KeyCode::Space){
-        // let selected = globals.selected;
         let (mut minx, mut maxx, mut miny, mut maxy) =
             (1000000.0f32, -1000000.0f32, 1000000.0f32, -1000000.0f32);
 
@@ -949,14 +946,15 @@ pub fn adjust_selection_attributes(
         }
         let shader_handle = shader_query.single();
         let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
-        let scale = 1.10;
+        let up_factor = 1.10;
         let x_pos = (maxx + minx) / 2.0;
         let y_pox = (maxy + miny) / 2.0;
-        let x_width = (maxx - minx) * scale / 2.0;
-        let y_width = (maxy - miny) * scale / 2.0;
+        let x_width = (maxx - minx) * up_factor / 2.0;
+        let y_width = (maxy - miny) * up_factor / 2.0;
 
         // send correct width to shader that will adjust the thickness of the box accordingly
-        shader_params.size = Vec2::new(x_width * 2.0, y_width * 2.0);
+        let scale = globals.scale / 0.5;
+        shader_params.size = Vec2::new(x_width * 2.0 / scale, y_width * 2.0 / scale);
 
         let vertex_positions = vec![
             [x_pos - x_width, y_pox - y_width, 0.0],
@@ -976,6 +974,7 @@ pub fn adjust_selection_attributes(
     }
 }
 
+// change the group selection mesh according to the bounding box of the curves inside the group
 pub fn adjust_group_attributes(
     // keyboard_input: Res<Input<KeyCode>>,
     mouse_button_input: Res<Input<MouseButton>>,
@@ -993,11 +992,6 @@ pub fn adjust_group_attributes(
 ) {
     // TODO: make this system run only when necessary
     if mouse_button_input.pressed(MouseButton::Left) {
-        //     && !keyboard_input.pressed(KeyCode::LShift)
-        // && !keyboard_input.pressed(KeyCode::LControl)
-        // && !keyboard_input.pressed(KeyCode::Space){
-        // let selected = globals.selected;
-
         for (group_handle, shader_handle) in group_query.iter() {
             let group = groups.get(group_handle).unwrap();
             let (mut minx, mut maxx, mut miny, mut maxy) =
@@ -1016,7 +1010,6 @@ pub fn adjust_group_attributes(
                 maxy = maxy.max(bound1.y);
             }
 
-            // let shader_handle = shader_query.single().unwrap();
             let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
             let scale = 1.10;
             let x_pos = (maxx + minx) / 2.0;

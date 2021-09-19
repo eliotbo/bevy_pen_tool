@@ -22,8 +22,8 @@ pub fn spawn_selection_bounding_box(
     let shader_params_handle_group_bb = my_shader_params.add(MyShader {
         color: Color::DARK_GRAY,
         t: 0.5,
-        zoom: globals.camera_scale,
-        size: bb_group_size,
+        zoom: 0.15 / globals.scale,
+        size: bb_group_size / (globals.scale / 0.15),
         clearcolor: clearcolor_struct.0.clone(),
         ..Default::default()
     });
@@ -71,8 +71,8 @@ pub fn spawn_group_bounding_box(
         let shader_params_handle_group_bb = my_shader_params.add(MyShader {
             color: Color::BLACK,
             t: 0.5,
-            zoom: globals.camera_scale,
-            size: bb_group_size,
+            zoom: 0.15 / globals.scale,
+            size: bb_group_size / (globals.scale / 0.15),
             clearcolor: clearcolor_struct.0.clone(),
             ..Default::default()
         });
@@ -152,7 +152,7 @@ pub fn spawn_group_middle_quads(
             let mid_shader_params_handle = my_shader_params.add(MyShader {
                 color,
                 t: 0.5,
-                zoom: globals.camera_scale,
+                zoom: 0.15 / globals.scale,
                 size: Vec2::new(1.0, 1.0),
                 clearcolor: clearcolor_struct.0.clone(),
                 ..Default::default()

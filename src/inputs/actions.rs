@@ -4,8 +4,9 @@ use crate::spawner::spawn_bezier;
 
 use crate::util::{
     get_close_anchor, get_close_anchor_entity, get_close_still_anchor, Anchor, AnchorEdge, Bezier,
-    BoundingBoxQuad, ColorButton, ControlPointQuad, EndpointQuad, Globals, Group, Icon, LatchData,
-    MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, SoundStruct, UiAction, UiBoard,
+    BoundingBoxQuad, ColorButton, ControlPointQuad, EndpointQuad, Globals, GrandParent, Group,
+    Icon, LatchData, MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, SoundStruct,
+    UiAction, UiBoard,
 };
 
 // use crate::util::*;
@@ -30,14 +31,12 @@ pub fn pick_color(
     mut globals: ResMut<Globals>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Left) {
-        // let mut ui_board = ui_query.single_mut().unwrap();
-
+        //
         let mut pressed_button = (false, 0);
+        //
         for (ui_transform, mut ui_board) in ui_query.iter_mut() {
-            // send info to global variable
-
             // TODO: fix scales
-            let cam_scale = globals.camera_scale / 0.15;
+            let cam_scale = globals.scale * globals.scale;
             for (k, (transform, shader_param_handle, _color_button)) in query.iter().enumerate() {
                 let shader_params = my_shader_params.get(shader_param_handle).unwrap().clone();
                 // println!("{:?}", cam_scale);
@@ -49,7 +48,7 @@ pub fn pick_color(
 
                     globals.picked_color = Some(shader_params.color);
 
-                    println!("chose color: {:?}", globals.picked_color);
+                    // println!("chose color: {:?}", globals.picked_color);
 
                     ui_board.action = UiAction::PickingColor;
 
@@ -101,9 +100,13 @@ pub fn begin_move_on_mouseclick(
     if mouse_button_input.just_pressed(MouseButton::Left) && !globals.do_spawn_curve {
         let mut latch_partners: Vec<LatchData> = Vec::new();
 
-        if let Some((_distance, anchor, handle)) =
-            get_close_anchor(3.0, cursor.position, &bezier_curves, &query)
-        {
+        if let Some((_distance, anchor, handle)) = get_close_anchor(
+            3.0 * globals.scale,
+            cursor.position,
+            &bezier_curves,
+            &query,
+            globals.scale,
+        ) {
             let mut bezier = bezier_curves.get_mut(handle.clone()).unwrap();
 
             // order to move the quad that was clicked on
@@ -195,6 +198,7 @@ pub fn selection(
     button_query: Query<(&ButtonState, &UiButton)>,
     ui_query: Query<&UiBoard>,
 ) {
+    // avoids selection if the click is on the UI
     let mut clicked_on_ui = false;
     for ui_board in ui_query.iter() {
         if ui_board.action != UiAction::None {
@@ -217,9 +221,14 @@ pub fn selection(
             && !keyboard_input.pressed(KeyCode::Space)
             && (keyboard_input.pressed(KeyCode::LControl) || selection_button_on)
         {
-            if let Some((_distance, _anchor, entity, selected_handle)) =
-                get_close_anchor_entity(2.0, cursor.position, &bezier_curves, &query)
-            {
+            if let Some((_distance, _anchor, entity, selected_handle)) = get_close_anchor_entity(
+                2.0 * globals.scale,
+                cursor.position,
+                &bezier_curves,
+                &query,
+                globals.scale,
+            ) {
+                // if the selected quad is part of a group, show group selection
                 for group_handle in group_query.iter() {
                     let group = groups.get(group_handle).unwrap();
                     //
@@ -235,6 +244,7 @@ pub fn selection(
 
                 let selected_entity = entity.clone();
 
+                // add the selected quad to the selected group
                 globals
                     .selected
                     .group
@@ -708,9 +718,12 @@ pub fn latch2(
         // find quad within latching_distance. Upon success, setup a latch and store the
         // paramters of the latchee (partner)
         if let Some((pos, id, mover_edge, mover_handle)) = potential_mover {
-            if let Some((_dist, anchor_edge, partner_handle)) =
-                get_close_still_anchor(latching_distance, pos, &bezier_curves, &query.q0())
-            {
+            if let Some((_dist, anchor_edge, partner_handle)) = get_close_still_anchor(
+                latching_distance * globals.scale,
+                pos,
+                &bezier_curves,
+                &query.q0(),
+            ) {
                 let partner_bezier = bezier_curves.get_mut(partner_handle.clone()).unwrap();
 
                 // if the potential partner is free, continue
@@ -785,18 +798,10 @@ pub fn officiate_latch_partnership(
     }
 }
 
+//
 pub fn rescale(
-    mut query: Query<
-        (&mut Transform, &Handle<MyShader>),
-        (
-            Without<OrthographicProjection>,
-            Without<UiButton>,
-            Without<ColorButton>,
-            Without<UiBoard>,
-            Without<Sprite>,
-            Without<Icon>,
-        ),
-    >,
+    mut grandparent_query: Query<&mut Transform, With<GrandParent>>,
+    shader_param_query: Query<&Handle<MyShader>>,
     mut my_shaders: ResMut<Assets<MyShader>>,
     mut mouse_wheel_events: EventReader<MouseWheel>,
     mut globals: ResMut<Globals>,
@@ -808,10 +813,16 @@ pub fn rescale(
         if keyboard_input.pressed(KeyCode::LControl) {
             let zoom_factor = 1.0 + event.y * 0.1;
             globals.scale = globals.scale * zoom_factor;
-            for (mut transform, shader_param_handle) in query.iter_mut() {
+            // the bounding box, the ends and the control points share the same shader parameters
+            for mut transform in grandparent_query.iter_mut() {
                 transform.scale = Vec2::new(globals.scale, globals.scale).extend(1.0);
-                let shader_param = my_shaders.get_mut(shader_param_handle).unwrap();
+            }
+
+            // update the shader params for the middle quads (animated quads)
+            for shader_handle in shader_param_query.iter() {
+                let shader_param = my_shaders.get_mut(shader_handle).unwrap();
                 shader_param.zoom = 0.15 / globals.scale;
+                shader_param.size *= 1.0 / zoom_factor;
             }
         }
     }

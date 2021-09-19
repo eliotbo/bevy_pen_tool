@@ -1,7 +1,7 @@
 use crate::inputs::{Cursor, Latch};
 use crate::util::{
     compute_lut, Anchor, AnchorEdge, Bezier, BezierPositions, BoundingBoxQuad, ControlPointQuad,
-    EndpointQuad, Globals, LatchData, MiddlePointQuad, MyShader,
+    EndpointQuad, Globals, GrandParent, LatchData, MiddlePointQuad, MyShader,
 };
 
 use bevy::{
@@ -185,7 +185,7 @@ pub fn spawn_bezier(
     let shader_params_handle_bb = my_shader_params.add(MyShader {
         color,
         t: 0.5,
-        zoom: globals.camera_scale,
+        zoom: 0.15 / globals.scale,
         size: bb_size,
         clearcolor: clearcolor.clone(),
         ..Default::default()
@@ -194,7 +194,8 @@ pub fn spawn_bezier(
     // TODO: make the depth deterministic
     let mut rng = thread_rng();
     let pos_z = -rng.gen::<f32>() * 10000.0;
-    let init_pos = Transform::from_translation(bb_pos.extend(pos_z + 30.0));
+    let mut init_pos = Transform::from_translation(bb_pos.extend(pos_z + 30.0));
+    init_pos.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
     let parent = commands
         .spawn_bundle(MeshBundle {
@@ -208,6 +209,7 @@ pub fn spawn_bezier(
         })
         .insert(shader_params_handle_bb.clone())
         .insert(BoundingBoxQuad)
+        .insert(GrandParent)
         .insert(bezier_handle.clone())
         .id();
 
@@ -222,7 +224,7 @@ pub fn spawn_bezier(
     // Although the interface is two-dimensional, the z position of the quads is important for transparency
 
     let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
-        bezier.ends_displacement();
+        bezier.ends_displacement(globals.scale);
 
     start_pt_pos += start_displacement;
     end_pt_pos += end_displacement;
@@ -314,8 +316,8 @@ pub fn spawn_bezier(
         let mid_shader_params_handle = my_shader_params.add(MyShader {
             color,
             t: 0.5,
-            zoom: globals.camera_scale,
-            size: Vec2::new(1.0, 1.0),
+            zoom: 0.15 / globals.scale,
+            size: Vec2::new(1.0, 1.0) * globals.scale,
             clearcolor: clearcolor.clone(),
             ..Default::default()
         });

@@ -20,13 +20,14 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 // 12. make save/load preserve groups
 // 13. make whole group move when selected
 // 14. make undo/redo work for moving anchors and control points
+// 15. make compatible with a projective perspective
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_startup_system(camera_setup)
         .add_plugin(CamPlugin)
         .add_plugin(PenPlugin)
-        .add_startup_system(camera_setup)
         .run();
 }
 
