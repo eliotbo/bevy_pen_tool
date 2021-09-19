@@ -44,10 +44,6 @@ Undo: delete the curve that was spawned last (does not keep track of anchor and 
 
 ![redo](https://user-images.githubusercontent.com/6177048/133933739-a72e308d-c2d7-4ecc-a9cc-daf0b19fa0d6.png)
 Left Control + Left Shift + Z
-
-
-https://user-images.githubusercontent.com/6177048/133934737-b52dae07-bfdd-4924-a01c-f39c3d604306.mp4
-
 Redo: respawn the curve that was deleted last with "undo".
 
 ![toggle_sound](https://user-images.githubusercontent.com/6177048/133933748-4769bd96-f6c6-4863-9de5-e283f614b6f4.png)
@@ -55,6 +51,8 @@ Toggle sound.
 
 
 
+
+![bevy_pen_tool](https://user-images.githubusercontent.com/6177048/133935702-ac72da4f-4470-4c8d-ab14-ab9724f1b201.gif)
 
 
 
