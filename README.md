@@ -11,9 +11,9 @@ TODO:
 | --- | --- | --- |
 | ![spawn](https://user-images.githubusercontent.com/6177048/133933744-aafdf2cd-9c56-4310-8704-4baa73e376b6.png) | Left Shift + Click | Spawn curve |
 | ![group](https://user-images.githubusercontent.com/6177048/133933726-dd9394b8-7742-491f-88a3-43d4a06a2967.png) | Left Control + G | Group selected curves |
-| ![select](https://user-images.githubusercontent.com/6177048/133933742-63a11995-ceee-4747-8910-e0210a4fc277.png) | Left Control | Select curves by clicking on either its start anchor or its end anchor |
-| ![latch](https://user-images.githubusercontent.com/6177048/133933734-41806eb3-d507-4aa9-88ec-915f60bd1dbf.png) | Left Shift + Left Control |   Latch a curve to another curve by dragging a free anchor close to another free anchor |
-| ![unlatch](https://user-images.githubusercontent.com/6177048/133933752-9f935b91-c8a1-4682-98e7-7e86459dcdea.png) | Space | Unlatch anchors that were latched together. |
+| ![select](https://user-images.githubusercontent.com/6177048/133933742-63a11995-ceee-4747-8910-e0210a4fc277.png) | Left Control + Click | Select curves by clicking on either its start anchor or its end anchor |
+| ![latch](https://user-images.githubusercontent.com/6177048/133933734-41806eb3-d507-4aa9-88ec-915f60bd1dbf.png) | Left Shift + Left Control + Drag |   Latch a curve to another curve by dragging a free anchor close to another free anchor |
+| ![unlatch](https://user-images.githubusercontent.com/6177048/133933752-9f935b91-c8a1-4682-98e7-7e86459dcdea.png) | Space + Drag | Unlatch anchors that were latched together. |
 |![hide_anchors](https://user-images.githubusercontent.com/6177048/133933733-fd83ac0c-aadc-4028-a1fd-68c0028a8b60.png) | H | Hide anchors and control points |
 |  ![save](https://user-images.githubusercontent.com/6177048/133933741-591d12c7-b7b2-4479-8f39-3da4d7a3f293.png) | Left Control + S | Save set of existing individual curves (does not currently preserve groups or latches) |
 | ![load](https://user-images.githubusercontent.com/6177048/133933736-6bed8165-fe08-4401-9bb1-e580d2f3e31a.png) | Left Control + Left Shift + S | Load set of saved curves (does not currently preserve groups or latches)|
@@ -25,8 +25,8 @@ TODO:
 
 
 
-![bevy_pen_tool](https://user-images.githubusercontent.com/6177048/133935702-ac72da4f-4470-4c8d-ab14-ab9724f1b201.gif)
 
 
 
 
+![bevy_pen_tool](https://user-images.githubusercontent.com/6177048/133936336-c9bc8a18-a54e-4fc6-a068-bf765d833d49.gif)
