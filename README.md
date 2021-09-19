@@ -5,7 +5,7 @@ TODO:
 - Save groups and generate a high-quality look-up-table for grouped curves
 - Mesh-making functionality for building 2D shapes and roads
 
-# Controls
+## Controls
 
 | Icon | Keys | Description |
 | --- | --- | --- |
