@@ -6,10 +6,13 @@ TODO:
 - Mesh-making functionality for building 2D shapes and roads
 
 # Controls
-Left Shift + Click
 
-![spawn](https://user-images.githubusercontent.com/6177048/133933744-aafdf2cd-9c56-4310-8704-4baa73e376b6.png)
-Spawn curve 
+| Icon | Keys | Description |
+| --- | --- | --- |
+| ![spawn](https://user-images.githubusercontent.com/6177048/133933744-aafdf2cd-9c56-4310-8704-4baa73e376b6.png) | Left Shift + Click | Spawn curve |
+
+
+
 
 
 
