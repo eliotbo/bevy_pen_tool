@@ -462,8 +462,7 @@ pub fn spawn_ui(
         })
         .id();
 
-    let mut icon1_transform =
-        Transform::from_translation(Vec3::new(-button_width / 8.0, 0.0, 20.1));
+    let icon1_transform = Transform::from_translation(Vec3::new(-button_width / 8.0, 0.0, 20.1));
     // icon1_transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
     let icon1 = commands
         .spawn_bundle(MeshBundle {

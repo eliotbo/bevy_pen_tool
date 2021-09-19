@@ -32,7 +32,7 @@ impl Plugin for CamPlugin {
     }
 }
 
-pub fn zoom_camera(
+pub fn _zoom_camera(
     mut query: QuerySet<(
         QueryState<(&mut OrthographicProjection, &mut Cam, &Transform)>,
         QueryState<(&mut Transform, &mut UiBoard)>,

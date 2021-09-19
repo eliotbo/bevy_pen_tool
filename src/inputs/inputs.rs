@@ -55,7 +55,7 @@ pub fn record_mouse_events_system(
     // mut cam_query: Query<(&Cam, &Transform)>,
     cam_transform_query: Query<&Transform, With<Cam>>,
     cam_ortho_query: Query<&OrthographicProjection>,
-    globals: Res<Globals>,
+    // globals: Res<Globals>,
 ) {
     for event in cursor_moved_events.iter() {
         let cursor_in_pixels = event.position; // lower left is origin
@@ -91,7 +91,7 @@ pub fn record_mouse_events_system(
 
 pub fn check_mouse_on_ui(
     cursor: ResMut<Cursor>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
+    my_shader_params: ResMut<Assets<MyShader>>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut query: Query<(
         &GlobalTransform,
@@ -100,9 +100,9 @@ pub fn check_mouse_on_ui(
         &UiButton,
     )>,
     mut ui_query: Query<(&Transform, &mut UiBoard)>,
-    mut globals: ResMut<Globals>,
+    globals: ResMut<Globals>,
 ) {
-    for (global_transform, shader_handle, mut button_interaction, ui_button) in query.iter_mut() {
+    for (global_transform, shader_handle, mut button_interaction, _ui_button) in query.iter_mut() {
         let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
         //
         let cam_scale = globals.scale * globals.scale;

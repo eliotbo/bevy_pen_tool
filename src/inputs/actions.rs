@@ -5,13 +5,17 @@ use crate::spawner::spawn_bezier;
 use crate::util::{
     get_close_anchor, get_close_anchor_entity, get_close_still_anchor, Anchor, AnchorEdge, Bezier,
     BoundingBoxQuad, ColorButton, ControlPointQuad, EndpointQuad, Globals, GrandParent, Group,
-    Icon, LatchData, MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, SoundStruct,
-    UiAction, UiBoard,
+    LatchData, MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, SoundStruct, UiAction,
+    UiBoard,
 };
 
 // use crate::util::*;
 
-use bevy::{input::mouse::MouseWheel, prelude::*, render::camera::OrthographicProjection};
+use bevy::{
+    input::mouse::MouseWheel,
+    prelude::*,
+    // render::camera::OrthographicProjection
+};
 
 // use rand::prelude::*;
 use std::collections::HashMap;
@@ -498,20 +502,6 @@ pub fn redo(
     }
 }
 
-// pub fn hide_bounding_boxes(
-//     keyboard_input: Res<Input<KeyCode>>,
-//     mut globals: ResMut<Globals>,
-//     mut query: Query<&mut Visible, (With<BoundingBoxQuad>,)>,
-
-// ) {
-// if keyboard_input.just_pressed(KeyCode::B) {
-//     globals.do_hide_bounding_boxes = !globals.do_hide_bounding_boxes;
-//     for mut visible in query.iter_mut() {
-//         visible.is_visible = !globals.do_hide_bounding_boxes;
-//     }
-// }
-// }
-
 pub fn hide_anchors(
     keyboard_input: Res<Input<KeyCode>>,
     mut globals: ResMut<Globals>,
@@ -532,9 +522,9 @@ pub fn hide_anchors(
 }
 
 pub fn toggle_sound(
-    asset_server: Res<AssetServer>,
+    // asset_server: Res<AssetServer>,
     mut globals: ResMut<Globals>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    // mut materials: ResMut<Assets<ColorMaterial>>,
     mut query: Query<(&mut Handle<ColorMaterial>, &mut SoundStruct)>,
     mut event_reader: EventReader<UiButton>,
 ) {
@@ -552,10 +542,6 @@ pub fn toggle_sound(
                 let mat = material_handle.deref_mut();
                 *mat = other_material.clone();
                 soundstruct.material = current_material;
-
-                // if globals.sound_on {
-                // } else {
-                // }
             }
         }
     }
@@ -806,8 +792,6 @@ pub fn rescale(
     mut mouse_wheel_events: EventReader<MouseWheel>,
     mut globals: ResMut<Globals>,
     keyboard_input: Res<Input<KeyCode>>,
-    // entity_query: Query<(Entity, &Handle<MyShader>)>,
-    // mut res: ResMut<Assets<MyShader>>,
 ) {
     for event in mouse_wheel_events.iter() {
         if keyboard_input.pressed(KeyCode::LControl) {

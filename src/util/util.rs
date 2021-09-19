@@ -1,29 +1,22 @@
 use crate::inputs::*;
-// use crate::spawner::*;
 
 use bevy::{
-    input::mouse::MouseWheel,
     prelude::*,
     reflect::TypeUuid,
     render::{
-        camera::OrthographicProjection, mesh::VertexAttributeValues::Float32x3,
-        pipeline::PipelineDescriptor, renderer::RenderResources,
+        // camera::OrthographicProjection,
+        mesh::VertexAttributeValues::Float32x3,
+        pipeline::PipelineDescriptor,
+        renderer::RenderResources,
     },
 };
 
 use serde::{Deserialize, Serialize};
-// use serde_json;
-
-// // use std::fs;
-// use std::fs::File;
-// use std::io::Read;
-// use std::io::Write;
 
 use rand::prelude::*;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
-// use serde::lib::HashSet;
 
 use flo_curves::bezier::BezierCurve;
 use flo_curves::bezier::Curve;
@@ -33,8 +26,6 @@ use flo_curves::*;
 // use plotlib::repr::Plot;
 // use plotlib::style::LineStyle;
 // use plotlib::view::ContinuousView;
-
-// use rand::prelude::*;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Copy, Hash)]
 pub enum AnchorEdge {
@@ -976,19 +967,13 @@ pub fn adjust_selection_attributes(
 
 // change the group selection mesh according to the bounding box of the curves inside the group
 pub fn adjust_group_attributes(
-    // keyboard_input: Res<Input<KeyCode>>,
     mouse_button_input: Res<Input<MouseButton>>,
-    // cursor: ResMut<Cursor>,
-    // bezier_curves: ResMut<Assets<Bezier>>,
-    // query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
     mut query: Query<&Handle<Mesh>, With<GroupBoxQuad>>,
     groups: ResMut<Assets<Group>>,
     group_query: Query<(&Handle<Group>, &Handle<MyShader>)>,
-    // shader_query: Query<, With<GroupBoxQuad>>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    // globals: ResMut<Globals>,
 ) {
     // TODO: make this system run only when necessary
     if mouse_button_input.pressed(MouseButton::Left) {

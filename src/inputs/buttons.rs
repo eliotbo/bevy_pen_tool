@@ -159,7 +159,7 @@ pub fn button_system(
     }
 
     if turn_other_buttons_off {
-        for (interaction, shader_handle, ui_button, button_state_option) in
+        for (_interaction, shader_handle, ui_button, button_state_option) in
             interaction_query.iter_mut()
         {
             if ui_button != &ui_button_that_was_turned_on {

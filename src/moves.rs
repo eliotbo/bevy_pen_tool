@@ -47,9 +47,7 @@ pub fn move_middle_quads(
 
     for (handle_id, bezier) in bezier_curves.iter() {
         //
-        let bezier_c = bezier.to_coord2();
         let curve = bezier.to_curve();
-        // bezier::Curve::from_points(bezier_c.start, bezier_c.control_points, bezier_c.end);
 
         for ((mut transform, bezier_handle, shader_params_handle), t) in
             query.iter_mut().zip(vrange.clone())
