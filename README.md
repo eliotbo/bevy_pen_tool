@@ -6,22 +6,31 @@ TODO:
 - Mesh-making functionality for building 2D shapes and roads
 
 # Controls
+Left Shift + Click
 
 ![spawn](https://user-images.githubusercontent.com/6177048/133933744-aafdf2cd-9c56-4310-8704-4baa73e376b6.png)
-Left Shift + Click:         Spawn curve 
+Spawn curve 
 
 
+
+Left Control + G
 
 ![group](https://user-images.githubusercontent.com/6177048/133933726-dd9394b8-7742-491f-88a3-43d4a06a2967.png)
-Left Control + G:           Group selected curves
+Group selected curves
 
+
+
+Left Control: 
 
 ![select](https://user-images.githubusercontent.com/6177048/133933742-63a11995-ceee-4747-8910-e0210a4fc277.png)
-Left Control:               Select curves by clicking on either its start anchor or its end anchor.
+Select curves by clicking on either its start anchor or its end anchor.
 
+
+
+Left Shift + Left Control
 
 ![latch](https://user-images.githubusercontent.com/6177048/133933734-41806eb3-d507-4aa9-88ec-915f60bd1dbf.png)
-Left Shift + Left Control:  Latch a curve to another curve by dragging a free anchor close to another free anchor.
+  Latch a curve to another curve by dragging a free anchor close to another free anchor.
 
 
 ![unlatch](https://user-images.githubusercontent.com/6177048/133933752-9f935b91-c8a1-4682-98e7-7e86459dcdea.png)
