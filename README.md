@@ -18,8 +18,7 @@ TODO:
 |  ![save](https://user-images.githubusercontent.com/6177048/133933741-591d12c7-b7b2-4479-8f39-3da4d7a3f293.png) | Left Control + S | Save set of existing individual curves (does not currently preserve groups or latches) |
 | ![load](https://user-images.githubusercontent.com/6177048/133933736-6bed8165-fe08-4401-9bb1-e580d2f3e31a.png) | Left Control + Left Shift + S | Load set of saved curves (does not currently preserve groups or latches)|
 |![undo](https://user-images.githubusercontent.com/6177048/133933750-47820fb4-8e1b-4a57-aa4a-e60fa3bee66c.png) | Left Control + Z | Delete the curve that was spawned last (does not keep track of anchor and control point movement) |
-| ![redo](https://user-images.githubusercontent.com/6177048/133933739-a72e308d-c2d7-4ecc-a9cc-daf0b19fa0d6.png) | 
-Left Control + Left Shift + Z | Respawn the curve that was deleted last with "undo" |
+| ![redo](https://user-images.githubusercontent.com/6177048/133933739-a72e308d-c2d7-4ecc-a9cc-daf0b19fa0d6.png) | Left Control + Left Shift + Z | Respawn the curve that was deleted last with "undo" |
 | ![toggle_sound](https://user-images.githubusercontent.com/6177048/133933748-4769bd96-f6c6-4863-9de5-e283f614b6f4.png) | None | Toggle sound |
 
 
