@@ -6,15 +6,15 @@ TODO:
 - Mesh-making functionality for building 2D shapes and roads
 
 # Controls
-![spawn](https://user-images.githubusercontent.com/6177048/133933744-aafdf2cd-9c56-4310-8704-4baa73e376b6.png)
 Left Shift + Click
+![spawn](https://user-images.githubusercontent.com/6177048/133933744-aafdf2cd-9c56-4310-8704-4baa73e376b6.png)
+Spawn curve 
 
-Spawn curve
 
-![group](https://user-images.githubusercontent.com/6177048/133933726-dd9394b8-7742-491f-88a3-43d4a06a2967.png)
 Left Control + G
-
+![group](https://user-images.githubusercontent.com/6177048/133933726-dd9394b8-7742-491f-88a3-43d4a06a2967.png)
 Group selected curves
+
 
 ![select](https://user-images.githubusercontent.com/6177048/133933742-63a11995-ceee-4747-8910-e0210a4fc277.png)
 Left Control
