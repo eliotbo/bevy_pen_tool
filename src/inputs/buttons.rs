@@ -31,6 +31,8 @@ pub enum UiButton {
     SpawnCurve,
     Hide,
     Sound,
+    ScaleUp,
+    ScaleDown,
 }
 
 pub fn button_system(

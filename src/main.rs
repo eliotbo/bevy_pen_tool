@@ -11,7 +11,6 @@ use plugin::PenPlugin;
 use bevy::{prelude::*, render::camera::OrthographicProjection};
 
 // TODO:
-// 0. Make everything scale dependent instead of absolute
 // 1. Attach UI to a UI camera
 // 4. Collapse the color UI
 // 7. ungroup
@@ -21,6 +20,7 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 // 13. make whole group move when selected
 // 14. make undo/redo work for moving anchors and control points
 // 15. make compatible with a projective perspective
+// 16. Add RControl and RShift to keys
 
 fn main() {
     App::new()

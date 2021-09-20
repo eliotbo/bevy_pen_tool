@@ -796,7 +796,38 @@ pub fn rescale(
     mut mouse_wheel_events: EventReader<MouseWheel>,
     mut globals: ResMut<Globals>,
     keyboard_input: Res<Input<KeyCode>>,
+    mut event_reader: EventReader<UiButton>,
 ) {
+    for ui_button in event_reader.iter() {
+        //
+        let mut pressed_rescale_button = false;
+        let mut zoom_direction = 0.0;
+        //
+        if ui_button == &UiButton::ScaleUp {
+            pressed_rescale_button = true;
+            zoom_direction = 1.0;
+        } else if ui_button == &UiButton::ScaleDown {
+            pressed_rescale_button = true;
+            zoom_direction = -1.0;
+        }
+        if pressed_rescale_button {
+            let zoom_factor = 1.0 + zoom_direction * 0.1;
+            globals.scale = globals.scale * zoom_factor;
+
+            // the bounding box, the ends and the control points share the same shader parameters
+            for mut transform in grandparent_query.iter_mut() {
+                transform.scale = Vec2::new(globals.scale, globals.scale).extend(1.0);
+            }
+
+            // update the shader params for the middle quads (animated quads)
+            for shader_handle in shader_param_query.iter() {
+                let shader_param = my_shaders.get_mut(shader_handle).unwrap();
+                shader_param.zoom = 0.15 / globals.scale;
+                shader_param.size *= 1.0 / zoom_factor;
+            }
+        }
+    }
+
     for event in mouse_wheel_events.iter() {
         if keyboard_input.pressed(KeyCode::LControl) {
             let zoom_factor = 1.0 + event.y * 0.1;
