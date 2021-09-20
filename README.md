@@ -9,7 +9,8 @@ TODO:
 
 | Icon | Keys | Description |
 | --- | --- | --- |
-| None | Left Control + Mousescroll | Scale UI and curves up and down |
+| ![scale_up](https://user-images.githubusercontent.com/6177048/134077683-37d31efb-32d7-4c8a-895e-e5fe7b143c03.png) | Left Control + Mousescroll up | Scale UI and curves up |
+| ![scale_down](https://user-images.githubusercontent.com/6177048/134077757-31701bb7-baed-462a-8256-522eea95ec45.png) | Left Control + Mousescroll down | Scale UI and curves down |
 | ![spawn](https://user-images.githubusercontent.com/6177048/133933744-aafdf2cd-9c56-4310-8704-4baa73e376b6.png) | Left Shift + Click | Spawn curve |
 | ![group](https://user-images.githubusercontent.com/6177048/133933726-dd9394b8-7742-491f-88a3-43d4a06a2967.png) | Left Control + G | Group selected curves |
 | ![select](https://user-images.githubusercontent.com/6177048/133933742-63a11995-ceee-4747-8910-e0210a4fc277.png) | Left Control + Click | Select curves by clicking on either its start anchor or its end anchor |
@@ -30,4 +31,6 @@ TODO:
 
 
 
+
 ![bevy_pen_tool](https://user-images.githubusercontent.com/6177048/133936336-c9bc8a18-a54e-4fc6-a068-bf765d833d49.gif)
+
