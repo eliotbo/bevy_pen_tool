@@ -9,8 +9,8 @@ TODO:
 
 | Icon | Keys | Description |
 | --- | --- | --- |
-| ![scale_up](https://user-images.githubusercontent.com/6177048/134077683-37d31efb-32d7-4c8a-895e-e5fe7b143c03.png) | Left Control + Mousescroll up | Scale UI and curves up |
-| ![scale_down](https://user-images.githubusercontent.com/6177048/134077757-31701bb7-baed-462a-8256-522eea95ec45.png) | Left Control + Mousescroll down | Scale UI and curves down |
+| ![scale_up](https://user-images.githubusercontent.com/6177048/134087619-89ea602c-dca0-478e-8653-0dba7a50d1d5.png) | Left Control + Mousescroll up | Scale UI and curves up |
+| ![scale_down](https://user-images.githubusercontent.com/6177048/134087639-8434a081-270b-49c2-a220-7eb196621c94.png) | Left Control + Mousescroll down | Scale UI and curves down |
 | ![spawn](https://user-images.githubusercontent.com/6177048/133933744-aafdf2cd-9c56-4310-8704-4baa73e376b6.png) | Left Shift + Click | Spawn curve |
 | ![group](https://user-images.githubusercontent.com/6177048/133933726-dd9394b8-7742-491f-88a3-43d4a06a2967.png) | Left Control + G | Group selected curves |
 | ![select](https://user-images.githubusercontent.com/6177048/133933742-63a11995-ceee-4747-8910-e0210a4fc277.png) | Left Control + Click | Select curves by clicking on either its start anchor or its end anchor |
@@ -22,6 +22,8 @@ TODO:
 |![undo](https://user-images.githubusercontent.com/6177048/133933750-47820fb4-8e1b-4a57-aa4a-e60fa3bee66c.png) | Left Control + Z | Delete the curve that was spawned last (does not keep track of anchor and control point movement) |
 | ![redo](https://user-images.githubusercontent.com/6177048/133933739-a72e308d-c2d7-4ecc-a9cc-daf0b19fa0d6.png) | Left Control + Left Shift + Z | Respawn the curve that was deleted last with "undo" |
 | ![toggle_sound](https://user-images.githubusercontent.com/6177048/133933748-4769bd96-f6c6-4863-9de5-e283f614b6f4.png) | None | Toggle sound |
+
+
 
 
 
