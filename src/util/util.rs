@@ -114,10 +114,16 @@ pub struct ColorButton {
     pub size: Vec2,
 }
 
-// #[derive(Clone)]
-// struct BezierCurves {
-//     curves: Vec<Bezier>,
-// }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LutSaveLoad {
+    pub lut: Vec<((f64, f64), Vec<f64>)>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupSaveLoad {
+    // the AnchorEdge corresponds to first anchor encountered when traversing the group
+    pub curves: Vec<(AnchorEdge, Bezier)>,
+}
 
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "1e08866c-0b8a-484e-8bce-31333b21137e"]
@@ -125,10 +131,20 @@ pub struct Group {
     pub group: HashSet<(Entity, Handle<Bezier>)>,
     pub handles: HashSet<Handle<Bezier>>,
     pub ends: Option<Vec<(Handle<Bezier>, AnchorEdge)>>,
+    // the tuple (f64, f64) represents (t_min, t_max), the min and max t-values for the curve
     pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), Vec<f64>)>,
 }
 
 impl Group {
+    pub fn into_group_save(&self, bezier_curves: &mut ResMut<Assets<Bezier>>) -> GroupSaveLoad {
+        let mut curves = Vec::new();
+        for (handle, anchor, _, _) in self.lut.iter() {
+            let bezier = bezier_curves.get(handle.clone()).unwrap();
+            curves.push((anchor.clone(), bezier.clone()));
+        }
+        GroupSaveLoad { curves }
+    }
+
     pub fn find_connected_ends(
         &mut self,
         bezier_curves: &mut ResMut<Assets<Bezier>>,

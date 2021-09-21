@@ -5,8 +5,8 @@ use crate::spawner::spawn_bezier;
 use crate::util::{
     get_close_anchor, get_close_anchor_entity, get_close_still_anchor, Anchor, AnchorEdge, Bezier,
     BoundingBoxQuad, ColorButton, ControlPointQuad, EndpointQuad, Globals, GrandParent, Group,
-    LatchData, MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, SoundStruct, UiAction,
-    UiBoard,
+    GroupBoxQuad, GroupSaveLoad, LatchData, MiddlePointQuad, MyShader, OfficialLatch,
+    SelectionBoxQuad, SoundStruct, UiAction, UiBoard,
 };
 
 // use crate::util::*;
@@ -555,6 +555,8 @@ pub fn save(
     keyboard_input: Res<Input<KeyCode>>,
     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
+    group_query: Query<&Handle<Group>, With<GroupBoxQuad>>,
+    groups: Res<Assets<Group>>,
     mut event_reader: EventReader<UiButton>,
     // mut event_writer: EventWriter<Handle<Group>>,
     // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
@@ -572,18 +574,33 @@ pub fn save(
     {
         let mut vec: Vec<Bezier> = Vec::new();
         for bezier_handle in query.iter() {
-            let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
+            let bezier = bezier_curves.get(bezier_handle).unwrap();
 
             vec.push(bezier.clone());
         }
 
         let serialized = serde_json::to_string_pretty(&vec).unwrap();
 
-        let path = "bezier.txt";
+        let path = "curves.txt";
         let mut output = File::create(path).unwrap();
         let _result = output.write(serialized.as_bytes());
 
-        println!("{:?}", "saved Bezier curves");
+        println!("{:?}", "saved individual Bezier curves");
+
+        let mut group_vec = Vec::new();
+        for group_handle in group_query.iter() {
+            let group = groups.get(group_handle).unwrap();
+
+            group_vec.push(group.into_group_save(&mut bezier_curves));
+        }
+
+        let serialized = serde_json::to_string_pretty(&group_vec).unwrap();
+
+        let path = "curve_groups.txt";
+        let mut output = File::create(path).unwrap();
+        let _result = output.write(serialized.as_bytes());
+
+        println!("{:?}", "saved groups");
     }
 }
 
@@ -591,6 +608,7 @@ pub fn load(
     keyboard_input: Res<Input<KeyCode>>,
     query: Query<Entity, With<BoundingBoxQuad>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut groups: ResMut<Assets<Group>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
@@ -628,19 +646,42 @@ pub fn load(
         globals.do_hide_anchors = false;
         globals.do_hide_bounding_boxes = true;
 
-        for mut bezier in loaded_bezier_vec {
-            spawn_bezier(
-                &mut bezier,
-                &mut bezier_curves,
-                &mut commands,
-                &mut meshes,
-                // &mut pipelines,
-                &mut my_shader_params,
-                clearcolor,
-                &mut globals,
-            )
+        // for mut bezier in loaded_bezier_vec {
+        //     spawn_bezier(
+        //         &mut bezier,
+        //         &mut bezier_curves,
+        //         &mut commands,
+        //         &mut meshes,
+        //         // &mut pipelines,
+        //         &mut my_shader_params,
+        //         clearcolor,
+        //         &mut globals,
+        //     )
+        // }
+        // println!("{:?}", "loaded Bezier curves");
+
+        let path = "curve_groups.txt";
+        let mut file = std::fs::File::open(path).unwrap();
+
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+        let loaded_groups_vec: Vec<GroupSaveLoad> = serde_json::from_str(&contents).unwrap();
+
+        for group_load_save in loaded_groups_vec {
+            for (_anchor, mut bezier) in group_load_save.curves {
+                spawn_bezier(
+                    &mut bezier,
+                    &mut bezier_curves,
+                    &mut commands,
+                    &mut meshes,
+                    // &mut pipelines,
+                    &mut my_shader_params,
+                    clearcolor,
+                    &mut globals,
+                );
+            }
         }
-        println!("{:?}", "loaded Bezier curves");
+        println!("{:?}", "loaded groups");
     }
 }
 
