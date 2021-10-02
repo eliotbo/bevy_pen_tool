@@ -1,6 +1,7 @@
 use super::buttons::{ButtonState, UiButton};
 use super::inputs::Cursor;
 use crate::spawner::spawn_bezier;
+use crate::GroupMiddleQuad;
 
 use crate::util::{
     get_close_anchor, get_close_anchor_entity, get_close_still_anchor, Anchor, AnchorEdge, Bezier,
@@ -293,15 +294,22 @@ pub fn groupy(
     keyboard_input: Res<Input<KeyCode>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
-    mut event_reader: EventReader<UiButton>,
+    group_query: Query<(Entity, &Handle<Group>), Or<(With<GroupBoxQuad>, With<GroupMiddleQuad>)>>,
+    mut ui_event_reader: EventReader<UiButton>,
+    mut group_event_reader: EventReader<Group>,
     mut event_writer: EventWriter<Handle<Group>>,
     audio: Res<Audio>,
     // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 ) {
     let mut pressed_group_button = false;
-    for ui_button in event_reader.iter() {
+    for ui_button in ui_event_reader.iter() {
         pressed_group_button = ui_button == &UiButton::Group;
         break;
+    }
+
+    // TODO: replace globals.selected by the value passed in the event
+    for _group in group_event_reader.iter() {
+        pressed_group_button = true;
     }
 
     if !globals.selected.group.is_empty()
@@ -320,6 +328,7 @@ pub fn groupy(
 
         // abort grouping if the selection is not completely connected with latches
         if selected.ends.is_none() {
+            println!("Cannot group. Select multiple latched curves to successfully group");
             return;
         }
 
@@ -330,10 +339,23 @@ pub fn groupy(
         }
 
         selected.group_lut(&mut bezier_curves, id_handle_map.clone());
+        selected.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
 
-        for (entity, handle) in query.iter() {
-            if selected.handles.contains(handle) {
+        // get rid of the middle point quads
+        for (entity, bezier_handle) in query.iter() {
+            if selected.handles.contains(bezier_handle) {
                 commands.entity(entity).despawn();
+            }
+        }
+
+        // get rid of the current group before making a new one
+        for (entity, group_handle) in group_query.iter() {
+            let group = groups.get(group_handle).unwrap();
+            for bezier_handle in group.handles.clone() {
+                if selected.handles.contains(&bezier_handle) {
+                    commands.entity(entity).despawn();
+                    break;
+                }
             }
         }
 
@@ -343,13 +365,44 @@ pub fn groupy(
     }
 }
 
+// pub fn ungroup(
+//     mut commands: Commands,
+//     mut groups: ResMut<Assets<Group>>,
+//     globals: ResMut<Globals>,
+//     keyboard_input: Res<Input<KeyCode>>,
+//     mut bezier_curves: ResMut<Assets<Bezier>>,
+//     query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
+//     mut ui_event_reader: EventReader<UiButton>,
+//     mut group_event_reader: EventReader<Group>,
+//     mut event_writer: EventWriter<Handle<Group>>,
+//     audio: Res<Audio>,
+// ) {
+//     if !globals.selected.group.is_empty()
+//         && (keyboard_input.pressed(KeyCode::LControl)
+//             && keyboard_input.just_pressed(KeyCode::G)
+//             && keyboard_input.pressed(KeyCode::LShift)
+//             && !keyboard_input.pressed(KeyCode::Space))
+//     {
+//         let mut selected = globals.selected.clone();
+//         for bezier_handle in selected.handles {
+//             for (idx, group) in groups.clone().iter().enumerate() {
+//                 for handle_in_group in group.handles {
+
+//                 }
+//             }
+//         }
+//     }
+// }
+
 pub fn delete(
     keyboard_input: Res<Input<KeyCode>>,
     mut commands: Commands,
     mut globals: ResMut<Globals>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut groups: ResMut<Assets<Group>>,
     mut visible_query: Query<&mut Visible, With<SelectionBoxQuad>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+    query2: Query<(Entity, &Handle<Group>), With<GroupBoxQuad>>,
 ) {
     if keyboard_input.pressed(KeyCode::Delete) {
         // println!("{:?}", globals.selected.clone());
@@ -366,6 +419,16 @@ pub fn delete(
                 latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
 
                 if &handle == bezier_handle {
+                    commands.entity(entity).despawn_recursive();
+                }
+            }
+        }
+
+        for (entity, group_handle) in query2.iter() {
+            //
+            let group = groups.get(group_handle).unwrap();
+            for (_entity_selected, bezier_handle) in globals.selected.group.clone() {
+                if group.handles.contains(&bezier_handle) {
                     commands.entity(entity).despawn_recursive();
                 }
             }
@@ -556,7 +619,7 @@ pub fn save(
     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     group_query: Query<&Handle<Group>, With<GroupBoxQuad>>,
-    groups: Res<Assets<Group>>,
+    mut groups: ResMut<Assets<Group>>,
     mut event_reader: EventReader<UiButton>,
     // mut event_writer: EventWriter<Handle<Group>>,
     // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
@@ -575,8 +638,9 @@ pub fn save(
         let mut vec: Vec<Bezier> = Vec::new();
         for bezier_handle in query.iter() {
             let bezier = bezier_curves.get(bezier_handle).unwrap();
-
-            vec.push(bezier.clone());
+            let mut bezier_clone = bezier.clone();
+            bezier_clone.lut = Vec::new();
+            vec.push(bezier_clone);
         }
 
         let serialized = serde_json::to_string_pretty(&vec).unwrap();
@@ -589,9 +653,15 @@ pub fn save(
 
         let mut group_vec = Vec::new();
         for group_handle in group_query.iter() {
-            let group = groups.get(group_handle).unwrap();
+            let group = groups.get_mut(group_handle).unwrap();
 
-            group_vec.push(group.into_group_save(&mut bezier_curves));
+            group.compute_standalone_lut(&mut bezier_curves, 100);
+            let lut_serialized = serde_json::to_string_pretty(&group.standalone_lut).unwrap();
+            let lut_path = "group_lut.txt";
+            let mut lut_output = File::create(lut_path).unwrap();
+            let _lut_result = lut_output.write(lut_serialized.as_bytes());
+
+            group_vec.push(group.into_group_save(&mut bezier_curves).clone());
         }
 
         let serialized = serde_json::to_string_pretty(&group_vec).unwrap();
@@ -606,7 +676,7 @@ pub fn save(
 
 pub fn load(
     keyboard_input: Res<Input<KeyCode>>,
-    query: Query<Entity, With<BoundingBoxQuad>>,
+    query: Query<Entity, Or<(With<BoundingBoxQuad>, With<GroupBoxQuad>)>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut groups: ResMut<Assets<Group>>,
     mut commands: Commands,
@@ -616,7 +686,7 @@ pub fn load(
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
     mut event_reader: EventReader<UiButton>,
-    // mut event_writer: EventWriter<Handle<Group>>,
+    mut event_writer: EventWriter<Group>,
     // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 ) {
     let mut pressed_load_button = false;
@@ -639,6 +709,7 @@ pub fn load(
         file.read_to_string(&mut contents).unwrap();
         let loaded_bezier_vec: Vec<Bezier> = serde_json::from_str(&contents).unwrap();
 
+        // delete all current groups and curves before spawning the saved ones
         for entity in query.iter() {
             commands.entity(entity).despawn_recursive();
         }
@@ -667,9 +738,19 @@ pub fn load(
         file.read_to_string(&mut contents).unwrap();
         let loaded_groups_vec: Vec<GroupSaveLoad> = serde_json::from_str(&contents).unwrap();
 
+        let mut group = Group {
+            group: HashSet::new(),
+            handles: HashSet::new(),
+            lut: Vec::new(),
+            ends: None,
+            standalone_lut: (0.0, Vec::new()),
+        };
+
+        println!("group_load_save length: {:?}", loaded_groups_vec.len());
+
         for group_load_save in loaded_groups_vec {
             for (_anchor, mut bezier) in group_load_save.curves {
-                spawn_bezier(
+                let entity_and_handle = spawn_bezier(
                     &mut bezier,
                     &mut bezier_curves,
                     &mut commands,
@@ -679,8 +760,14 @@ pub fn load(
                     clearcolor,
                     &mut globals,
                 );
+                group.group.insert(entity_and_handle.clone());
+                group.handles.insert(entity_and_handle.1);
             }
         }
+        globals.selected = group.clone();
+        event_writer.send(group);
+        // to create a group: select all the curves programmatically, and send a UiButton::Group event
+
         println!("{:?}", "loaded groups");
     }
 }
@@ -840,6 +927,7 @@ pub fn rescale(
     mut event_reader: EventReader<UiButton>,
 ) {
     for ui_button in event_reader.iter() {
+        //
         //
         let mut pressed_rescale_button = false;
         let mut zoom_direction = 0.0;

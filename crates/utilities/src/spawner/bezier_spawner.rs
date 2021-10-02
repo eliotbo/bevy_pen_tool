@@ -88,7 +88,7 @@ pub fn spawn_bezier_system(
             &mut my_shader_params,
             clearcolor,
             &mut globals,
-        )
+        );
     }
 }
 
@@ -101,7 +101,7 @@ pub fn spawn_bezier(
     my_shader_params: &mut ResMut<Assets<MyShader>>,
     clearcolor: Color,
     globals: &mut ResMut<Globals>,
-) {
+) -> (Entity, Handle<Bezier>) {
     let curve0 = bezier.to_curve();
 
     bezier.lut = compute_lut(curve0, 100);
@@ -340,4 +340,6 @@ pub fn spawn_bezier(
 
         commands.entity(parent).push_children(&[child]);
     }
+
+    return (parent, bezier_handle);
 }

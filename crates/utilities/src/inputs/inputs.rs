@@ -52,10 +52,8 @@ pub fn record_mouse_events_system(
     mouse_button_input: Res<Input<MouseButton>>,
     mut cursor_res: ResMut<Cursor>,
     mut windows: ResMut<Windows>,
-    // mut cam_query: Query<(&Cam, &Transform)>,
     cam_transform_query: Query<&Transform, With<Cam>>,
     cam_ortho_query: Query<&OrthographicProjection>,
-    // globals: Res<Globals>,
 ) {
     for event in cursor_moved_events.iter() {
         let cursor_in_pixels = event.position; // lower left is origin

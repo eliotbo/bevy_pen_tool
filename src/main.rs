@@ -1,14 +1,13 @@
-mod cam;
-mod inputs;
-mod moves;
-mod plugin;
-mod spawner;
-mod util;
+// use utilities::cam::{Cam, CamPlugin};
+// use utilities::plugin::PenPlugin;
 
-use cam::{Cam, CamPlugin};
-use plugin::PenPlugin;
+use utilities::*;
 
 use bevy::{prelude::*, render::camera::OrthographicProjection};
+
+use std::fs::File;
+// use std::io::Read;
+use std::io::Write;
 
 // TODO:
 // 1. Attach UI to a UI camera
@@ -21,6 +20,7 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 // 14. make undo/redo work for moving anchors and control points
 // 15. make compatible with a projective perspective
 // 16. Add RControl and RShift to keys
+// 17. Disable move anchors and control points when hiding
 
 fn main() {
     App::new()
@@ -28,6 +28,7 @@ fn main() {
         .add_startup_system(camera_setup)
         .add_plugin(CamPlugin)
         .add_plugin(PenPlugin)
+        .add_system(save_group)
         .run();
 }
 
@@ -41,9 +42,25 @@ fn camera_setup(mut commands: Commands) {
                 far: 100000.0,
                 near: -100000.0,
                 // top: 115.0,
+                // dummy
                 ..Default::default()
             },
             ..OrthographicCameraBundle::new_2d()
         })
         .insert(Cam::default());
+}
+//
+//
+//
+
+pub fn save_group(
+    keyboard_input: Res<Input<KeyCode>>,
+    query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+    mut bezier_curves: ResMut<Assets<Bezier>>,
+    group_query: Query<&Handle<Group>, With<GroupBoxQuad>>,
+    groups: Res<Assets<Group>>,
+    mut event_reader: EventReader<UiButton>,
+    // mut event_writer: EventWriter<Handle<Group>>,
+    // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+) {
 }

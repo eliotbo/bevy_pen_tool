@@ -59,14 +59,17 @@ pub fn move_middle_quads(
                 let t_time = (t as f64 + time.seconds_since_startup() * 0.1) % 1.0;
                 shader_params.t = t_time as f32;
 
-                let idx_f64 = t_time * (bezier.lut.len() - 1) as f64;
-                let p1 = bezier.lut[(idx_f64 as usize)];
-                let p2 = bezier.lut[idx_f64 as usize + 1];
-                //
-                // TODO: is the minus one useful here?
-                let rem = (idx_f64 - 1.0) % 1.0;
-                let t_distance = interpolate(p1, p2, rem);
+                // let idx_f64 = t_time * (bezier.lut.len() - 1) as f64;
+                // let p1 = bezier.lut[(idx_f64 as usize)];
+                // let p2 = bezier.lut[idx_f64 as usize + 1];
+                // //
+                // // TODO: is the minus one useful here?
+                // let rem = (idx_f64 - 1.0) % 1.0;
+                // let t_distance = interpolate(p1, p2, rem);
+
                 use flo_curves::bezier::BezierCurve;
+
+                let t_distance = bezier.compute_real_distance(t_time);
                 let pos = curve.point_at_pos(t_distance);
 
                 transform.translation.x = pos.0 as f32;
@@ -117,7 +120,8 @@ pub fn move_group_middle_quads(
             shader_params.t = t_time as f32;
             // println!("time: {:?}", t_time);
 
-            let pos = group.compute_position(&bezier_curves, t_time);
+            let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
+            // let pos = group.compute_position_with_lut(t_time as f32);
 
             transform.translation.x = pos.x;
             transform.translation.y = pos.y;

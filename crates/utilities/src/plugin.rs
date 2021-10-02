@@ -1,4 +1,5 @@
-// use crate::cam::Cam;
+use crate::cam::Cam;
+
 use crate::inputs::{
     begin_move_on_mouseclick, button_system, check_mouse_on_ui, delete, groupy, hide_anchors,
     latch2, load, officiate_latch_partnership, pick_color, record_mouse_events_system, redo,
@@ -15,6 +16,22 @@ use crate::spawner::{
 };
 use crate::util::*;
 
+// use utilities::inputs::{
+//     begin_move_on_mouseclick, button_system, check_mouse_on_ui, delete, groupy, hide_anchors,
+//     latch2, load, officiate_latch_partnership, pick_color, record_mouse_events_system, redo,
+//     rescale, save, selection, spawn_curve_order_on_mouseclick, toggle_sound, undo, Cursor, Latch,
+//     UiButton,
+// };
+// use utilities::moves::{
+//     move_bb_quads, move_control_quads, move_end_quads, move_group_middle_quads, move_middle_quads,
+//     move_ui,
+// };
+// use utilities::spawner::{
+//     spawn_bezier_system, spawn_group_bounding_box, spawn_group_middle_quads,
+//     spawn_selection_bounding_box, spawn_ui,
+// };
+// use utilities::util::*;
+
 use bevy::{
     prelude::*,
     render::{
@@ -28,12 +45,16 @@ use bevy::{
 use std::{thread, time};
 
 pub struct PenPlugin;
+//
+//
+//
 
 impl Plugin for PenPlugin {
     fn build(&self, app: &mut App) {
         app.add_asset::<MyShader>()
             .add_asset::<Bezier>()
             .add_asset::<Group>()
+            .add_event::<Group>()
             .add_event::<OfficialLatch>()
             .add_event::<Latch>()
             .add_event::<UiButton>()
@@ -72,8 +93,20 @@ impl Plugin for PenPlugin {
                     .label("spawn_bezier")
                     .after("move_curve"),
             )
-            .add_system(spawn_group_middle_quads.system().after("move_curve"))
-            .add_system(spawn_group_bounding_box.system().after("move_curve"))
+            .add_system(
+                spawn_group_middle_quads
+                    .system()
+                    .label("group_mid")
+                    .after("spawn_bezier"),
+            )
+            .add_system(
+                spawn_group_bounding_box
+                    .system()
+                    .label("spawn_group")
+                    .after("group_mid"),
+            )
+            .add_system(groupy.system().after("spawn_group").label("groupy"))
+            .add_system(load.system().after("groupy"))
             .add_system(
                 change_ends_and_controls_params
                     .system()
@@ -95,13 +128,11 @@ impl Plugin for PenPlugin {
             .add_system(undo.system())
             .add_system(redo.system())
             .add_system(selection.system().label("selection"))
-            .add_system(groupy.system())
             .add_system(adjust_selection_attributes.system())
             .add_system(adjust_group_attributes.system())
             .add_system(hide_anchors.system())
             .add_system(do_long_lut.system().label("long_lut"))
             .add_system(save.system().after("long_lut"))
-            .add_system(load.system())
             .add_system(delete.system().label("delete"))
             .add_system(tests.system())
             .add_system(button_system.after("mouse_color"))
@@ -110,15 +141,19 @@ impl Plugin for PenPlugin {
     }
 }
 
-fn tests(keyboard_input: Res<Input<KeyCode>>, groups: ResMut<Assets<Group>>) {
+fn tests(
+    keyboard_input: Res<Input<KeyCode>>,
+    groups: ResMut<Assets<Group>>,
+    globals: Res<Globals>,
+) {
     if keyboard_input.just_pressed(KeyCode::V) {
-        for (id, group) in groups.iter() {
-            let lut = group.lut.clone();
-            let minmax: Vec<(&Handle<Bezier>, &AnchorEdge, &(f64, f64))> = lut
-                .iter()
-                .map(|(handle, anchor, ts, _lu)| (handle, anchor, ts))
-                .collect();
-            println!("{:?} ---- {:?}", id, minmax);
+        println!(
+            "number of selected curves: {:?} ",
+            globals.selected.group.len()
+        );
+        println!("number of groups: {:?} ", groups.len());
+        for group in groups.iter() {
+            println!("number of curves in group: {:?} ", group.1.group.len());
         }
     }
 }

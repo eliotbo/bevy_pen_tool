@@ -1,18 +1,12 @@
 [package]
-name = "bevy_pen_tool"
+name = "utilities"
 version = "0.1.0"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-
-[workspace]
-members = ["crates/*"]
-
 [dependencies]
 bevy = { version = "0.5", git = "https://github.com/bevyengine/bevy", rev="615d43b", default-features = true }
-
-utilities = { path = "crates/utilities", version = "0.1.0" }
 
 strum  = "0.21.0"
 strum_macros = "0.21"

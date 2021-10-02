@@ -133,16 +133,46 @@ pub struct Group {
     pub ends: Option<Vec<(Handle<Bezier>, AnchorEdge)>>,
     // the tuple (f64, f64) represents (t_min, t_max), the min and max t-values for the curve
     pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), Vec<f64>)>,
+    pub standalone_lut: (f32, Vec<Vec2>),
 }
 
 impl Group {
     pub fn into_group_save(&self, bezier_curves: &mut ResMut<Assets<Bezier>>) -> GroupSaveLoad {
         let mut curves = Vec::new();
         for (handle, anchor, _, _) in self.lut.iter() {
-            let bezier = bezier_curves.get(handle.clone()).unwrap();
+            let mut bezier = bezier_curves.get(handle.clone()).unwrap().clone();
+            bezier.lut = Vec::new();
             curves.push((anchor.clone(), bezier.clone()));
         }
         GroupSaveLoad { curves }
+    }
+
+    pub fn compute_standalone_lut(
+        &mut self,
+        bezier_curves: &ResMut<Assets<Bezier>>,
+        num_points: u32,
+    ) {
+        let mut total_length: f32 = 0.0;
+        for lut in self.lut.clone() {
+            let bezier = bezier_curves.get(lut.0).unwrap();
+            total_length += bezier.length();
+        }
+
+        let vrange: Vec<f32> = (0..num_points)
+            .map(|x| ((x) as f32) / (num_points as f32 - 1.0))
+            .collect();
+
+        let mut standalone_lut: (f32, Vec<Vec2>) = (total_length, Vec::new());
+        for t in vrange {
+            standalone_lut
+                .1
+                .push(self.compute_position_with_bezier(bezier_curves, t as f64));
+        }
+
+        self.standalone_lut = standalone_lut;
+
+        //todo: find data structure for standalone_lut that makes more sense
+        // standalone_lut: (f32, Vec<Vec2>), where standalone_lut.0 = total_length
     }
 
     pub fn find_connected_ends(
@@ -190,6 +220,7 @@ impl Group {
 
         let mut num_con = 0;
 
+        // TODO: only consider curves that are selected
         for anchor in anchors.clone() {
             num_con += 1;
             let mut latch = initial_bezier.latches[&anchor].get(0).unwrap();
@@ -282,7 +313,14 @@ impl Group {
                     ));
 
                     if let Some(next_latch) = bezier_next.latches[&next_edge].get(0) {
-                        latch = next_latch;
+                        if self
+                            .handles
+                            .contains(id_handle_map.get(&next_latch.latched_to_id).unwrap())
+                        {
+                            latch = next_latch;
+                        } else {
+                            found_connection = false;
+                        }
                     } else {
                         found_connection = false;
                     }
@@ -302,11 +340,17 @@ impl Group {
                 group_lut.push((handle, anchor, t_m, lut));
                 min_t = max_t;
             }
+
+            // update the look-up table
             self.lut = group_lut.clone();
         }
     }
 
-    pub fn compute_position(&self, bezier_curves: &ResMut<Assets<Bezier>>, t: f64) -> Vec2 {
+    pub fn compute_position_with_bezier(
+        &self,
+        bezier_curves: &ResMut<Assets<Bezier>>,
+        t: f64,
+    ) -> Vec2 {
         let mut curve_index = 0;
         let mut pos = Vec2::ZERO;
         for (_handle, _anchor, (t_min, t_max), _lut) in &self.lut {
@@ -342,6 +386,16 @@ impl Group {
 
         return pos;
     }
+
+    pub fn compute_position_with_lut(&self, t: f32) -> Vec2 {
+        let lut = self.standalone_lut.1.clone();
+        let idx_f64 = t * (lut.len() - 1) as f32;
+        let p1 = lut[(idx_f64 as usize)];
+        let p2 = lut[idx_f64 as usize + 1];
+        let rem = idx_f64 % 1.0;
+        let position = interpolate_vec2(p1, p2, rem);
+        return position;
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -361,6 +415,7 @@ pub struct Globals {
     pub selected: Group,
     pub sounds: HashMap<&'static str, Handle<AudioSource>>,
     pub sound_on: bool,
+    pub group_lut_num_points: u32,
     // pub groups: Vec<Group>,
 }
 
@@ -383,9 +438,11 @@ impl Default for Globals {
                 handles: HashSet::new(),
                 lut: Vec::new(),
                 ends: None,
+                standalone_lut: (0.0, Vec::new()),
             },
             sounds: HashMap::new(),
             sound_on: true,
+            group_lut_num_points: 100,
             // groups: Vec::new(),
         }
     }
@@ -747,6 +804,17 @@ impl Bezier {
         let bound1 = Vec2::new(bx as f32, by as f32);
         return (bound0, bound1);
     }
+
+    pub fn compute_real_distance(&self, t: f64) -> f64 {
+        let idx_f64 = t * (self.lut.len() - 1) as f64;
+        let p1 = self.lut[(idx_f64 as usize)];
+        let p2 = self.lut[idx_f64 as usize + 1];
+        //
+        // TODO: is the minus one useful here?
+        let rem = (idx_f64 - 1.0) % 1.0;
+        let t_distance = interpolate(p1, p2, rem);
+        return t_distance;
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -786,6 +854,10 @@ impl FromWorld for ButtonMaterials {
 }
 
 pub fn interpolate(p0: f64, p1: f64, rem: f64) -> f64 {
+    return p0 + rem * (p1 - p0);
+}
+
+pub fn interpolate_vec2(p0: Vec2, p1: Vec2, rem: f32) -> Vec2 {
     return p0 + rem * (p1 - p0);
 }
 
@@ -1067,6 +1139,7 @@ pub fn recompute_lut_upon_change(
                 if group.handles.contains(bezier_handle) {
                     let id_handle_map = globals.id_handle_map.clone();
                     group.group_lut(&mut bezier_curves, id_handle_map);
+                    group.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
                 }
             }
             // bezier.move_quad.just_created = false;

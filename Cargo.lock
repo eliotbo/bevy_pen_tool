@@ -447,6 +447,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_pen_tool"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "flo_curves",
+ "itertools",
+ "rand",
+ "serde",
+ "serde_json",
+ "strum",
+ "strum_macros",
+ "utilities",
+]
+
+[[package]]
 name = "bevy_reflect"
 version = "0.5.0"
 source = "git+https://github.com/bevyengine/bevy?rev=615d43b#615d43b9989c45cdd310d4bea1aaa3fc285b2782"
@@ -2473,20 +2488,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 
 [[package]]
-name = "pen_test3"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "flo_curves",
- "itertools",
- "rand",
- "serde",
- "serde_json",
- "strum",
- "strum_macros",
-]
-
-[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3200,6 +3201,20 @@ name = "unicode-xid"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
+
+[[package]]
+name = "utilities"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "flo_curves",
+ "itertools",
+ "rand",
+ "serde",
+ "serde_json",
+ "strum",
+ "strum_macros",
+]
 
 [[package]]
 name = "uuid"

@@ -147,7 +147,8 @@ pub fn spawn_group_middle_quads(
         // let mut k = 0;
 
         for t in vrange {
-            let pos = group.compute_position(&bezier_curves, t as f64);
+            // let pos = group.compute_position_with_bezier(&bezier_curves, t as f64);
+            let pos = group.compute_position_with_lut(t as f32);
 
             let mid_shader_params_handle = my_shader_params.add(MyShader {
                 color,
