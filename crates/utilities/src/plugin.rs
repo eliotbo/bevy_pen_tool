@@ -20,6 +20,7 @@ use crate::inputs::{
     selection,
     send_action,
     toggle_ui_button,
+    unselect,
     // redo, undo,
     Action,
     Cursor,
@@ -146,6 +147,7 @@ impl Plugin for PenPlugin {
             // .add_system(undo.system())
             // .add_system(redo.system())
             .add_system(selection.system().label("selection"))
+            .add_system(unselect)
             .add_system(adjust_selection_attributes.system())
             .add_system(adjust_group_attributes.system())
             .add_system(hide_anchors.system())

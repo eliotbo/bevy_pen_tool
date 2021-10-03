@@ -6,6 +6,7 @@ use utilities::*;
 use bevy::{prelude::*, render::camera::OrthographicProjection};
 
 // TODO:
+// -1. Save/Load is broken -> wobble in loaded groups
 // 0. Make independent of camera
 // 1. Attach UI to a UI camera
 // 4. Collapse the color UI

@@ -2,7 +2,7 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 use crate::cam::Cam;
 use crate::util::{
     get_close_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad, ColorButton, Globals,
-    GrandParent, LatchData, MyShader, UiAction, UiBoard,
+    GrandParent, LatchData, MyShader, SelectionBoxQuad, UiAction, UiBoard,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -50,6 +50,7 @@ impl Cursor {
     }
 }
 
+#[derive(PartialEq)]
 pub enum Action {
     Latch,
     Redo,
@@ -58,6 +59,7 @@ pub enum Action {
     Save,
     Group,
     Select,
+    Unselect,
     Detach,
     SpawnCurve,
     HideAnchors,
@@ -85,6 +87,7 @@ pub fn send_action(
             UiButton::Save => action_event_writer.send(Action::Save),
             UiButton::Group => action_event_writer.send(Action::Group),
             UiButton::Selection => action_event_writer.send(Action::Select),
+
             UiButton::Detach => action_event_writer.send(Action::Detach),
             UiButton::SpawnCurve => action_event_writer.send(Action::SpawnCurve),
             UiButton::Hide => action_event_writer.send(Action::HideAnchors),
@@ -97,6 +100,7 @@ pub fn send_action(
     }
 
     let mouse_just_pressed = mouse_button_input.just_pressed(MouseButton::Left);
+    let mouse_pressed = mouse_button_input.pressed(MouseButton::Left);
     let mut mouse_wheel_up = false;
     let mut mouse_wheel_down = false;
     if let Some(mouse_wheel) = mouse_wheel_events.iter().next() {
@@ -109,7 +113,7 @@ pub fn send_action(
     }
 
     // only used for pattern matching
-    let _control_only = (false, true, false);
+    // let _control_only = (false, true, false);
     let _pressed_g = keyboard_input.just_pressed(KeyCode::G);
     let _pressed_h = keyboard_input.just_pressed(KeyCode::H);
     let _pressed_s = keyboard_input.just_pressed(KeyCode::S);
@@ -125,18 +129,18 @@ pub fn send_action(
         keyboard_input.pressed(KeyCode::Space),
     ) {
         (true, false, false) if mouse_just_pressed => action_event_writer.send(Action::SpawnCurve),
-        (true, true, false) if mouse_just_pressed => action_event_writer.send(Action::Latch),
+        (true, true, false) if mouse_pressed => action_event_writer.send(Action::Latch),
         (false, false, true) if mouse_just_pressed => action_event_writer.send(Action::Detach),
-        _control_only if mouse_just_pressed => action_event_writer.send(Action::Select),
-        _control_only if _pressed_g => action_event_writer.send(Action::Group),
-        _control_only if _pressed_h => action_event_writer.send(Action::HideAnchors),
+        (false, true, false) if mouse_just_pressed => action_event_writer.send(Action::Select),
+        (false, true, false) if _pressed_g => action_event_writer.send(Action::Group),
+        (false, true, false) if _pressed_h => action_event_writer.send(Action::HideAnchors),
         (true, true, false) if _pressed_h => action_event_writer.send(Action::HideControls),
-        _control_only if _pressed_s => action_event_writer.send(Action::Save),
-        _control_only if _pressed_l => action_event_writer.send(Action::Load),
-        _control_only if _pressed_z => action_event_writer.send(Action::Undo),
+        (false, true, false) if _pressed_s => action_event_writer.send(Action::Save),
+        (false, true, false) if _pressed_l => action_event_writer.send(Action::Load),
+        (false, true, false) if _pressed_z => action_event_writer.send(Action::Undo),
         (true, true, false) if _pressed_z => action_event_writer.send(Action::Redo),
-        _control_only if mouse_wheel_up => action_event_writer.send(Action::ScaleUp),
-        _control_only if mouse_wheel_down => action_event_writer.send(Action::ScaleDown),
+        (false, true, false) if mouse_wheel_up => action_event_writer.send(Action::ScaleUp),
+        (false, true, false) if mouse_wheel_down => action_event_writer.send(Action::ScaleDown),
         (false, false, false) if _pressed_delete => action_event_writer.send(Action::Delete),
         (true, false, false) if _pressed_t => action_event_writer.send(Action::ComputeLut),
         _ => {}
@@ -254,9 +258,11 @@ pub fn check_mouse_on_canvas(
     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     globals: ResMut<Globals>,
     mut move_event_writer: EventWriter<MoveAnchor>,
+    mut action_event_writer: EventWriter<Action>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Left)
         && !keyboard_input.pressed(KeyCode::LShift)
+        && !keyboard_input.pressed(KeyCode::LControl)
         && !globals.do_hide_anchors
         && !globals.do_spawn_curve
     {
@@ -267,27 +273,17 @@ pub fn check_mouse_on_canvas(
             &query,
             globals.scale,
         ) {
-            let mut bezier = bezier_curves.get_mut(handle.clone()).unwrap();
+            let unlatch = !keyboard_input.pressed(KeyCode::LShift)
+                && !keyboard_input.pressed(KeyCode::LControl)
+                && keyboard_input.pressed(KeyCode::Space);
 
-            let chose_a_control_point =
-                anchor == Anchor::ControlStart || anchor == Anchor::ControlEnd;
-            let hidden_controls = globals.hide_control_points;
-
-            // order to move the quad that was clicked on
-            if anchor != Anchor::None && !(chose_a_control_point && hidden_controls) {
-                bezier.move_quad = anchor;
-
-                bezier.update_previous_pos();
-                let unlatch = !keyboard_input.pressed(KeyCode::LShift)
-                    && !keyboard_input.pressed(KeyCode::LControl)
-                    && keyboard_input.pressed(KeyCode::Space);
-
-                move_event_writer.send(MoveAnchor {
-                    handle,
-                    anchor,
-                    unlatch,
-                })
-            }
+            move_event_writer.send(MoveAnchor {
+                handle,
+                anchor,
+                unlatch,
+            })
+        } else {
+            action_event_writer.send(Action::Unselect);
         }
     }
 

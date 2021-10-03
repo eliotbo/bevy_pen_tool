@@ -75,32 +75,13 @@ pub fn recompute_lut(
 }
 
 // unlatch is part of this function
-// TODO: make an independent system for unlatching
 pub fn begin_move_on_mouseclick(
-    keyboard_input: Res<Input<KeyCode>>,
-    mut cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     globals: ResMut<Globals>,
-    button_query: Query<(&ButtonState, &UiButton, &Handle<MyShader>)>,
-    mut action_event_reader: EventReader<Action>,
     mut move_event_reader: EventReader<MoveAnchor>,
     audio: Res<Audio>,
 ) {
-    // if mouse_button_input.just_pressed(MouseButton::Left)
-    //     && !globals.do_spawn_curve
-    //     && !globals.do_hide_anchors
-    // {
     let mut latch_partners: Vec<LatchData> = Vec::new();
-
-    //     if let Some((_distance, anchor, handle)) = get_close_anchor(
-    //         3.0 * globals.scale,
-    //         cursor.position,
-    //         &bezier_curves,
-    //         &query,
-    //         globals.scale,
-    //     ) {
 
     if let Some(move_anchor) = move_event_reader.iter().next() {
         let mut bezier = bezier_curves.get_mut(move_anchor.handle.clone()).unwrap();
@@ -162,92 +143,71 @@ pub fn begin_move_on_mouseclick(
 pub fn selection(
     mut globals: ResMut<Globals>,
     cursor: ResMut<Cursor>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    keyboard_input: Res<Input<KeyCode>>,
     bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
     mut visible_selection_query: Query<&mut Visible, With<SelectionBoxQuad>>,
     group_query: Query<&Handle<Group>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
-    button_query: Query<(&ButtonState, &UiButton)>,
-    ui_query: Query<&UiBoard>,
+    mut action_event_reader: EventReader<Action>,
 ) {
-    // avoids selection if the click is on the UI
-    let mut clicked_on_ui = false;
-    for ui_board in ui_query.iter() {
-        if ui_board.action != UiAction::None {
-            clicked_on_ui = true;
-            break;
-        }
-    }
-
-    if mouse_button_input.just_pressed(MouseButton::Left) && !clicked_on_ui {
-        //
-        let mut selection_button_on = false;
-        for (button_state, ui_button) in button_query.iter() {
-            if ui_button == &UiButton::Selection {
-                selection_button_on = button_state == &ButtonState::On;
-            }
-        }
-
-        if !globals.do_spawn_curve
-            && !keyboard_input.pressed(KeyCode::LShift)
-            && !keyboard_input.pressed(KeyCode::Space)
-            && (keyboard_input.pressed(KeyCode::LControl) || selection_button_on)
-        {
-            if let Some((_distance, _anchor, entity, selected_handle)) = get_close_anchor_entity(
-                2.0 * globals.scale,
-                cursor.position,
-                &bezier_curves,
-                &query,
-                globals.scale,
-            ) {
-                // if the selected quad is part of a group, show group selection
-                for group_handle in group_query.iter() {
-                    let group = groups.get(group_handle).unwrap();
-                    //
-                    if group.handles.contains(&selected_handle) {
-                        globals.selected = group.clone();
-                        for mut visible in visible_selection_query.iter_mut() {
-                            visible.is_visible = true;
-                        }
-
-                        return ();
+    if let Some(Action::Select) = action_event_reader.iter().next() {
+        println!("select");
+        if let Some((_distance, _anchor, entity, selected_handle)) = get_close_anchor_entity(
+            2.0 * globals.scale,
+            cursor.position,
+            &bezier_curves,
+            &query,
+            globals.scale,
+        ) {
+            // if the selected quad is part of a group, show group selection
+            for group_handle in group_query.iter() {
+                let group = groups.get(group_handle).unwrap();
+                //
+                if group.handles.contains(&selected_handle) {
+                    globals.selected = group.clone();
+                    for mut visible in visible_selection_query.iter_mut() {
+                        visible.is_visible = true;
                     }
+
+                    return ();
                 }
-
-                let selected_entity = entity.clone();
-
-                // add the selected quad to the selected group
-                globals
-                    .selected
-                    .group
-                    .insert((selected_entity.clone(), selected_handle.clone()));
-
-                globals.selected.handles.insert(selected_handle.clone());
-
-                // these will be computed when a group order has been emitted
-                globals.selected.ends = None;
-                globals.selected.lut = Vec::new();
-
-                for mut visible in visible_selection_query.iter_mut() {
-                    visible.is_visible = true;
-                }
-                // println!("selectd: {:?}", &globals.selected);
             }
-        } else if !globals.do_spawn_curve
-            && !keyboard_input.pressed(KeyCode::LControl)
-            && !keyboard_input.pressed(KeyCode::LShift)
-            && !keyboard_input.pressed(KeyCode::Space)
-        {
-            globals.selected.group = HashSet::new();
-            globals.selected.handles = HashSet::new();
+
+            let selected_entity = entity.clone();
+
+            // add the selected quad to the selected group
+            globals
+                .selected
+                .group
+                .insert((selected_entity.clone(), selected_handle.clone()));
+
+            globals.selected.handles.insert(selected_handle.clone());
+
+            // these will be computed when a group order has been emitted
             globals.selected.ends = None;
             globals.selected.lut = Vec::new();
 
             for mut visible in visible_selection_query.iter_mut() {
-                visible.is_visible = false;
+                visible.is_visible = true;
             }
+            // println!("selectd: {:?}", &globals.selected);
+        }
+    }
+}
+
+pub fn unselect(
+    mut globals: ResMut<Globals>,
+    mut visible_selection_query: Query<&mut Visible, With<SelectionBoxQuad>>,
+    mut action_event_reader: EventReader<Action>,
+) {
+    if let Some(Action::Unselect) = action_event_reader.iter().next() {
+        globals.selected.group = HashSet::new();
+        globals.selected.handles = HashSet::new();
+        globals.selected.ends = None;
+        globals.selected.lut = Vec::new();
+
+        for mut visible in visible_selection_query.iter_mut() {
+            visible.is_visible = false;
         }
     }
 }
@@ -256,34 +216,36 @@ pub fn groupy(
     mut commands: Commands,
     mut groups: ResMut<Assets<Group>>,
     globals: ResMut<Globals>,
-    keyboard_input: Res<Input<KeyCode>>,
+    // keyboard_input: Res<Input<KeyCode>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
     group_query: Query<(Entity, &Handle<Group>), Or<(With<GroupBoxQuad>, With<GroupMiddleQuad>)>>,
-    mut ui_event_reader: EventReader<UiButton>,
-    mut group_event_reader: EventReader<Group>,
+    // mut ui_event_reader: EventReader<UiButton>,
+    // mut group_event_reader: EventReader<Group>,
     mut event_writer: EventWriter<Handle<Group>>,
+    mut action_event_reader: EventReader<Action>,
     audio: Res<Audio>,
     // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 ) {
-    let mut pressed_group_button = false;
-    for ui_button in ui_event_reader.iter() {
-        pressed_group_button = ui_button == &UiButton::Group;
-        break;
-    }
+    // let mut pressed_group_button = false;
+    // for ui_button in ui_event_reader.iter() {
+    //     pressed_group_button = ui_button == &UiButton::Group;
+    //     break;
+    // }
 
-    // TODO: replace globals.selected by the value passed in the event
-    for _group in group_event_reader.iter() {
-        pressed_group_button = true;
-    }
+    // // TODO: replace globals.selected by the value passed in the event
+    // for _group in group_event_reader.iter() {
+    //     pressed_group_button = true;
+    // }
 
-    if !globals.selected.group.is_empty()
-        && (pressed_group_button
-            || (keyboard_input.pressed(KeyCode::LControl)
-                && keyboard_input.just_pressed(KeyCode::G)
-                && !keyboard_input.pressed(KeyCode::LShift)
-                && !keyboard_input.pressed(KeyCode::Space)))
-    {
+    // if !globals.selected.group.is_empty()
+    //     && (pressed_group_button
+    //         || (keyboard_input.pressed(KeyCode::LControl)
+    //             && keyboard_input.just_pressed(KeyCode::G)
+    //             && !keyboard_input.pressed(KeyCode::LShift)
+    //             && !keyboard_input.pressed(KeyCode::Space)))
+    // {
+    if let Some(Action::Group) = action_event_reader.iter().next() {
         let id_handle_map: HashMap<u128, Handle<Bezier>> = globals.id_handle_map.clone();
 
         let mut selected = globals.selected.clone();
@@ -365,16 +327,18 @@ pub fn groupy(
 // }
 
 pub fn delete(
-    keyboard_input: Res<Input<KeyCode>>,
+    // keyboard_input: Res<Input<KeyCode>>,
     mut commands: Commands,
     mut globals: ResMut<Globals>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut groups: ResMut<Assets<Group>>,
+    groups: ResMut<Assets<Group>>,
     mut visible_query: Query<&mut Visible, With<SelectionBoxQuad>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
     query2: Query<(Entity, &Handle<Group>), With<GroupBoxQuad>>,
+    mut action_event_reader: EventReader<Action>,
 ) {
-    if keyboard_input.pressed(KeyCode::Delete) {
+    // if keyboard_input.pressed(KeyCode::Delete) {
+    if let Some(Action::Delete) = action_event_reader.iter().next() {
         // println!("{:?}", globals.selected.clone());
 
         // list of partners that need to be unlatched
@@ -540,21 +504,11 @@ pub fn delete(
 // }
 
 pub fn hide_anchors(
-    keyboard_input: Res<Input<KeyCode>>,
     mut globals: ResMut<Globals>,
     mut query: Query<&mut Visible, Or<(With<ControlPointQuad>, With<EndpointQuad>)>>,
-
-    mut event_reader: EventReader<UiButton>,
+    mut action_event_reader: EventReader<Action>,
 ) {
-    let mut pressed_hide_button = false;
-
-    for ui_button in event_reader.iter() {
-        pressed_hide_button = ui_button == &UiButton::Hide;
-        break;
-    }
-    if (!keyboard_input.pressed(KeyCode::LShift) && keyboard_input.just_pressed(KeyCode::H))
-        || pressed_hide_button
-    {
+    if let Some(Action::HideAnchors) = action_event_reader.iter().next() {
         globals.do_hide_anchors = !globals.do_hide_anchors;
         for mut visible in query.iter_mut() {
             visible.is_visible = !globals.do_hide_anchors;
@@ -563,20 +517,11 @@ pub fn hide_anchors(
 }
 
 pub fn hide_control_points(
-    keyboard_input: Res<Input<KeyCode>>,
     mut globals: ResMut<Globals>,
     mut query_control: Query<&mut Visible, With<ControlPointQuad>>,
-    mut event_reader: EventReader<UiButton>,
+    mut action_event_reader: EventReader<Action>,
 ) {
-    let mut pressed_hide_control_points = false;
-    for ui_button in event_reader.iter() {
-        pressed_hide_control_points = ui_button == &UiButton::HideControls;
-        break;
-    }
-
-    if (keyboard_input.pressed(KeyCode::LShift) && keyboard_input.just_pressed(KeyCode::H))
-        || pressed_hide_control_points
-    {
+    if let Some(Action::HideControls) = action_event_reader.iter().next() {
         globals.hide_control_points = !globals.hide_control_points;
         for mut visible in query_control.iter_mut() {
             visible.is_visible = !globals.hide_control_points;
@@ -611,27 +556,16 @@ pub fn hide_control_points(
 // }
 
 pub fn save(
-    keyboard_input: Res<Input<KeyCode>>,
+    // keyboard_input: Res<Input<KeyCode>>,
     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     group_query: Query<&Handle<Group>, With<GroupBoxQuad>>,
     mut groups: ResMut<Assets<Group>>,
-    mut event_reader: EventReader<UiButton>,
+    // mut event_reader: EventReader<UiButton>,
     globals: ResMut<Globals>,
-    // mut event_writer: EventWriter<Handle<Group>>,
-    // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+    mut action_event_reader: EventReader<Action>,
 ) {
-    let mut pressed_save_button = false;
-    for ui_button in event_reader.iter() {
-        pressed_save_button = ui_button == &UiButton::Save;
-        break;
-    }
-
-    if pressed_save_button
-        || (keyboard_input.pressed(KeyCode::LControl)
-            && keyboard_input.just_released(KeyCode::S)
-            && !keyboard_input.pressed(KeyCode::LShift))
-    {
+    if let Some(Action::Save) = action_event_reader.iter().next() {
         let mut vec: Vec<Bezier> = Vec::new();
         for bezier_handle in query.iter() {
             let bezier = bezier_curves.get(bezier_handle).unwrap();
@@ -672,31 +606,22 @@ pub fn save(
 }
 
 pub fn load(
-    keyboard_input: Res<Input<KeyCode>>,
+    // keyboard_input: Res<Input<KeyCode>>,
     query: Query<Entity, Or<(With<BoundingBoxQuad>, With<GroupBoxQuad>)>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut groups: ResMut<Assets<Group>>,
+    // mut groups: ResMut<Assets<Group>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
-    mut event_reader: EventReader<UiButton>,
+    // mut event_reader: EventReader<UiButton>,
     mut event_writer: EventWriter<Group>,
+    mut action_event_reader: EventReader<Action>,
     // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 ) {
-    let mut pressed_load_button = false;
-    for ui_button in event_reader.iter() {
-        pressed_load_button = ui_button == &UiButton::Load;
-        break;
-    }
-
-    if pressed_load_button
-        || (keyboard_input.pressed(KeyCode::LControl)
-            && keyboard_input.just_released(KeyCode::S)
-            && keyboard_input.pressed(KeyCode::LShift))
-    {
+    if let Some(Action::Load) = action_event_reader.iter().next() {
         let clearcolor = clearcolor_struct.0;
 
         let path = "bezier.txt";
@@ -704,7 +629,6 @@ pub fn load(
 
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
-        let loaded_bezier_vec: Vec<Bezier> = serde_json::from_str(&contents).unwrap();
 
         // delete all current groups and curves before spawning the saved ones
         for entity in query.iter() {
@@ -714,6 +638,7 @@ pub fn load(
         globals.do_hide_anchors = false;
         globals.do_hide_bounding_boxes = true;
 
+        // let loaded_bezier_vec: Vec<Bezier> = serde_json::from_str(&contents).unwrap();
         // for mut bezier in loaded_bezier_vec {
         //     spawn_bezier(
         //         &mut bezier,
@@ -770,9 +695,7 @@ pub fn load(
 }
 
 pub fn latch2(
-    keyboard_input: Res<Input<KeyCode>>,
     cursor: ResMut<Cursor>,
-    mouse_button_input: Res<Input<MouseButton>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: QuerySet<(
         QueryState<(&Handle<Bezier>, &BoundingBoxQuad)>,
@@ -780,23 +703,9 @@ pub fn latch2(
     )>,
     globals: ResMut<Globals>,
     mut event_writer: EventWriter<OfficialLatch>,
-    // mut event_reader: EventReader<UiButton>,
-    button_query: Query<(&ButtonState, &UiButton)>,
+    mut action_event_reader: EventReader<Action>,
 ) {
-    let mut latch_button_on = false;
-    for (button_state, ui_button) in button_query.iter() {
-        if ui_button == &UiButton::Latch {
-            latch_button_on = button_state == &ButtonState::On;
-        }
-    }
-
-    if !globals.do_spawn_curve
-        && (latch_button_on
-            || keyboard_input.pressed(KeyCode::LShift)
-                && keyboard_input.pressed(KeyCode::LControl)
-                && !keyboard_input.pressed(KeyCode::Space)
-                && mouse_button_input.pressed(MouseButton::Left))
-    {
+    if let Some(Action::Latch) = action_event_reader.iter().next() {
         let latching_distance = 5.0;
 
         let mut potential_mover: Option<(Vec2, u128, AnchorEdge, Handle<Bezier>)> = None;
@@ -918,21 +827,18 @@ pub fn rescale(
     mut grandparent_query: Query<&mut Transform, With<GrandParent>>,
     shader_param_query: Query<&Handle<MyShader>>,
     mut my_shaders: ResMut<Assets<MyShader>>,
-    mut mouse_wheel_events: EventReader<MouseWheel>,
     mut globals: ResMut<Globals>,
-    keyboard_input: Res<Input<KeyCode>>,
-    mut event_reader: EventReader<UiButton>,
+    mut action_event_reader: EventReader<Action>,
 ) {
-    for ui_button in event_reader.iter() {
-        //
+    for action in action_event_reader.iter() {
         //
         let mut pressed_rescale_button = false;
         let mut zoom_direction = 0.0;
         //
-        if ui_button == &UiButton::ScaleUp {
+        if action == &Action::ScaleUp {
             pressed_rescale_button = true;
             zoom_direction = 1.0;
-        } else if ui_button == &UiButton::ScaleDown {
+        } else if action == &Action::ScaleDown {
             pressed_rescale_button = true;
             zoom_direction = -1.0;
         }
@@ -940,24 +846,6 @@ pub fn rescale(
             let zoom_factor = 1.0 + zoom_direction * 0.1;
             globals.scale = globals.scale * zoom_factor;
 
-            // the bounding box, the ends and the control points share the same shader parameters
-            for mut transform in grandparent_query.iter_mut() {
-                transform.scale = Vec2::new(globals.scale, globals.scale).extend(1.0);
-            }
-
-            // update the shader params for the middle quads (animated quads)
-            for shader_handle in shader_param_query.iter() {
-                let shader_param = my_shaders.get_mut(shader_handle).unwrap();
-                shader_param.zoom = 0.15 / globals.scale;
-                shader_param.size *= 1.0 / zoom_factor;
-            }
-        }
-    }
-
-    for event in mouse_wheel_events.iter() {
-        if keyboard_input.pressed(KeyCode::LControl) {
-            let zoom_factor = 1.0 + event.y * 0.1;
-            globals.scale = globals.scale * zoom_factor;
             // the bounding box, the ends and the control points share the same shader parameters
             for mut transform in grandparent_query.iter_mut() {
                 transform.scale = Vec2::new(globals.scale, globals.scale).extend(1.0);
