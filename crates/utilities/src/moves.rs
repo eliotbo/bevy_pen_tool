@@ -120,8 +120,8 @@ pub fn move_group_middle_quads(
             shader_params.t = t_time as f32;
             // println!("time: {:?}", t_time);
 
-            // let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
-            let pos = group.compute_position_with_lut(t_time as f32);
+            let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
+            // let pos = group.compute_position_with_lut(t_time as f32);
 
             transform.translation.x = pos.x;
             transform.translation.y = pos.y;
@@ -199,7 +199,7 @@ pub fn move_end_quads(
                     transform.rotation = end_rotation;
                 }
 
-                bezier.do_compute_lut = true;
+                // bezier.do_compute_lut = true;
             }
         }
     }
@@ -246,8 +246,6 @@ pub fn move_control_quads(
                 transform.rotation = Quat::from_rotation_z(bezier_angle_90);
 
                 // println!("tac: {:?}, {:?}, {:?}", offset, rotated, id);
-
-                bezier.do_compute_lut = true;
             }
         }
     }

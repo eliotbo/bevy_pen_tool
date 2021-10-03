@@ -131,7 +131,7 @@ pub fn begin_move_on_mouseclick(
             // order to move the quad that was clicked on
             if anchor != Anchor::None && !(chose_a_control_point && hidden_controls) {
                 bezier.move_quad = anchor;
-                bezier.do_compute_lut = true;
+
                 bezier.update_previous_pos();
 
                 // retrieve the detach (unlatch) button state

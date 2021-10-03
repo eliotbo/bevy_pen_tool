@@ -147,34 +147,6 @@ impl Group {
         GroupSaveLoad { curves }
     }
 
-    pub fn compute_standalone_lut(
-        &mut self,
-        bezier_curves: &ResMut<Assets<Bezier>>,
-        num_points: u32,
-    ) {
-        let mut total_length: f32 = 0.0;
-        for lut in self.lut.clone() {
-            let bezier = bezier_curves.get(lut.0).unwrap();
-            total_length += bezier.length();
-        }
-
-        let vrange: Vec<f32> = (0..num_points)
-            .map(|x| ((x) as f32) / (num_points as f32 - 1.0))
-            .collect();
-
-        let mut standalone_lut: (f32, Vec<Vec2>) = (total_length, Vec::new());
-        for t in vrange {
-            standalone_lut
-                .1
-                .push(self.compute_position_with_bezier(bezier_curves, t as f64));
-        }
-
-        self.standalone_lut = standalone_lut;
-
-        //todo: find data structure for standalone_lut that makes more sense
-        // standalone_lut: (f32, Vec<Vec2>), where standalone_lut.0 = total_length
-    }
-
     pub fn find_connected_ends(
         &mut self,
         bezier_curves: &mut ResMut<Assets<Bezier>>,
@@ -387,6 +359,33 @@ impl Group {
         return pos;
     }
 
+    pub fn compute_standalone_lut(
+        &mut self,
+        bezier_curves: &ResMut<Assets<Bezier>>,
+        num_points: u32,
+    ) {
+        let mut total_length: f32 = 0.0;
+        for lut in self.lut.clone() {
+            let bezier = bezier_curves.get(lut.0).unwrap();
+            total_length += bezier.length();
+        }
+
+        let vrange: Vec<f32> = (0..num_points)
+            .map(|x| ((x) as f32) / (num_points as f32 - 1.0))
+            .collect();
+
+        let mut standalone_lut: (f32, Vec<Vec2>) = (total_length, Vec::new());
+        for t in vrange {
+            standalone_lut
+                .1
+                .push(self.compute_position_with_bezier(bezier_curves, t as f64));
+        }
+
+        self.standalone_lut = standalone_lut;
+    }
+
+    // this is now used inside the plugin, but this would be the function used in
+    // an application where the look-up table (lut) would be loaded
     pub fn compute_position_with_lut(&self, t: f32) -> Vec2 {
         let lut = self.standalone_lut.1.clone();
         let idx_f64 = t * (lut.len() - 1) as f32;
@@ -1116,25 +1115,40 @@ pub fn adjust_group_attributes(
     }
 }
 
-pub fn recompute_lut_upon_change(
+pub fn recompute_lut(
+    keyboard_input: Res<Input<KeyCode>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     query_group: Query<&Handle<Group>>,
     mut groups: ResMut<Assets<Group>>,
+    mut ui_event_reader: EventReader<UiButton>,
     globals: ResMut<Globals>,
+    time: Res<Time>,
 ) {
-    for bezier_handle in query.iter_mut() {
-        let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap();
-        if bezier.do_compute_lut {
-            // println!("spending");
+    let mut pressed_lut_button = false;
+    for ui_button in ui_event_reader.iter() {
+        pressed_lut_button = ui_button == &UiButton::Lut;
+        break;
+    }
+
+    if pressed_lut_button
+        || (keyboard_input.pressed(KeyCode::LShift) && keyboard_input.just_pressed(KeyCode::T))
+    {
+        for bezier_handle in query.iter_mut() {
+            let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap();
+
             let bezier_c = bezier.to_coord2();
 
             let curve =
                 bezier::Curve::from_points(bezier_c.start, bezier_c.control_points, bezier_c.end);
 
-            let lut = compute_lut(curve, globals.group_lut_num_points as usize);
-
-            bezier.lut = lut;
+            let lut_option =
+                compute_lut_long(curve, globals.group_lut_num_points as usize, time.clone());
+            if let Some(lut) = lut_option {
+                bezier.lut = lut;
+            } else {
+                bezier.lut = compute_lut(curve, globals.group_lut_num_points as usize);
+            }
 
             bezier.do_compute_lut = false;
 
@@ -1205,7 +1219,7 @@ pub fn compute_lut(curve: Curve<Coord2>, num_sections: usize) -> Vec<f64> {
 }
 
 fn derivative(curve: Curve<Coord2>, t: f64, dist: f64) -> f64 {
-    let delta_t = 0.00000001;
+    let delta_t = 0.0000001;
     let d = 2.0
         * (curve.section(0.0, t).estimate_length() - dist)
         * (curve.section(0.0, t + delta_t / 2.0).estimate_length()
@@ -1216,9 +1230,15 @@ fn derivative(curve: Curve<Coord2>, t: f64, dist: f64) -> f64 {
 }
 
 // Computes a better look-up table using gradient descent with Nesterov acceleration
-pub fn compute_lut_long(curve: Curve<Coord2>, num_sections: usize, time: Time) -> Option<Vec<f64>> {
-    let time_at_start = time.seconds_since_startup();
-    let mut time_now;
+pub fn compute_lut_long(
+    curve: Curve<Coord2>,
+    num_sections: usize,
+    mut time: Time,
+) -> Option<Vec<f64>> {
+    // let time_at_start = time.seconds_since_startup();
+    time.update();
+    let mut total_time = 0.0;
+    // let mut time_now;
 
     // let section_lengths: Vec<f64> = Vec::new();
     let whole_distance = curve.estimate_length();
@@ -1227,14 +1247,14 @@ pub fn compute_lut_long(curve: Curve<Coord2>, num_sections: usize, time: Time) -
         .map(|x| (whole_distance * (x) as f64) / (num_sections as f64 - 1.0))
         .collect();
 
-    // generate plot
-    let f1 = Plot::from_function(|x| curve.section(0.0, x).estimate_length(), 0., 1.)
-        .line_style(LineStyle::new().colour("burlywood"));
+    // // generate plot
+    // let f1 = Plot::from_function(|x| curve.section(0.0, x).estimate_length(), 0., 1.)
+    //     .line_style(LineStyle::new().colour("burlywood"));
 
-    let v = ContinuousView::new().add(f1);
+    // let v = ContinuousView::new().add(f1);
 
-    Page::single(&v).save("function.svg").expect("saving svg");
-    println!("saving svg");
+    // Page::single(&v).save("function.svg").expect("saving svg");
+    // println!("saving svg");
 
     let eta0 = 0.00001;
     let mut eta;
@@ -1280,8 +1300,11 @@ pub fn compute_lut_long(curve: Curve<Coord2>, num_sections: usize, time: Time) -
 
             k = k + 1.0;
 
-            time_now = time.seconds_since_startup();
-            if (time_now - time_at_start) > 0.2 {
+            let delta_time = time.delta_seconds();
+            total_time += delta_time;
+            // println!("{:?}", total_time);
+            time.update();
+            if total_time > 0.2 {
                 return None;
             }
 

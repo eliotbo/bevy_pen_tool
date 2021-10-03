@@ -44,7 +44,7 @@ fn camera_setup(mut commands: Commands, mut globals: ResMut<Globals>) {
         })
         .insert(Cam::default());
 
-    globals.group_lut_num_points = 200;
+    globals.group_lut_num_points = 100;
 }
 
 fn tests(

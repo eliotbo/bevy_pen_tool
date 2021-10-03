@@ -134,7 +134,7 @@ impl Plugin for PenPlugin {
             .add_system(move_group_middle_quads.system().after("move_ends"))
             .add_system(move_control_quads.system().after("move_ends"))
             .add_system(move_bb_quads.system())
-            .add_system(recompute_lut_upon_change.system())
+            .add_system(recompute_lut.system())
             // .add_system(undo.system())
             // .add_system(redo.system())
             .add_system(selection.system().label("selection"))
