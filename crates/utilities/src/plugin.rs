@@ -1,36 +1,46 @@
 use crate::cam::Cam;
 
 use crate::inputs::{
-    begin_move_on_mouseclick, button_system, check_mouse_on_ui, delete, groupy, hide_anchors,
-    latch2, load, officiate_latch_partnership, pick_color, record_mouse_events_system, redo,
-    rescale, save, selection, spawn_curve_order_on_mouseclick, toggle_sound, undo, Cursor, Latch,
+    begin_move_on_mouseclick,
+    button_system,
+    check_mouse_on_ui,
+    delete,
+    groupy,
+    hide_anchors,
+    hide_control_points,
+    latch2,
+    load,
+    officiate_latch_partnership,
+    pick_color,
+    record_mouse_events_system,
+    rescale,
+    save,
+    selection,
+    spawn_curve_order_on_mouseclick,
+    toggle_ui_button,
+    Cursor,
+    Latch,
     UiButton,
+    // redo, undo,
 };
 use crate::moves::{
-    move_bb_quads, move_control_quads, move_end_quads, move_group_middle_quads, move_middle_quads,
+    move_bb_quads,
+    move_control_quads,
+    move_end_quads,
+    move_group_middle_quads,
+    move_middle_quads,
     move_ui,
+    //
 };
 use crate::spawner::{
-    spawn_bezier_system, spawn_group_bounding_box, spawn_group_middle_quads,
-    spawn_selection_bounding_box, spawn_ui,
+    spawn_bezier_system,
+    spawn_group_bounding_box,
+    spawn_group_middle_quads,
+    spawn_selection_bounding_box,
+    spawn_ui,
+    //
 };
 use crate::util::*;
-
-// use utilities::inputs::{
-//     begin_move_on_mouseclick, button_system, check_mouse_on_ui, delete, groupy, hide_anchors,
-//     latch2, load, officiate_latch_partnership, pick_color, record_mouse_events_system, redo,
-//     rescale, save, selection, spawn_curve_order_on_mouseclick, toggle_sound, undo, Cursor, Latch,
-//     UiButton,
-// };
-// use utilities::moves::{
-//     move_bb_quads, move_control_quads, move_end_quads, move_group_middle_quads, move_middle_quads,
-//     move_ui,
-// };
-// use utilities::spawner::{
-//     spawn_bezier_system, spawn_group_bounding_box, spawn_group_middle_quads,
-//     spawn_selection_bounding_box, spawn_ui,
-// };
-// use utilities::util::*;
 
 use bevy::{
     prelude::*,
@@ -125,36 +135,19 @@ impl Plugin for PenPlugin {
             .add_system(move_control_quads.system().after("move_ends"))
             .add_system(move_bb_quads.system())
             .add_system(recompute_lut_upon_change.system())
-            .add_system(undo.system())
-            .add_system(redo.system())
+            // .add_system(undo.system())
+            // .add_system(redo.system())
             .add_system(selection.system().label("selection"))
             .add_system(adjust_selection_attributes.system())
             .add_system(adjust_group_attributes.system())
             .add_system(hide_anchors.system())
-            .add_system(do_long_lut.system().label("long_lut"))
+            // .add_system(do_long_lut.system().label("long_lut"))
             .add_system(save.system().after("long_lut"))
             .add_system(delete.system().label("delete"))
-            .add_system(tests.system())
             .add_system(button_system.after("mouse_color"))
             .add_system(move_ui.system().label("move_ui").after("selection"))
-            .add_system(toggle_sound.system());
-    }
-}
-
-fn tests(
-    keyboard_input: Res<Input<KeyCode>>,
-    groups: ResMut<Assets<Group>>,
-    globals: Res<Globals>,
-) {
-    if keyboard_input.just_pressed(KeyCode::V) {
-        println!(
-            "number of selected curves: {:?} ",
-            globals.selected.group.len()
-        );
-        println!("number of groups: {:?} ", groups.len());
-        for group in groups.iter() {
-            println!("number of curves in group: {:?} ", group.1.group.len());
-        }
+            .add_system(toggle_ui_button.system())
+            .add_system(hide_control_points);
     }
 }
 

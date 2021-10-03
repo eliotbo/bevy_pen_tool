@@ -33,6 +33,7 @@ pub enum UiButton {
     Sound,
     ScaleUp,
     ScaleDown,
+    Controls,
 }
 
 pub fn button_system(

@@ -74,6 +74,7 @@ pub fn spawn_bezier_system(
             just_created: true,
             id: spawner_id,
             latches,
+            grouped: false,
             // latch_start,
             // latch_end: None,
         };

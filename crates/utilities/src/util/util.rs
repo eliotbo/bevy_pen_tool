@@ -22,10 +22,10 @@ use flo_curves::bezier::BezierCurve;
 use flo_curves::bezier::Curve;
 use flo_curves::*;
 
-// use plotlib::page::Page;
-// use plotlib::repr::Plot;
-// use plotlib::style::LineStyle;
-// use plotlib::view::ContinuousView;
+use plotlib::page::Page;
+use plotlib::repr::Plot;
+use plotlib::style::LineStyle;
+use plotlib::view::ContinuousView;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Copy, Hash)]
 pub enum AnchorEdge {
@@ -51,7 +51,7 @@ impl AnchorEdge {
 
 pub struct GrandParent;
 pub struct Icon;
-pub struct SoundStruct {
+pub struct OnOffMaterial {
     pub material: Handle<ColorMaterial>,
 }
 pub struct EndpointQuad(pub AnchorEdge);
@@ -415,6 +415,7 @@ pub struct Globals {
     pub selected: Group,
     pub sounds: HashMap<&'static str, Handle<AudioSource>>,
     pub sound_on: bool,
+    pub hide_control_points: bool,
     pub group_lut_num_points: u32,
     // pub groups: Vec<Group>,
 }
@@ -442,7 +443,8 @@ impl Default for Globals {
             },
             sounds: HashMap::new(),
             sound_on: true,
-            group_lut_num_points: 100,
+            hide_control_points: false,
+            group_lut_num_points: 500,
             // groups: Vec::new(),
         }
     }
@@ -503,6 +505,7 @@ pub struct Bezier {
     // pub latch_start: Option<LatchData>, // the u8 is 0 for control_start and 1 for control_end
     // pub latch_end: Option<LatchData>,
     pub latches: HashMap<AnchorEdge, Vec<LatchData>>,
+    pub grouped: bool,
 }
 
 impl Default for Bezier {
@@ -523,6 +526,7 @@ impl Default for Bezier {
             just_created: true,
             id: rng.gen(),
             latches,
+            grouped: false,
             // latch_start: None, // id of the latch partner if applicable
             // latch_end: None,
         }
@@ -1128,7 +1132,7 @@ pub fn recompute_lut_upon_change(
             let curve =
                 bezier::Curve::from_points(bezier_c.start, bezier_c.control_points, bezier_c.end);
 
-            let lut = compute_lut(curve, 1000);
+            let lut = compute_lut(curve, globals.group_lut_num_points as usize);
 
             bezier.lut = lut;
 
@@ -1148,28 +1152,28 @@ pub fn recompute_lut_upon_change(
     }
 }
 
-// Before saving the curves, we compute a lower-memory-and-higher-accuracy look-up table using accelerated gradient
-// descent
-pub fn do_long_lut(
-    keyboard_input: Res<Input<KeyCode>>,
-    query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    time: Res<Time>,
-) {
-    if keyboard_input.pressed(KeyCode::LControl) && keyboard_input.just_pressed(KeyCode::S) {
-        // let last_handle_option: Option<Handle<Bezier>> = None;
-        for handle in query.iter() {
-            let bezier = bezier_curves.get_mut(handle).unwrap();
-            let curve = bezier.to_curve();
-            if let Some(lut_gradient_descent) = compute_lut_long(curve, 100, time.clone()) {
-                bezier.lut = lut_gradient_descent;
-                // println!("computed LUT with accelerated  gradient descent");
-            } else {
-                println!("failed to find look-up table using accelerated gradient descent");
-            }
-        }
-    }
-}
+// // Before saving the curves, we compute a lower-memory-and-higher-accuracy look-up table using accelerated gradient
+// // descent
+// pub fn do_long_lut(
+//     keyboard_input: Res<Input<KeyCode>>,
+//     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+//     mut bezier_curves: ResMut<Assets<Bezier>>,
+//     time: Res<Time>,
+// ) {
+//     if keyboard_input.pressed(KeyCode::LControl) && keyboard_input.just_pressed(KeyCode::S) {
+//         // let last_handle_option: Option<Handle<Bezier>> = None;
+//         for handle in query.iter() {
+//             let bezier = bezier_curves.get_mut(handle).unwrap();
+//             let curve = bezier.to_curve();
+//             if let Some(lut_gradient_descent) = compute_lut_long(curve, 100, time.clone()) {
+//                 bezier.lut = lut_gradient_descent;
+//                 // println!("computed LUT with accelerated  gradient descent");
+//             } else {
+//                 println!("failed to find look-up table using accelerated gradient descent");
+//             }
+//         }
+//     }
+// }
 
 pub fn compute_lut(curve: Curve<Coord2>, num_sections: usize) -> Vec<f64> {
     let mut section_lengths: Vec<f64> = Vec::new();
@@ -1201,7 +1205,7 @@ pub fn compute_lut(curve: Curve<Coord2>, num_sections: usize) -> Vec<f64> {
 }
 
 fn derivative(curve: Curve<Coord2>, t: f64, dist: f64) -> f64 {
-    let delta_t = 0.0000001;
+    let delta_t = 0.00000001;
     let d = 2.0
         * (curve.section(0.0, t).estimate_length() - dist)
         * (curve.section(0.0, t + delta_t / 2.0).estimate_length()
@@ -1223,13 +1227,14 @@ pub fn compute_lut_long(curve: Curve<Coord2>, num_sections: usize, time: Time) -
         .map(|x| (whole_distance * (x) as f64) / (num_sections as f64 - 1.0))
         .collect();
 
-    // // generate plot
-    // let f1 = Plot::from_function(|x| curve.section(0.0, x).estimate_length(), 0., 1.)
-    //     .line_style(LineStyle::new().colour("burlywood"));
+    // generate plot
+    let f1 = Plot::from_function(|x| curve.section(0.0, x).estimate_length(), 0., 1.)
+        .line_style(LineStyle::new().colour("burlywood"));
 
-    // let v = ContinuousView::new().add(f1);
+    let v = ContinuousView::new().add(f1);
 
-    // Page::single(&v).save("function.svg").expect("saving svg");
+    Page::single(&v).save("function.svg").expect("saving svg");
+    println!("saving svg");
 
     let eta0 = 0.00001;
     let mut eta;

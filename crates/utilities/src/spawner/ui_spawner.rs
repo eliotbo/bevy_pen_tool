@@ -1,6 +1,6 @@
 use crate::inputs::{ButtonInteraction, ButtonState, UiButton};
 use crate::util::{
-    ColorButton, Globals, GrandParent, Icon, MyShader, SoundStruct, UiAction, UiBoard,
+    ColorButton, Globals, GrandParent, Icon, MyShader, OnOffMaterial, UiAction, UiBoard,
 };
 
 use bevy::{
@@ -586,87 +586,87 @@ pub fn spawn_ui(
     //
     //
     ///////////////////// undo button /////////////////////
-    let shader_params_undo = my_shader_params.add(MyShader {
-        color: Color::hex("4a4e4d").unwrap(),
-        size: button_size,
-        ..Default::default()
-    });
-    let undo_button = commands
-        .spawn_bundle(MeshBundle {
-            mesh: mesh_handle_button.clone(),
-            visible: visible_ui.clone(),
-            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                button_pipeline_handle.clone(),
-            )]),
-            transform: Transform::from_translation(Vec3::new(
-                -button_width * 1.5,
-                -button_width,
-                -430.0,
-            )),
-            ..Default::default()
-        })
-        .insert(ButtonInteraction::None)
-        .insert(shader_params_undo.clone())
-        .insert(UiButton::Undo)
-        .id();
+    // let shader_params_undo = my_shader_params.add(MyShader {
+    //     color: Color::hex("4a4e4d").unwrap(),
+    //     size: button_size,
+    //     ..Default::default()
+    // });
+    // let undo_button = commands
+    //     .spawn_bundle(MeshBundle {
+    //         mesh: mesh_handle_button.clone(),
+    //         visible: visible_ui.clone(),
+    //         render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+    //             button_pipeline_handle.clone(),
+    //         )]),
+    //         transform: Transform::from_translation(Vec3::new(
+    //             -button_width * 1.5,
+    //             -button_width,
+    //             -430.0,
+    //         )),
+    //         ..Default::default()
+    //     })
+    //     .insert(ButtonInteraction::None)
+    //     .insert(shader_params_undo.clone())
+    //     .insert(UiButton::Undo)
+    //     .id();
 
-    commands.entity(main_ui).push_children(&[undo_button]);
+    // commands.entity(main_ui).push_children(&[undo_button]);
 
-    let texture_handle = asset_server.load("textures/undo.png");
-    let undo_sprite = commands
-        .spawn_bundle(SpriteBundle {
-            material: materials.add(texture_handle.into()),
-            // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 11.0)),
-            sprite: Sprite::new(button_size / 1.3),
-            ..Default::default()
-        })
-        .id();
+    // let texture_handle = asset_server.load("textures/undo.png");
+    // let undo_sprite = commands
+    //     .spawn_bundle(SpriteBundle {
+    //         material: materials.add(texture_handle.into()),
+    //         // mesh: mesh_handle_button.clone(),
+    //         transform: Transform::from_translation(Vec3::new(0.0, 0.0, 11.0)),
+    //         sprite: Sprite::new(button_size / 1.3),
+    //         ..Default::default()
+    //     })
+    //     .id();
 
-    commands.entity(undo_button).push_children(&[undo_sprite]);
+    // commands.entity(undo_button).push_children(&[undo_sprite]);
 
     //
     //
     //
     ///////////////////// redo button /////////////////////
-    let shader_params_redo = my_shader_params.add(MyShader {
-        color: Color::hex("4a4e4d").unwrap(),
-        size: button_size,
-        ..Default::default()
-    });
-    let redo_button = commands
-        .spawn_bundle(MeshBundle {
-            mesh: mesh_handle_button.clone(),
-            visible: visible_ui.clone(),
-            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                button_pipeline_handle.clone(),
-            )]),
-            transform: Transform::from_translation(Vec3::new(
-                -button_width * 0.5,
-                -button_width,
-                -430.0,
-            )),
-            ..Default::default()
-        })
-        .insert(ButtonInteraction::None)
-        .insert(shader_params_redo.clone())
-        .insert(UiButton::Redo)
-        .id();
+    // let shader_params_redo = my_shader_params.add(MyShader {
+    //     color: Color::hex("4a4e4d").unwrap(),
+    //     size: button_size,
+    //     ..Default::default()
+    // });
+    // let redo_button = commands
+    //     .spawn_bundle(MeshBundle {
+    //         mesh: mesh_handle_button.clone(),
+    //         visible: visible_ui.clone(),
+    //         render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+    //             button_pipeline_handle.clone(),
+    //         )]),
+    //         transform: Transform::from_translation(Vec3::new(
+    //             -button_width * 0.5,
+    //             -button_width,
+    //             -430.0,
+    //         )),
+    //         ..Default::default()
+    //     })
+    //     .insert(ButtonInteraction::None)
+    //     .insert(shader_params_redo.clone())
+    //     .insert(UiButton::Redo)
+    //     .id();
 
-    commands.entity(main_ui).push_children(&[redo_button]);
+    // commands.entity(main_ui).push_children(&[redo_button]);
 
-    let texture_handle = asset_server.load("textures/redo.png");
-    let redo_sprite = commands
-        .spawn_bundle(SpriteBundle {
-            material: materials.add(texture_handle.into()),
-            // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 11.0)),
-            sprite: Sprite::new(button_size / 1.3),
-            ..Default::default()
-        })
-        .id();
+    // let texture_handle = asset_server.load("textures/redo.png");
+    // let redo_sprite = commands
+    //     .spawn_bundle(SpriteBundle {
+    //         material: materials.add(texture_handle.into()),
+    //         // mesh: mesh_handle_button.clone(),
+    //         transform: Transform::from_translation(Vec3::new(0.0, 0.0, 11.0)),
+    //         sprite: Sprite::new(button_size / 1.3),
+    //         ..Default::default()
+    //     })
+    //     .id();
 
-    commands.entity(redo_button).push_children(&[redo_sprite]);
+    // commands.entity(redo_button).push_children(&[redo_sprite]);
 
     //
     //
@@ -685,8 +685,8 @@ pub fn spawn_ui(
                 button_pipeline_handle.clone(),
             )]),
             transform: Transform::from_translation(Vec3::new(
-                button_width * 0.5,
-                button_width,
+                -button_width * 0.5,
+                -button_width,
                 -430.0,
             )),
             ..Default::default()
@@ -710,6 +710,56 @@ pub fn spawn_ui(
         .id();
 
     commands.entity(hide_button).push_children(&[hide_sprite]);
+
+    //
+    //
+    //
+    ///////////////////// controls button /////////////////////
+    let shader_params_controls = my_shader_params.add(MyShader {
+        color: Color::hex("4a4e4d").unwrap(),
+        size: button_size,
+        ..Default::default()
+    });
+    let controls_button = commands
+        .spawn_bundle(MeshBundle {
+            mesh: mesh_handle_button.clone(),
+            visible: visible_ui.clone(),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                button_pipeline_handle.clone(),
+            )]),
+            transform: Transform::from_translation(Vec3::new(
+                -button_width * 1.5,
+                -button_width,
+                -440.0,
+            )),
+            ..Default::default()
+        })
+        .insert(ButtonInteraction::None)
+        .insert(shader_params_controls.clone())
+        .insert(UiButton::Controls)
+        .id();
+
+    commands.entity(main_ui).push_children(&[controls_button]);
+
+    let on_material = asset_server.load("textures/controls_on.png");
+    let off_material = asset_server.load("textures/controls_off.png");
+    let controls_sprite = commands
+        .spawn_bundle(SpriteBundle {
+            material: materials.add(on_material.into()),
+            // mesh: mesh_handle_button.clone(),
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 11.0)),
+            sprite: Sprite::new(button_size / 1.3),
+            ..Default::default()
+        })
+        .insert(UiButton::Controls)
+        .insert(OnOffMaterial {
+            material: materials.add(off_material.into()),
+        })
+        .id();
+
+    commands
+        .entity(controls_button)
+        .push_children(&[controls_sprite]);
 
     //
     //
@@ -748,7 +798,7 @@ pub fn spawn_ui(
             ..Default::default()
         })
         .insert(UiButton::Sound)
-        .insert(SoundStruct {
+        .insert(OnOffMaterial {
             material: materials.add(off_material.into()),
         })
         .id();

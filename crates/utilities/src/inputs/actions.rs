@@ -7,7 +7,7 @@ use crate::util::{
     get_close_anchor, get_close_anchor_entity, get_close_still_anchor, Anchor, AnchorEdge, Bezier,
     BoundingBoxQuad, ColorButton, ControlPointQuad, EndpointQuad, Globals, GrandParent, Group,
     GroupBoxQuad, GroupSaveLoad, LatchData, MiddlePointQuad, MyShader, OfficialLatch,
-    SelectionBoxQuad, SoundStruct, UiAction, UiBoard,
+    OnOffMaterial, SelectionBoxQuad, UiAction, UiBoard,
 };
 
 // use crate::util::*;
@@ -95,6 +95,8 @@ pub fn pick_color(
     // }
 }
 
+// unlatch is part of this function
+// TODO: make an independent system for unlatching
 pub fn begin_move_on_mouseclick(
     keyboard_input: Res<Input<KeyCode>>,
     mut cursor: ResMut<Cursor>,
@@ -107,7 +109,10 @@ pub fn begin_move_on_mouseclick(
     button_query: Query<(&ButtonState, &UiButton, &Handle<MyShader>)>,
     audio: Res<Audio>,
 ) {
-    if mouse_button_input.just_pressed(MouseButton::Left) && !globals.do_spawn_curve {
+    if mouse_button_input.just_pressed(MouseButton::Left)
+        && !globals.do_spawn_curve
+        && !globals.do_hide_anchors
+    {
         let mut latch_partners: Vec<LatchData> = Vec::new();
 
         if let Some((_distance, anchor, handle)) = get_close_anchor(
@@ -119,8 +124,12 @@ pub fn begin_move_on_mouseclick(
         ) {
             let mut bezier = bezier_curves.get_mut(handle.clone()).unwrap();
 
+            let chose_a_control_point =
+                anchor == Anchor::ControlStart || anchor == Anchor::ControlEnd;
+            let hidden_controls = globals.hide_control_points;
+
             // order to move the quad that was clicked on
-            if anchor != Anchor::None {
+            if anchor != Anchor::None && !(chose_a_control_point && hidden_controls) {
                 bezier.move_quad = anchor;
                 bezier.do_compute_lut = true;
                 bezier.update_previous_pos();
@@ -132,8 +141,10 @@ pub fn begin_move_on_mouseclick(
                         detach_button_on = button_state == &ButtonState::On;
                     }
                 }
+
                 // order to unlatch the anchor if the user presses Space
-                if !keyboard_input.pressed(KeyCode::LShift)
+                if !bezier.grouped
+                    && !keyboard_input.pressed(KeyCode::LShift)
                     && !keyboard_input.pressed(KeyCode::LControl)
                     && (keyboard_input.pressed(KeyCode::Space) || detach_button_on)
                 {
@@ -359,6 +370,11 @@ pub fn groupy(
             }
         }
 
+        for bezier_handle in selected.handles.clone() {
+            let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
+            bezier.grouped = true;
+        }
+
         let group_handle = groups.add(selected);
         // spawn the middle quads and the bounding box
         event_writer.send(group_handle.clone());
@@ -463,124 +479,128 @@ pub fn delete(
     }
 }
 
-pub fn undo(
-    keyboard_input: Res<Input<KeyCode>>,
-    mut commands: Commands,
-    mut globals: ResMut<Globals>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut event_reader: EventReader<UiButton>,
-    query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
-) {
-    let mut pressed_undo_button = false;
-    for ui_button in event_reader.iter() {
-        pressed_undo_button = ui_button == &UiButton::Undo;
-        break;
-    }
+// pub fn undo(
+//     keyboard_input: Res<Input<KeyCode>>,
+//     mut commands: Commands,
+//     mut globals: ResMut<Globals>,
+//     mut bezier_curves: ResMut<Assets<Bezier>>,
+//     mut event_reader: EventReader<UiButton>,
+//     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+// ) {
+//     let mut pressed_undo_button = false;
+//     for ui_button in event_reader.iter() {
+//         pressed_undo_button = ui_button == &UiButton::Undo;
+//         break;
+//     }
 
-    if pressed_undo_button
-        || (keyboard_input.pressed(KeyCode::LControl)
-            && keyboard_input.just_pressed(KeyCode::Z)
-            && !keyboard_input.pressed(KeyCode::LShift))
-    {
-        // let mut latched_start: Vec<LatchData> = Vec::new();
-        // let mut latched_end: Vec<LatchData> = Vec::new();
-        let mut latches: Vec<Vec<LatchData>> = Vec::new();
+//     if pressed_undo_button
+//         || (keyboard_input.pressed(KeyCode::LControl)
+//             && keyboard_input.just_pressed(KeyCode::Z)
+//             && !keyboard_input.pressed(KeyCode::LShift))
+//     {
+//         // let mut latched_start: Vec<LatchData> = Vec::new();
+//         // let mut latched_end: Vec<LatchData> = Vec::new();
+//         let mut latches: Vec<Vec<LatchData>> = Vec::new();
 
-        if let Some((entity, bezier_handle)) = query.iter().last() {
-            globals.history.push(bezier_handle.clone());
+//         if let Some((entity, bezier_handle)) = query.iter().last() {
+//             globals.history.push(bezier_handle.clone());
 
-            let bezier = bezier_curves.get(bezier_handle).unwrap();
-            latches.push(bezier.latches[&AnchorEdge::Start].clone());
-            latches.push(bezier.latches[&AnchorEdge::End].clone());
+//             let bezier = bezier_curves.get(bezier_handle).unwrap();
+//             latches.push(bezier.latches[&AnchorEdge::Start].clone());
+//             latches.push(bezier.latches[&AnchorEdge::End].clone());
 
-            commands.entity(entity).despawn_recursive();
-        }
+//             commands.entity(entity).despawn_recursive();
+//         }
 
-        // This piece of code is shared with delete()
-        // unlatch partners of deleted curves
-        for latch_vec in latches {
-            //
-            if let Some(latch) = latch_vec.get(0) {
-                //
-                if let Some(handle) = globals.id_handle_map.get(&latch.latched_to_id) {
-                    //
-                    let bezier_partner = bezier_curves.get_mut(handle).unwrap();
-                    //
-                    if let Some(latch_local) = bezier_partner.latches.get_mut(&latch.partners_edge)
-                    {
-                        *latch_local = Vec::new();
-                        println!("deleted partner's latch {:?}", latch.partners_edge);
-                    }
-                }
-            }
-        }
-    }
-}
+//         // This piece of code is shared with delete()
+//         // unlatch partners of deleted curves
+//         for latch_vec in latches {
+//             //
+//             if let Some(latch) = latch_vec.get(0) {
+//                 //
+//                 if let Some(handle) = globals.id_handle_map.get(&latch.latched_to_id) {
+//                     //
+//                     let bezier_partner = bezier_curves.get_mut(handle).unwrap();
+//                     //
+//                     if let Some(latch_local) = bezier_partner.latches.get_mut(&latch.partners_edge)
+//                     {
+//                         *latch_local = Vec::new();
+//                         println!("deleted partner's latch {:?}", latch.partners_edge);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
-// Warning: undo followed by redo does not preserve the latch data
-// spawn_bezier() does not allow the end point to be latched
-pub fn redo(
-    keyboard_input: Res<Input<KeyCode>>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
-    clearcolor_struct: Res<ClearColor>,
-    mut globals: ResMut<Globals>,
-    mut event_reader: EventReader<UiButton>,
-) {
-    let mut pressed_redo_button = false;
-    for ui_button in event_reader.iter() {
-        pressed_redo_button = ui_button == &UiButton::Redo;
-        break;
-    }
+// // Warning: undo followed by redo does not preserve the latch data
+// // spawn_bezier() does not allow the end point to be latched
+// pub fn redo(
+//     keyboard_input: Res<Input<KeyCode>>,
+//     mut bezier_curves: ResMut<Assets<Bezier>>,
+//     mut commands: Commands,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
+//     mut my_shader_params: ResMut<Assets<MyShader>>,
+//     clearcolor_struct: Res<ClearColor>,
+//     mut globals: ResMut<Globals>,
+//     mut event_reader: EventReader<UiButton>,
+// ) {
+//     let mut pressed_redo_button = false;
+//     for ui_button in event_reader.iter() {
+//         pressed_redo_button = ui_button == &UiButton::Redo;
+//         break;
+//     }
 
-    if pressed_redo_button
-        || (keyboard_input.pressed(KeyCode::LControl)
-            && keyboard_input.just_pressed(KeyCode::Z)
-            && keyboard_input.pressed(KeyCode::LShift))
-    {
-        let clearcolor = clearcolor_struct.0;
-        let length = globals.history.len();
-        let mut should_remove_last_from_history = false;
-        if let Some(bezier_handle) = globals.history.last() {
-            should_remove_last_from_history = true;
-            let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap().clone();
-            bezier_curves.remove(bezier_handle);
-            globals.do_spawn_curve = false;
-            // println!("{:?}", bezier.color);
+//     if pressed_redo_button
+//         || (keyboard_input.pressed(KeyCode::LControl)
+//             && keyboard_input.just_pressed(KeyCode::Z)
+//             && keyboard_input.pressed(KeyCode::LShift))
+//     {
+//         let clearcolor = clearcolor_struct.0;
+//         let length = globals.history.len();
+//         let mut should_remove_last_from_history = false;
+//         if let Some(bezier_handle) = globals.history.last() {
+//             should_remove_last_from_history = true;
+//             let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap().clone();
+//             bezier_curves.remove(bezier_handle);
+//             globals.do_spawn_curve = false;
+//             // println!("{:?}", bezier.color);
 
-            spawn_bezier(
-                &mut bezier,
-                &mut bezier_curves,
-                &mut commands,
-                &mut meshes,
-                // &mut pipelines,
-                &mut my_shader_params,
-                clearcolor,
-                &mut globals,
-            );
-        }
+//             spawn_bezier(
+//                 &mut bezier,
+//                 &mut bezier_curves,
+//                 &mut commands,
+//                 &mut meshes,
+//                 // &mut pipelines,
+//                 &mut my_shader_params,
+//                 clearcolor,
+//                 &mut globals,
+//             );
+//         }
 
-        if should_remove_last_from_history {
-            globals.history.swap_remove(length - 1);
-        }
-    }
-}
+//         if should_remove_last_from_history {
+//             globals.history.swap_remove(length - 1);
+//         }
+//     }
+// }
 
 pub fn hide_anchors(
     keyboard_input: Res<Input<KeyCode>>,
     mut globals: ResMut<Globals>,
     mut query: Query<&mut Visible, Or<(With<ControlPointQuad>, With<EndpointQuad>)>>,
+
     mut event_reader: EventReader<UiButton>,
 ) {
     let mut pressed_hide_button = false;
+
     for ui_button in event_reader.iter() {
         pressed_hide_button = ui_button == &UiButton::Hide;
         break;
     }
-    if keyboard_input.just_pressed(KeyCode::H) || pressed_hide_button {
+    if (!keyboard_input.pressed(KeyCode::LShift) && keyboard_input.just_pressed(KeyCode::H))
+        || pressed_hide_button
+    {
         globals.do_hide_anchors = !globals.do_hide_anchors;
         for mut visible in query.iter_mut() {
             visible.is_visible = !globals.do_hide_anchors;
@@ -588,27 +608,83 @@ pub fn hide_anchors(
     }
 }
 
-pub fn toggle_sound(
+pub fn hide_control_points(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut globals: ResMut<Globals>,
+    mut query_control: Query<&mut Visible, With<ControlPointQuad>>,
+    mut event_reader: EventReader<UiButton>,
+) {
+    let mut pressed_hide_control_points = false;
+    for ui_button in event_reader.iter() {
+        pressed_hide_control_points = ui_button == &UiButton::Controls;
+        break;
+    }
+
+    if (keyboard_input.pressed(KeyCode::LShift) && keyboard_input.just_pressed(KeyCode::H))
+        || pressed_hide_control_points
+    {
+        globals.hide_control_points = !globals.hide_control_points;
+        for mut visible in query_control.iter_mut() {
+            visible.is_visible = !globals.hide_control_points;
+        }
+    }
+}
+
+// pub fn toggle_sound(
+//     // asset_server: Res<AssetServer>,
+//     mut globals: ResMut<Globals>,
+//     // mut materials: ResMut<Assets<ColorMaterial>>,
+//     mut query: Query<(&mut Handle<ColorMaterial>, &mut OnOffMaterial)>,
+//     mut event_reader: EventReader<UiButton>,
+// ) {
+//     for ui_button in event_reader.iter() {
+//         //
+//         if ui_button == &UiButton::Sound {
+//             //
+//             globals.sound_on = !globals.sound_on;
+//             //
+//             for (mut material_handle, mut on_off_mat) in query.iter_mut() {
+//                 // toggle sprite
+//                 use std::ops::DerefMut;
+//                 let other_material = on_off_mat.material.clone();
+//                 let current_material = material_handle.clone();
+//                 let mat = material_handle.deref_mut();
+//                 *mat = other_material.clone();
+//                 on_off_mat.material = current_material;
+//             }
+//         }
+//     }
+// }
+
+pub fn toggle_ui_button(
     // asset_server: Res<AssetServer>,
     mut globals: ResMut<Globals>,
     // mut materials: ResMut<Assets<ColorMaterial>>,
-    mut query: Query<(&mut Handle<ColorMaterial>, &mut SoundStruct)>,
+    mut query: Query<(&mut Handle<ColorMaterial>, &mut OnOffMaterial, &UiButton)>,
     mut event_reader: EventReader<UiButton>,
 ) {
     for ui_button in event_reader.iter() {
         //
-        if ui_button == &UiButton::Sound {
-            //
-            globals.sound_on = !globals.sound_on;
-            //
-            for (mut material_handle, mut soundstruct) in query.iter_mut() {
-                // toggle sprite
+        match ui_button {
+            &UiButton::Sound => {
+                //
+                globals.sound_on = !globals.sound_on;
+                //
+            }
+            &UiButton::Controls => {
+                // globals.hide_control_points = !globals.hide_control_points;
+            }
+            _ => {}
+        }
+        for (mut material_handle, mut on_off_mat, ui_button_queried) in query.iter_mut() {
+            // toggle sprite
+            if ui_button == ui_button_queried {
                 use std::ops::DerefMut;
-                let other_material = soundstruct.material.clone();
+                let other_material = on_off_mat.material.clone();
                 let current_material = material_handle.clone();
                 let mat = material_handle.deref_mut();
                 *mat = other_material.clone();
-                soundstruct.material = current_material;
+                on_off_mat.material = current_material;
             }
         }
     }
@@ -621,6 +697,7 @@ pub fn save(
     group_query: Query<&Handle<Group>, With<GroupBoxQuad>>,
     mut groups: ResMut<Assets<Group>>,
     mut event_reader: EventReader<UiButton>,
+    globals: ResMut<Globals>,
     // mut event_writer: EventWriter<Handle<Group>>,
     // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 ) {
@@ -655,7 +732,7 @@ pub fn save(
         for group_handle in group_query.iter() {
             let group = groups.get_mut(group_handle).unwrap();
 
-            group.compute_standalone_lut(&mut bezier_curves, 100);
+            group.compute_standalone_lut(&mut bezier_curves, globals.group_lut_num_points);
             let lut_serialized = serde_json::to_string_pretty(&group.standalone_lut).unwrap();
             let lut_path = "group_lut.txt";
             let mut lut_output = File::create(lut_path).unwrap();

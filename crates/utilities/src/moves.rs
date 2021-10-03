@@ -120,8 +120,8 @@ pub fn move_group_middle_quads(
             shader_params.t = t_time as f32;
             // println!("time: {:?}", t_time);
 
-            let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
-            // let pos = group.compute_position_with_lut(t_time as f32);
+            // let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
+            let pos = group.compute_position_with_lut(t_time as f32);
 
             transform.translation.x = pos.x;
             transform.translation.y = pos.y;
