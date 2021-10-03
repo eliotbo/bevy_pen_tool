@@ -3,6 +3,7 @@ use crate::cam::Cam;
 use crate::inputs::{
     begin_move_on_mouseclick,
     button_system,
+    check_mouse_on_canvas,
     check_mouse_on_ui,
     delete,
     groupy,
@@ -12,16 +13,20 @@ use crate::inputs::{
     load,
     officiate_latch_partnership,
     pick_color,
+    recompute_lut,
     record_mouse_events_system,
     rescale,
     save,
     selection,
-    spawn_curve_order_on_mouseclick,
+    send_action,
     toggle_ui_button,
+    // redo, undo,
+    Action,
     Cursor,
     Latch,
+    MoveAnchor,
+
     UiButton,
-    // redo, undo,
 };
 use crate::moves::{
     move_bb_quads,
@@ -34,6 +39,7 @@ use crate::moves::{
 };
 use crate::spawner::{
     spawn_bezier_system,
+    spawn_curve_order_on_mouseclick,
     spawn_group_bounding_box,
     spawn_group_middle_quads,
     spawn_selection_bounding_box,
@@ -66,7 +72,9 @@ impl Plugin for PenPlugin {
             .add_asset::<Group>()
             .add_event::<Group>()
             .add_event::<OfficialLatch>()
+            .add_event::<MoveAnchor>()
             .add_event::<Latch>()
+            .add_event::<Action>()
             .add_event::<UiButton>()
             .add_event::<Handle<Group>>()
             .insert_resource(ClearColor(Color::hex("6e7f80").unwrap()))
@@ -147,7 +155,9 @@ impl Plugin for PenPlugin {
             .add_system(button_system.after("mouse_color"))
             .add_system(move_ui.system().label("move_ui").after("selection"))
             .add_system(toggle_ui_button.system())
-            .add_system(hide_control_points);
+            .add_system(hide_control_points)
+            .add_system(send_action)
+            .add_system(check_mouse_on_canvas.before("move_curve"));
     }
 }
 

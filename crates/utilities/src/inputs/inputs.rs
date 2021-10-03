@@ -1,9 +1,12 @@
 use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 use crate::cam::Cam;
-use crate::util::{AnchorEdge, Bezier, BoundingBoxQuad, Globals, MyShader, UiAction, UiBoard};
+use crate::util::{
+    get_close_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad, ColorButton, Globals,
+    GrandParent, LatchData, MyShader, UiAction, UiBoard,
+};
 
 use bevy::render::camera::OrthographicProjection;
-use bevy::{prelude::*, window::CursorMoved};
+use bevy::{input::mouse::MouseWheel, prelude::*, window::CursorMoved};
 
 use std::ops::DerefMut;
 
@@ -44,6 +47,99 @@ impl Cursor {
             return true;
         }
         return false;
+    }
+}
+
+pub enum Action {
+    Latch,
+    Redo,
+    Undo,
+    Load,
+    Save,
+    Group,
+    Select,
+    Detach,
+    SpawnCurve,
+    HideAnchors,
+    ToggleSound,
+    ScaleUp,
+    ScaleDown,
+    HideControls,
+    ComputeLut,
+    Delete,
+}
+
+pub fn send_action(
+    mut ui_event_reader: EventReader<UiButton>,
+    mut action_event_writer: EventWriter<Action>,
+    keyboard_input: Res<Input<KeyCode>>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    mut mouse_wheel_events: EventReader<MouseWheel>,
+) {
+    for ui_button in ui_event_reader.iter() {
+        match ui_button {
+            UiButton::Latch => action_event_writer.send(Action::Latch),
+            UiButton::Redo => action_event_writer.send(Action::Redo),
+            UiButton::Undo => action_event_writer.send(Action::Undo),
+            UiButton::Load => action_event_writer.send(Action::Load),
+            UiButton::Save => action_event_writer.send(Action::Save),
+            UiButton::Group => action_event_writer.send(Action::Group),
+            UiButton::Selection => action_event_writer.send(Action::Select),
+            UiButton::Detach => action_event_writer.send(Action::Detach),
+            UiButton::SpawnCurve => action_event_writer.send(Action::SpawnCurve),
+            UiButton::Hide => action_event_writer.send(Action::HideAnchors),
+            UiButton::Sound => action_event_writer.send(Action::ToggleSound),
+            UiButton::ScaleUp => action_event_writer.send(Action::ScaleUp),
+            UiButton::ScaleDown => action_event_writer.send(Action::ScaleDown),
+            UiButton::HideControls => action_event_writer.send(Action::HideControls),
+            UiButton::Lut => action_event_writer.send(Action::ComputeLut),
+        }
+    }
+
+    let mouse_just_pressed = mouse_button_input.just_pressed(MouseButton::Left);
+    let mut mouse_wheel_up = false;
+    let mut mouse_wheel_down = false;
+    if let Some(mouse_wheel) = mouse_wheel_events.iter().next() {
+        if mouse_wheel.y > 0.5 {
+            mouse_wheel_up = true;
+        }
+        if mouse_wheel.y < -0.5 {
+            mouse_wheel_down = true;
+        }
+    }
+
+    // only used for pattern matching
+    let _control_only = (false, true, false);
+    let _pressed_g = keyboard_input.just_pressed(KeyCode::G);
+    let _pressed_h = keyboard_input.just_pressed(KeyCode::H);
+    let _pressed_s = keyboard_input.just_pressed(KeyCode::S);
+    let _pressed_l = keyboard_input.just_pressed(KeyCode::L);
+    let _pressed_z = keyboard_input.just_pressed(KeyCode::Z);
+    let _pressed_t = keyboard_input.just_pressed(KeyCode::T);
+    let _pressed_delete = keyboard_input.just_pressed(KeyCode::Delete);
+
+    // match keys / mouse buttons / mouse wheel combination and send event to corresponding action
+    match (
+        keyboard_input.pressed(KeyCode::LShift),
+        keyboard_input.pressed(KeyCode::LControl),
+        keyboard_input.pressed(KeyCode::Space),
+    ) {
+        (true, false, false) if mouse_just_pressed => action_event_writer.send(Action::SpawnCurve),
+        (true, true, false) if mouse_just_pressed => action_event_writer.send(Action::Latch),
+        (false, false, true) if mouse_just_pressed => action_event_writer.send(Action::Detach),
+        _control_only if mouse_just_pressed => action_event_writer.send(Action::Select),
+        _control_only if _pressed_g => action_event_writer.send(Action::Group),
+        _control_only if _pressed_h => action_event_writer.send(Action::HideAnchors),
+        (true, true, false) if _pressed_h => action_event_writer.send(Action::HideControls),
+        _control_only if _pressed_s => action_event_writer.send(Action::Save),
+        _control_only if _pressed_l => action_event_writer.send(Action::Load),
+        _control_only if _pressed_z => action_event_writer.send(Action::Undo),
+        (true, true, false) if _pressed_z => action_event_writer.send(Action::Redo),
+        _control_only if mouse_wheel_up => action_event_writer.send(Action::ScaleUp),
+        _control_only if mouse_wheel_down => action_event_writer.send(Action::ScaleDown),
+        (false, false, false) if _pressed_delete => action_event_writer.send(Action::Delete),
+        (true, false, false) if _pressed_t => action_event_writer.send(Action::ComputeLut),
+        _ => {}
     }
 }
 
@@ -144,73 +240,134 @@ pub fn check_mouse_on_ui(
     }
 }
 
-pub fn spawn_curve_order_on_mouseclick(
+pub struct MoveAnchor {
+    pub handle: Handle<Bezier>,
+    pub anchor: Anchor,
+    pub unlatch: bool,
+}
+
+pub fn check_mouse_on_canvas(
     keyboard_input: Res<Input<KeyCode>>,
     mut cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mouse_button_input: Res<Input<MouseButton>>,
     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
-    ui_query: Query<&UiBoard>,
-    mut globals: ResMut<Globals>,
-    mut event_writer: EventWriter<Latch>,
-    button_query: Query<(&ButtonState, &UiButton)>,
+    globals: ResMut<Globals>,
+    mut move_event_writer: EventWriter<MoveAnchor>,
 ) {
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        let mut ui_action = false;
-        for ui_board in ui_query.iter() {
-            if ui_board.action != UiAction::None {
-                ui_action = true;
-                break;
-            }
-        }
+    if mouse_button_input.just_pressed(MouseButton::Left)
+        && !keyboard_input.pressed(KeyCode::LShift)
+        && !globals.do_hide_anchors
+        && !globals.do_spawn_curve
+    {
+        if let Some((_distance, anchor, handle)) = get_close_anchor(
+            3.0 * globals.scale,
+            cursor.position,
+            &bezier_curves,
+            &query,
+            globals.scale,
+        ) {
+            let mut bezier = bezier_curves.get_mut(handle.clone()).unwrap();
 
-        let mut spawn_button_on = false;
-        for (button_state, ui_button) in button_query.iter() {
-            if ui_button == &UiButton::SpawnCurve {
-                spawn_button_on = button_state == &ButtonState::On;
-            }
-        }
+            let chose_a_control_point =
+                anchor == Anchor::ControlStart || anchor == Anchor::ControlEnd;
+            let hidden_controls = globals.hide_control_points;
 
-        // println!("ui_action: {:?}", ui_action);
+            // order to move the quad that was clicked on
+            if anchor != Anchor::None && !(chose_a_control_point && hidden_controls) {
+                bezier.move_quad = anchor;
 
-        if !ui_action
-            && ((keyboard_input.pressed(KeyCode::LShift)
-                && !keyboard_input.pressed(KeyCode::LControl)
-                && !keyboard_input.pressed(KeyCode::Space))
-                || spawn_button_on)
-        {
-            //TODO: use event instead
-            globals.do_spawn_curve = true;
+                bezier.update_previous_pos();
+                let unlatch = !keyboard_input.pressed(KeyCode::LShift)
+                    && !keyboard_input.pressed(KeyCode::LControl)
+                    && keyboard_input.pressed(KeyCode::Space);
 
-            // Check for latching on nearby curve endings
-            for bezier_handle in query.iter() {
-                //
-                if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
-                    //
-                    let max_click_distance = 5.0 * globals.scale;
-
-                    let start_close_enough =
-                        (bezier.positions.start - cursor.position).length() < max_click_distance;
-                    let end_close_enough =
-                        (bezier.positions.end - cursor.position).length() < max_click_distance;
-
-                    if start_close_enough && !bezier.quad_is_latched(AnchorEdge::Start) {
-                        //
-                        bezier.send_latch_on_spawn(AnchorEdge::Start, &mut event_writer);
-                        // println!("latched on start point");
-                        break;
-                    } else if end_close_enough && !bezier.quad_is_latched(AnchorEdge::End) {
-                        //
-                        bezier.send_latch_on_spawn(AnchorEdge::End, &mut event_writer);
-                        // println!("latched on end point");
-                        break;
-                    }
-                }
+                move_event_writer.send(MoveAnchor {
+                    handle,
+                    anchor,
+                    unlatch,
+                })
             }
         }
     }
 
+    // let go of all any moving quad upon mouse button release
     if mouse_button_input.just_released(MouseButton::Left) {
-        cursor.latch = Vec::new();
+        //
+        for bezier_handle in query.iter() {
+            //
+            if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
+                //
+                cursor.latch = Vec::new();
+                bezier.move_quad = Anchor::None;
+                // TODO: set the "just_created" field to false elsewhere once the right schedule
+                // of systems is in place
+                bezier.just_created = false;
+            }
+        }
+    }
+}
+
+// TODO: refactor
+pub fn pick_color(
+    cursor: ResMut<Cursor>,
+    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
+    mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
+    mut globals: ResMut<Globals>,
+) {
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        //
+        let mut pressed_button = (false, 0);
+        //
+        for (ui_transform, mut ui_board) in ui_query.iter_mut() {
+            // TODO: fix scales
+            let cam_scale = globals.scale * globals.scale;
+            for (k, (transform, shader_param_handle, _color_button)) in query.iter().enumerate() {
+                let shader_params = my_shader_params.get(shader_param_handle).unwrap().clone();
+                // println!("{:?}", cam_scale);
+                if cursor.within_rect(
+                    transform.translation.truncate(),
+                    shader_params.size * 1.15 * cam_scale,
+                ) {
+                    pressed_button = (true, k);
+
+                    globals.picked_color = Some(shader_params.color);
+
+                    // println!("chose color: {:?}", globals.picked_color);
+
+                    ui_board.action = UiAction::PickingColor;
+
+                    break;
+                }
+            }
+
+            // send selected color to shaders so that it shows the selected color with a white contour
+            if pressed_button.0 {
+                //
+                for (k, (_transform, shader_param_handle, _color_button)) in
+                    query.iter().enumerate()
+                {
+                    //
+                    let mut shader_params = my_shader_params.get_mut(shader_param_handle).unwrap();
+                    //
+                    if pressed_button.1 == k {
+                        shader_params.t = 1.0;
+                    } else {
+                        shader_params.t = 0.0;
+                    }
+                }
+            }
+
+            if ui_board.action == UiAction::None
+                && cursor.within_rect(
+                    ui_transform.translation.truncate(),
+                    ui_board.size * globals.scale,
+                )
+            {
+                ui_board.action = UiAction::MovingUi;
+            }
+        }
     }
 }

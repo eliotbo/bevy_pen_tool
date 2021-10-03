@@ -864,6 +864,7 @@ pub fn interpolate_vec2(p0: Vec2, p1: Vec2, rem: f32) -> Vec2 {
     return p0 + rem * (p1 - p0);
 }
 
+// // Could use these functions to make the plugin flo_curve independent
 // pub fn lerp(p0: Coord2, p1: Coord2, t: f64) -> Coord2 {
 //     return p0 + t * (p1 - p0);
 // }
@@ -1111,57 +1112,6 @@ pub fn adjust_group_attributes(
                     *array2 = Float32x3(vertex_positions.clone());
                 }
             }
-        }
-    }
-}
-
-pub fn recompute_lut(
-    keyboard_input: Res<Input<KeyCode>>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
-    query_group: Query<&Handle<Group>>,
-    mut groups: ResMut<Assets<Group>>,
-    mut ui_event_reader: EventReader<UiButton>,
-    globals: ResMut<Globals>,
-    time: Res<Time>,
-) {
-    let mut pressed_lut_button = false;
-    for ui_button in ui_event_reader.iter() {
-        pressed_lut_button = ui_button == &UiButton::Lut;
-        break;
-    }
-
-    if pressed_lut_button
-        || (keyboard_input.pressed(KeyCode::LShift) && keyboard_input.just_pressed(KeyCode::T))
-    {
-        for bezier_handle in query.iter_mut() {
-            let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap();
-
-            let bezier_c = bezier.to_coord2();
-
-            let curve =
-                bezier::Curve::from_points(bezier_c.start, bezier_c.control_points, bezier_c.end);
-
-            let lut_option =
-                compute_lut_long(curve, globals.group_lut_num_points as usize, time.clone());
-            if let Some(lut) = lut_option {
-                bezier.lut = lut;
-            } else {
-                bezier.lut = compute_lut(curve, globals.group_lut_num_points as usize);
-            }
-
-            bezier.do_compute_lut = false;
-
-            for group_handle in query_group.iter() {
-                let group = groups.get_mut(group_handle).unwrap();
-                if group.handles.contains(bezier_handle) {
-                    let id_handle_map = globals.id_handle_map.clone();
-                    group.group_lut(&mut bezier_curves, id_handle_map);
-                    group.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
-                }
-            }
-            // bezier.move_quad.just_created = false;
-            // println!("recomputed short LUT");
         }
     }
 }

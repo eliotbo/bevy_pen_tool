@@ -780,7 +780,7 @@ pub fn spawn_ui(
         })
         .insert(ButtonInteraction::None)
         .insert(shader_params_controls.clone())
-        .insert(UiButton::Controls)
+        .insert(UiButton::HideControls)
         .id();
 
     commands.entity(main_ui).push_children(&[controls_button]);
@@ -795,7 +795,7 @@ pub fn spawn_ui(
             sprite: Sprite::new(button_size / 1.3),
             ..Default::default()
         })
-        .insert(UiButton::Controls)
+        .insert(UiButton::HideControls)
         .insert(OnOffMaterial {
             material: materials.add(off_material.into()),
         })

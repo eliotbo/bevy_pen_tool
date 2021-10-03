@@ -1,4 +1,4 @@
-use crate::util::MyShader;
+use crate::util::{Globals, MyShader, OnOffMaterial};
 
 use bevy::prelude::*;
 
@@ -33,7 +33,7 @@ pub enum UiButton {
     Sound,
     ScaleUp,
     ScaleDown,
-    Controls,
+    HideControls,
     Lut,
 }
 
@@ -170,6 +170,41 @@ pub fn button_system(
                     let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
                     shader_params.t = 0.0;
                 }
+            }
+        }
+    }
+}
+
+pub fn toggle_ui_button(
+    // asset_server: Res<AssetServer>,
+    mut globals: ResMut<Globals>,
+    // mut materials: ResMut<Assets<ColorMaterial>>,
+    mut query: Query<(&mut Handle<ColorMaterial>, &mut OnOffMaterial, &UiButton)>,
+    mut event_reader: EventReader<UiButton>,
+) {
+    for ui_button in event_reader.iter() {
+        //
+        match ui_button {
+            // TODO : move to actions
+            &UiButton::Sound => {
+                //
+                globals.sound_on = !globals.sound_on;
+                //
+            }
+            &UiButton::HideControls => {
+                // globals.hide_control_points = !globals.hide_control_points;
+            }
+            _ => {}
+        }
+        for (mut material_handle, mut on_off_mat, ui_button_queried) in query.iter_mut() {
+            // toggle sprite
+            if ui_button == ui_button_queried {
+                use std::ops::DerefMut;
+                let other_material = on_off_mat.material.clone();
+                let current_material = material_handle.clone();
+                let mat = material_handle.deref_mut();
+                *mat = other_material.clone();
+                on_off_mat.material = current_material;
             }
         }
     }

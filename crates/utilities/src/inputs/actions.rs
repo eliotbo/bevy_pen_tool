@@ -1,13 +1,13 @@
 use super::buttons::{ButtonState, UiButton};
-use super::inputs::Cursor;
+use super::inputs::{Action, Cursor, MoveAnchor};
 use crate::spawner::spawn_bezier;
 use crate::GroupMiddleQuad;
 
 use crate::util::{
-    get_close_anchor, get_close_anchor_entity, get_close_still_anchor, Anchor, AnchorEdge, Bezier,
-    BoundingBoxQuad, ColorButton, ControlPointQuad, EndpointQuad, Globals, GrandParent, Group,
-    GroupBoxQuad, GroupSaveLoad, LatchData, MiddlePointQuad, MyShader, OfficialLatch,
-    OnOffMaterial, SelectionBoxQuad, UiAction, UiBoard,
+    compute_lut, compute_lut_long, get_close_anchor, get_close_anchor_entity,
+    get_close_still_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad,
+    EndpointQuad, Globals, GrandParent, Group, GroupBoxQuad, GroupSaveLoad, LatchData,
+    MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, UiAction, UiBoard,
 };
 
 // use crate::util::*;
@@ -27,72 +27,51 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 
-pub fn pick_color(
-    cursor: ResMut<Cursor>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
-    mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
-    mut globals: ResMut<Globals>,
+pub fn recompute_lut(
+    // keyboard_input: Res<Input<KeyCode>>,
+    mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+    query_group: Query<&Handle<Group>>,
+    mut groups: ResMut<Assets<Group>>,
+    // mut ui_event_reader: EventReader<UiButton>,
+    mut action_event_reader: EventReader<Action>,
+    globals: ResMut<Globals>,
+    time: Res<Time>,
 ) {
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        //
-        let mut pressed_button = (false, 0);
-        //
-        for (ui_transform, mut ui_board) in ui_query.iter_mut() {
-            // TODO: fix scales
-            let cam_scale = globals.scale * globals.scale;
-            for (k, (transform, shader_param_handle, _color_button)) in query.iter().enumerate() {
-                let shader_params = my_shader_params.get(shader_param_handle).unwrap().clone();
-                // println!("{:?}", cam_scale);
-                if cursor.within_rect(
-                    transform.translation.truncate(),
-                    shader_params.size * 1.15 * cam_scale,
-                ) {
-                    pressed_button = (true, k);
+    if let Some(Action::ComputeLut) = action_event_reader.iter().next() {
+        for bezier_handle in query.iter_mut() {
+            let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap();
 
-                    globals.picked_color = Some(shader_params.color);
+            let bezier_c = bezier.to_coord2();
 
-                    // println!("chose color: {:?}", globals.picked_color);
+            // this import is heavy, but from_points() does not work without importing everything
+            use flo_curves::*;
+            let curve = flo_curves::bezier::Curve::from_points(
+                bezier_c.start,
+                bezier_c.control_points,
+                bezier_c.end,
+            );
 
-                    ui_board.action = UiAction::PickingColor;
-
-                    break;
-                }
+            let lut_option =
+                compute_lut_long(curve, globals.group_lut_num_points as usize, time.clone());
+            if let Some(lut) = lut_option {
+                bezier.lut = lut;
+            } else {
+                bezier.lut = compute_lut(curve, globals.group_lut_num_points as usize);
             }
 
-            // send selected color to shaders so that it shows the selected color with a white contour
-            if pressed_button.0 {
-                //
-                for (k, (_transform, shader_param_handle, _color_button)) in
-                    query.iter().enumerate()
-                {
-                    //
-                    let mut shader_params = my_shader_params.get_mut(shader_param_handle).unwrap();
-                    //
-                    if pressed_button.1 == k {
-                        shader_params.t = 1.0;
-                    } else {
-                        shader_params.t = 0.0;
-                    }
-                }
-            }
+            bezier.do_compute_lut = false;
 
-            if ui_board.action == UiAction::None
-                && cursor.within_rect(
-                    ui_transform.translation.truncate(),
-                    ui_board.size * globals.scale,
-                )
-            {
-                ui_board.action = UiAction::MovingUi;
+            for group_handle in query_group.iter() {
+                let group = groups.get_mut(group_handle).unwrap();
+                if group.handles.contains(bezier_handle) {
+                    let id_handle_map = globals.id_handle_map.clone();
+                    group.group_lut(&mut bezier_curves, id_handle_map);
+                    group.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
+                }
             }
         }
     }
-    // else if mouse_button_input.just_released(MouseButton::Left) {
-    //     for (_ui_transform, mut ui_board) in ui_query.iter_mut() {
-    //         ui_board.action = UiAction::None;
-    //     }
-    // }
 }
 
 // unlatch is part of this function
@@ -103,103 +82,78 @@ pub fn begin_move_on_mouseclick(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mouse_button_input: Res<Input<MouseButton>>,
     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
-    // ui_query: Query<&UiBoard>,
     globals: ResMut<Globals>,
-    // mut my_shader_params: ResMut<Assets<MyShader>>,
     button_query: Query<(&ButtonState, &UiButton, &Handle<MyShader>)>,
+    mut action_event_reader: EventReader<Action>,
+    mut move_event_reader: EventReader<MoveAnchor>,
     audio: Res<Audio>,
 ) {
-    if mouse_button_input.just_pressed(MouseButton::Left)
-        && !globals.do_spawn_curve
-        && !globals.do_hide_anchors
-    {
-        let mut latch_partners: Vec<LatchData> = Vec::new();
+    // if mouse_button_input.just_pressed(MouseButton::Left)
+    //     && !globals.do_spawn_curve
+    //     && !globals.do_hide_anchors
+    // {
+    let mut latch_partners: Vec<LatchData> = Vec::new();
 
-        if let Some((_distance, anchor, handle)) = get_close_anchor(
-            3.0 * globals.scale,
-            cursor.position,
-            &bezier_curves,
-            &query,
-            globals.scale,
-        ) {
-            let mut bezier = bezier_curves.get_mut(handle.clone()).unwrap();
+    //     if let Some((_distance, anchor, handle)) = get_close_anchor(
+    //         3.0 * globals.scale,
+    //         cursor.position,
+    //         &bezier_curves,
+    //         &query,
+    //         globals.scale,
+    //     ) {
 
-            let chose_a_control_point =
-                anchor == Anchor::ControlStart || anchor == Anchor::ControlEnd;
-            let hidden_controls = globals.hide_control_points;
+    if let Some(move_anchor) = move_event_reader.iter().next() {
+        let mut bezier = bezier_curves.get_mut(move_anchor.handle.clone()).unwrap();
 
-            // order to move the quad that was clicked on
-            if anchor != Anchor::None && !(chose_a_control_point && hidden_controls) {
-                bezier.move_quad = anchor;
+        let chose_a_control_point =
+            move_anchor.anchor == Anchor::ControlStart || move_anchor.anchor == Anchor::ControlEnd;
+        let hidden_controls = globals.hide_control_points;
 
-                bezier.update_previous_pos();
+        // order to move the quad that was clicked on
+        if move_anchor.anchor != Anchor::None && !(chose_a_control_point && hidden_controls) {
+            bezier.move_quad = move_anchor.anchor;
 
-                // retrieve the detach (unlatch) button state
-                let mut detach_button_on = false;
-                for (button_state, ui_button, _my_shader_handle) in button_query.iter() {
-                    if ui_button == &UiButton::Detach {
-                        detach_button_on = button_state == &ButtonState::On;
-                    }
-                }
-
-                // order to unlatch the anchor if the user presses Space
-                if !bezier.grouped
-                    && !keyboard_input.pressed(KeyCode::LShift)
-                    && !keyboard_input.pressed(KeyCode::LControl)
-                    && (keyboard_input.pressed(KeyCode::Space) || detach_button_on)
-                {
-                    match anchor {
-                        Anchor::Start => {
-                            // keep the latch information in memory to unlatch the anchor's partner below
-                            latch_partners = bezier.latches[&AnchorEdge::Start].clone();
-                            if let Some(latch) = bezier.latches.get_mut(&AnchorEdge::Start) {
-                                *latch = Vec::new();
-                            }
-                        }
-                        Anchor::End => {
-                            latch_partners = bezier.latches[&AnchorEdge::End].clone();
-                            // bezier.latches[&AnchorEdge::End] = Vec::new();
-                            if let Some(latch) = bezier.latches.get_mut(&AnchorEdge::End) {
-                                *latch = Vec::new();
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
+            bezier.update_previous_pos();
         }
 
-        // unlatch partner
-        if let Some(latch) = latch_partners.get(0) {
-            //
-            if let Some(handle) = globals.id_handle_map.get(&latch.latched_to_id) {
-                //
-                let bezier = bezier_curves.get_mut(handle).unwrap();
-                //
-                if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
-                    *latch_local = Vec::new();
-                    if globals.sound_on {
-                        if let Some(sound) = globals.sounds.get("unlatch") {
-                            audio.play(sound.clone());
+        // unlatch mechanism
+        if move_anchor.unlatch {
+            if !bezier.grouped {
+                match move_anchor.anchor {
+                    Anchor::Start => {
+                        // keep the latch information in memory to unlatch the anchor's partner below
+                        latch_partners = bezier.latches[&AnchorEdge::Start].clone();
+                        if let Some(latch) = bezier.latches.get_mut(&AnchorEdge::Start) {
+                            *latch = Vec::new();
                         }
                     }
+                    Anchor::End => {
+                        latch_partners = bezier.latches[&AnchorEdge::End].clone();
+                        // bezier.latches[&AnchorEdge::End] = Vec::new();
+                        if let Some(latch) = bezier.latches.get_mut(&AnchorEdge::End) {
+                            *latch = Vec::new();
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
     }
 
-    // let go of all any moving quad upon mouse button release
-    if mouse_button_input.just_released(MouseButton::Left) {
+    // unlatch partner
+    if let Some(latch) = latch_partners.get(0) {
         //
-        for bezier_handle in query.iter() {
+        if let Some(handle) = globals.id_handle_map.get(&latch.latched_to_id) {
             //
-            if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
-                //
-                cursor.latch = Vec::new();
-                bezier.move_quad = Anchor::None;
-                // TODO: set the "just_created" field to false elsewhere once the right schedule
-                // of systems is in place
-                bezier.just_created = false;
+            let bezier = bezier_curves.get_mut(handle).unwrap();
+            //
+            if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
+                *latch_local = Vec::new();
+                if globals.sound_on {
+                    if let Some(sound) = globals.sounds.get("unlatch") {
+                        audio.play(sound.clone());
+                    }
+                }
             }
         }
     }
@@ -616,7 +570,7 @@ pub fn hide_control_points(
 ) {
     let mut pressed_hide_control_points = false;
     for ui_button in event_reader.iter() {
-        pressed_hide_control_points = ui_button == &UiButton::Controls;
+        pressed_hide_control_points = ui_button == &UiButton::HideControls;
         break;
     }
 
@@ -655,40 +609,6 @@ pub fn hide_control_points(
 //         }
 //     }
 // }
-
-pub fn toggle_ui_button(
-    // asset_server: Res<AssetServer>,
-    mut globals: ResMut<Globals>,
-    // mut materials: ResMut<Assets<ColorMaterial>>,
-    mut query: Query<(&mut Handle<ColorMaterial>, &mut OnOffMaterial, &UiButton)>,
-    mut event_reader: EventReader<UiButton>,
-) {
-    for ui_button in event_reader.iter() {
-        //
-        match ui_button {
-            &UiButton::Sound => {
-                //
-                globals.sound_on = !globals.sound_on;
-                //
-            }
-            &UiButton::Controls => {
-                // globals.hide_control_points = !globals.hide_control_points;
-            }
-            _ => {}
-        }
-        for (mut material_handle, mut on_off_mat, ui_button_queried) in query.iter_mut() {
-            // toggle sprite
-            if ui_button == ui_button_queried {
-                use std::ops::DerefMut;
-                let other_material = on_off_mat.material.clone();
-                let current_material = material_handle.clone();
-                let mat = material_handle.deref_mut();
-                *mat = other_material.clone();
-                on_off_mat.material = current_material;
-            }
-        }
-    }
-}
 
 pub fn save(
     keyboard_input: Res<Input<KeyCode>>,
