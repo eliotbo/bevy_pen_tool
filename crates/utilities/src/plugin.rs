@@ -75,6 +75,7 @@ impl Plugin for PenPlugin {
             .add_event::<OfficialLatch>()
             .add_event::<MoveAnchor>()
             .add_event::<Latch>()
+            .add_event::<Loaded>()
             .add_event::<Action>()
             .add_event::<UiButton>()
             .add_event::<Handle<Group>>()

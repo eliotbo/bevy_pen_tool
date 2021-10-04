@@ -49,6 +49,8 @@ impl AnchorEdge {
     }
 }
 
+
+pub struct Loaded;
 pub struct GrandParent;
 pub struct Icon;
 pub struct OnOffMaterial {
@@ -120,9 +122,18 @@ pub struct LutSaveLoad {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub struct GroupSaveLoad {
+//     // the AnchorEdge corresponds to first anchor encountered when traversing the group
+//     pub curves: Vec<(AnchorEdge, Bezier)>,
+//     pub standalone_lut: (f32, Vec<Vec2>),
+//     pub lut: Vec<(AnchorEdge, (f64, f64), Vec<f64>)>,
+// }
+
 pub struct GroupSaveLoad {
     // the AnchorEdge corresponds to first anchor encountered when traversing the group
-    pub curves: Vec<(AnchorEdge, Bezier)>,
+    // pub curves: Vec<(AnchorEdge, Bezier)>,
+    pub lut: Vec<(Bezier, AnchorEdge, (f64, f64), Vec<f64>)>,
+    pub standalone_lut: (f32, Vec<Vec2>),
 }
 
 #[derive(Debug, Clone, TypeUuid)]
@@ -130,6 +141,7 @@ pub struct GroupSaveLoad {
 pub struct Group {
     pub group: HashSet<(Entity, Handle<Bezier>)>,
     pub handles: HashSet<Handle<Bezier>>,
+    // Attempts to store the start and end points of a group. Fails if not fully connected
     pub ends: Option<Vec<(Handle<Bezier>, AnchorEdge)>>,
     // the tuple (f64, f64) represents (t_min, t_max), the min and max t-values for the curve
     pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), Vec<f64>)>,
@@ -138,13 +150,21 @@ pub struct Group {
 
 impl Group {
     pub fn into_group_save(&self, bezier_curves: &mut ResMut<Assets<Bezier>>) -> GroupSaveLoad {
-        let mut curves = Vec::new();
-        for (handle, anchor, _, _) in self.lut.iter() {
+        let mut lut = Vec::new();
+        for (handle, anchor, t_ends, local_lut) in self.lut.iter() {
             let mut bezier = bezier_curves.get(handle.clone()).unwrap().clone();
             bezier.lut = Vec::new();
-            curves.push((anchor.clone(), bezier.clone()));
+            lut.push((
+                bezier.clone(),
+                anchor.clone(),
+                t_ends.clone(),
+                local_lut.clone(),
+            ));
         }
-        GroupSaveLoad { curves }
+        GroupSaveLoad {
+            lut,
+            standalone_lut: self.standalone_lut.clone(),
+        }
     }
 
     pub fn find_connected_ends(
