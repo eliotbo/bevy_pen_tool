@@ -3,7 +3,7 @@
 
 use utilities::*;
 
-use bevy::{prelude::*, render::camera::OrthographicProjection};
+use bevy::{math::Quat, prelude::*, render::camera::OrthographicProjection};
 
 // TODO:
 // -2. Bug with group at latched points --> no bug when compute_position_with_lut
@@ -15,8 +15,8 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 // 11. reduce use of Globals
 // 12. make save/load preserve groups
 // 13. make whole group move when selected
-// 14. make undo/redo work for moving anchors and control points
-// 15. make compatible with a projective perspective
+// 14. make undo/redo
+
 // 16. Add RControl and RShift to keys
 
 fn main() {
@@ -25,7 +25,10 @@ fn main() {
         .add_startup_system(camera_setup)
         .add_plugin(CamPlugin)
         .add_plugin(PenPlugin)
+        .add_system(spawn_heli)
         .add_system(tests)
+        .add_system(turn_round_animation)
+        .add_system(follow_bezier_group)
         .run();
 }
 
@@ -55,20 +58,81 @@ fn tests(
     globals: Res<Globals>,
 ) {
     if keyboard_input.just_pressed(KeyCode::V) {
-        for group in groups.iter() {
-            let mut lut = group.1.standalone_lut.1.clone();
-            let mut lut2 = group.1.standalone_lut.1.clone();
-            lut.push(Vec2::new(0.0, 0.0));
-            lut2.insert(0, Vec2::new(0.0, 0.0));
-            println!(" ");
-            println!(" ");
-            println!(" ");
-            println!(" ");
-            println!(" ");
-            println!(" ");
-            for (l1, l2) in lut.iter().zip(lut2.iter()) {
-                println!("number of points in lut: {:?} ", l1.distance(*l2));
-            }
+        println!(" ");
+        println!(" ");
+        println!(" ");
+        println!(" ");
+        println!(" ");
+        println!(" ");
+    }
+}
+
+struct TurnRoundAnimation;
+struct FollowBezierAnimation;
+fn spawn_heli(
+    mut commands: Commands,
+    mut globals: ResMut<Globals>,
+    asset_server: Res<AssetServer>,
+    keyboard_input: Res<Input<KeyCode>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::V) {
+        let heli_handle = asset_server.load("textures/heli.png");
+        let size = Vec2::new(50.0, 50.0);
+        let heli_sprite = commands
+            .spawn_bundle(SpriteBundle {
+                material: materials.add(heli_handle.into()),
+                // mesh: mesh_handle_button.clone(),
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -222.0)),
+                sprite: Sprite::new(size),
+                ..Default::default()
+            })
+            .insert(FollowBezierAnimation)
+            .id();
+        let copter_handle = asset_server.load("textures/copter.png");
+        let copter_sprite = commands
+            .spawn_bundle(SpriteBundle {
+                material: materials.add(copter_handle.into()),
+                // mesh: mesh_handle_button.clone(),
+                transform: Transform::from_translation(Vec3::new(3.0, 2.0, -122.0)),
+                sprite: Sprite::new(size),
+                ..Default::default()
+            })
+            .insert(TurnRoundAnimation)
+            .id();
+
+        commands.entity(heli_sprite).push_children(&[copter_sprite]);
+    }
+}
+
+fn turn_round_animation(mut query: Query<&mut Transform, With<TurnRoundAnimation>>) {
+    for mut transform in query.iter_mut() {
+        let quat = Quat::from_rotation_z(0.1);
+        transform.rotate(quat);
+    }
+}
+
+fn follow_bezier_group(
+    mut query: Query<&mut Transform, With<FollowBezierAnimation>>,
+    mut globals: ResMut<Globals>,
+    groups: Res<Assets<Group>>,
+    bezier_curves: ResMut<Assets<Bezier>>,
+    time: Res<Time>,
+) {
+    if let Some(group) = groups.iter().next() {
+        let t_time = (time.seconds_since_startup() * 0.1) % 1.0;
+        let pos = group.1.compute_position_with_bezier(&bezier_curves, t_time);
+        let pos2 = group
+            .1
+            .compute_position_with_bezier(&bezier_curves, (t_time + 0.001) % 1.0);
+        for mut transform in query.iter_mut() {
+            transform.translation.x = pos.x;
+            transform.translation.y = pos.y;
+
+            let diff = pos - pos2;
+            let angle = diff.y.atan2(diff.x) + 3.1415;
+            let quat = Quat::from_rotation_arc(pos2.extend(0.0), pos.extend(0.0));
+            transform.rotation = Quat::from_rotation_z(angle as f32);
         }
     }
 }
