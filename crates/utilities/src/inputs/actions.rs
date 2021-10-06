@@ -6,8 +6,9 @@ use crate::GroupMiddleQuad;
 use crate::util::{
     compute_lut, compute_lut_long, get_close_anchor, get_close_anchor_entity,
     get_close_still_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad,
-    EndpointQuad, Globals, GrandParent, Group, GroupBoxQuad, GroupSaveLoad, LatchData,
-    MiddlePointQuad, MyShader, OfficialLatch, SelectionBoxQuad, UiAction, UiBoard, Loaded
+    EndpointQuad, Globals, GrandParent, Group, GroupBoxQuad, GroupSaveLoad, LatchData, Loaded,
+    MiddlePointQuad, MyShader, OfficialLatch, SelectedBoxQuad, SelectingBoxQuad, UiAction, UiBoard,
+    UserState,
 };
 
 use bevy::prelude::*;
@@ -139,7 +140,7 @@ pub fn selection(
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
-    mut visible_selection_query: Query<&mut Visible, With<SelectionBoxQuad>>,
+    mut visible_selection_query: Query<&mut Visible, With<SelectedBoxQuad>>,
     group_query: Query<&Handle<Group>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
@@ -189,9 +190,120 @@ pub fn selection(
     }
 }
 
+pub fn selection_box_init(
+    globals: ResMut<Globals>,
+    mut user_state: ResMut<UserState>,
+    cursor: ResMut<Cursor>,
+    bezier_curves: ResMut<Assets<Bezier>>,
+    query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+    mut action_event_reader: EventReader<Action>,
+    mut visible_selection_query: Query<&mut Visible, With<SelectingBoxQuad>>,
+) {
+    if let Some(Action::SelectionBox) = action_event_reader.iter().next() {
+        if let Some((_distance, _anchor, _entity, _selected_handle)) = get_close_anchor_entity(
+            2.0 * globals.scale,
+            cursor.position,
+            &bezier_curves,
+            &query,
+            globals.scale,
+        ) {
+        } else {
+            println!("select_box_init");
+            let us = user_state.as_mut();
+            *us = UserState::Selecting(cursor.position);
+            println!("changed UserState to Selecting");
+
+            for mut visible in visible_selection_query.iter_mut() {
+                visible.is_visible = true;
+            }
+        }
+    }
+}
+
+pub fn selection_final(
+    mut globals: ResMut<Globals>,
+    mut user_state: ResMut<UserState>,
+    cursor: ResMut<Cursor>,
+    bezier_curves: ResMut<Assets<Bezier>>,
+    groups: ResMut<Assets<Group>>,
+    // mut visible_selecting_query: Query<&mut Visible, With<SelectingBoxQuad>>,
+    // mut visible_selected_query: Query<&mut Visible, With<SelectedBoxQuad>>,
+    mut query_set: QuerySet<(
+        QueryState<&mut Visible, With<SelectingBoxQuad>>,
+        QueryState<&mut Visible, With<SelectedBoxQuad>>,
+    )>,
+    group_query: Query<&Handle<Group>>,
+    query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+    mut action_event_reader: EventReader<Action>,
+) {
+    if let Some(Action::Selected) = action_event_reader.iter().next() {
+        println!("select_box_final");
+
+        // let mut changed_user_state = false;
+        let mut selected = Group::default();
+        if let UserState::Selecting(click_position) = user_state.as_ref() {
+            // changed_user_state = true;
+            let release_position = cursor.position;
+
+            // check for anchors inside selection area
+            for (entity, bezier_handle) in query.iter() {
+                let bezier = bezier_curves.get(bezier_handle).unwrap();
+                let bs = bezier.positions.start;
+                let be = bezier.positions.end;
+                if (bs.x < click_position.x.max(release_position.x)
+                    && bs.x > click_position.x.min(release_position.x)
+                    && bs.y < click_position.y.max(release_position.y)
+                    && bs.y > click_position.y.min(release_position.y))
+                    || (be.x < click_position.x.max(release_position.x)
+                        && be.x > click_position.x.min(release_position.x)
+                        && be.y < click_position.y.max(release_position.y)
+                        && be.y > click_position.y.min(release_position.y))
+                {
+                    // if the selected quad is part of a group, show group selection and return
+                    // Cannot select more than one group
+                    // Cannot select a group and individual curves together
+                    for group_handle in group_query.iter() {
+                        let group = groups.get(group_handle).unwrap();
+                        //
+                        if group.handles.contains(&bezier_handle) {
+                            selected = group.clone();
+                            for mut visible in query_set.q0().iter_mut() {
+                                visible.is_visible = true;
+                            }
+                            for mut visible_selecting in query_set.q0().iter_mut() {
+                                visible_selecting.is_visible = false;
+                            }
+                            globals.selected = selected;
+                            let us = user_state.as_mut();
+                            *us = UserState::Idle;
+                            return ();
+                        }
+                    }
+
+                    selected
+                        .group
+                        .insert((entity.clone(), bezier_handle.clone()));
+                    selected.handles.insert(bezier_handle.clone());
+                }
+            }
+            globals.selected = selected;
+            println!("selected: {:?}", globals.selected);
+        }
+        let us = user_state.as_mut();
+        *us = UserState::Idle;
+
+        for mut visible_selected in query_set.q1().iter_mut() {
+            visible_selected.is_visible = true;
+        }
+        for mut visible_selecting in query_set.q0().iter_mut() {
+            visible_selecting.is_visible = false;
+        }
+    }
+}
+
 pub fn unselect(
     mut globals: ResMut<Globals>,
-    mut visible_selection_query: Query<&mut Visible, With<SelectionBoxQuad>>,
+    mut visible_selection_query: Query<&mut Visible, With<SelectedBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
 ) {
     if let Some(Action::Unselect) = action_event_reader.iter().next() {
@@ -322,7 +434,7 @@ pub fn delete(
     mut globals: ResMut<Globals>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
-    mut visible_query: Query<&mut Visible, With<SelectionBoxQuad>>,
+    mut visible_query: Query<&mut Visible, With<SelectedBoxQuad>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
     query2: Query<(Entity, &Handle<Group>), With<GroupBoxQuad>>,
     mut action_event_reader: EventReader<Action>,

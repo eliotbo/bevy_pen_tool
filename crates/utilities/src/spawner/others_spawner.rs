@@ -1,5 +1,6 @@
 use crate::util::{
-    Bezier, Globals, Group, GroupBoxQuad, GroupMiddleQuad, MyShader, SelectionBoxQuad,
+    Bezier, Globals, Group, GroupBoxQuad, GroupMiddleQuad, MyShader, SelectedBoxQuad,
+    SelectingBoxQuad,
 };
 
 use bevy::{
@@ -49,7 +50,52 @@ pub fn spawn_selection_bounding_box(
             ..Default::default()
         })
         .insert(shader_params_handle_group_bb)
-        .insert(SelectionBoxQuad);
+        .insert(SelectedBoxQuad);
+}
+
+pub fn spawn_selecting_bounding_box(
+    mut commands: Commands,
+    // asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
+    // mut render_graph: ResMut<RenderGraph>,
+    globals: ResMut<Globals>,
+    mut my_shader_params: ResMut<Assets<MyShader>>,
+    clearcolor_struct: Res<ClearColor>,
+) {
+    // Bounding Box for group
+    let bb_group_size = Vec2::new(100.0, 100.0);
+    let shader_params_handle_group_bb = my_shader_params.add(MyShader {
+        color: Color::DARK_GRAY,
+        t: 0.5,
+        zoom: 0.15 / globals.scale,
+        size: bb_group_size / (globals.scale / 0.15),
+        clearcolor: clearcolor_struct.0.clone(),
+        ..Default::default()
+    });
+    let visible_bb_group = Visible {
+        is_visible: false,
+        is_transparent: true,
+    };
+    let mesh_handle_bb_group = meshes.add(Mesh::from(shape::Quad {
+        size: bb_group_size,
+        flip: false,
+    }));
+    let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, -650.0));
+    let bb_group_pipeline_handle = globals.pipeline_handles["selecting"].clone();
+
+    commands
+        .spawn_bundle(MeshBundle {
+            mesh: mesh_handle_bb_group,
+            visible: visible_bb_group,
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                bb_group_pipeline_handle,
+            )]),
+            transform: bb_group_transform,
+            ..Default::default()
+        })
+        .insert(shader_params_handle_group_bb)
+        .insert(SelectingBoxQuad);
 }
 
 pub fn spawn_group_bounding_box(

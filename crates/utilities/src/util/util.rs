@@ -49,6 +49,20 @@ impl AnchorEdge {
     }
 }
 
+#[derive(Debug)]
+pub enum UserState {
+    Idle,
+    Selecting(Vec2),
+    Selected(Group),
+    SpawningCurve,
+    MovingAnchor(MoveAnchor),
+}
+
+impl Default for UserState {
+    fn default() -> Self {
+        Self::Idle
+    }
+}
 
 pub struct Loaded;
 pub struct GrandParent;
@@ -67,7 +81,8 @@ pub struct GroupMiddleQuad(pub usize);
 #[derive(Debug)]
 pub struct BoundingBoxQuad;
 
-pub struct SelectionBoxQuad;
+pub struct SelectedBoxQuad;
+pub struct SelectingBoxQuad;
 
 pub struct GroupBoxQuad;
 
@@ -146,6 +161,18 @@ pub struct Group {
     // the tuple (f64, f64) represents (t_min, t_max), the min and max t-values for the curve
     pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), Vec<f64>)>,
     pub standalone_lut: (f32, Vec<Vec2>),
+}
+
+impl Default for Group {
+    fn default() -> Self {
+        Group {
+            group: HashSet::new(),
+            handles: HashSet::new(),
+            lut: Vec::new(),
+            ends: None,
+            standalone_lut: (0.0, Vec::new()),
+        }
+    }
 }
 
 impl Group {
@@ -370,7 +397,7 @@ impl Group {
             let p2 = lut[idx_f64 as usize + 1];
 
             // TODO: is the minus one useful here?
-            let rem = (idx_f64 - 1.0) % 1.0;
+            let rem = idx_f64 % 1.0;
             let t_distance = interpolate(p1, p2, rem);
             let pos_coord2 = curve.point_at_pos(t_distance);
             pos = Vec2::new(pos_coord2.0 as f32, pos_coord2.1 as f32);
@@ -453,13 +480,7 @@ impl Default for Globals {
             mesh_handles: HashMap::new(),
             pipeline_handles: HashMap::new(),
             id_handle_map: HashMap::new(),
-            selected: Group {
-                group: HashSet::new(),
-                handles: HashSet::new(),
-                lut: Vec::new(),
-                ends: None,
-                standalone_lut: (0.0, Vec::new()),
-            },
+            selected: Group::default(),
             sounds: HashMap::new(),
             sound_on: true,
             hide_control_points: false,
@@ -1022,16 +1043,29 @@ pub fn get_close_still_anchor(
 
 // change the selection mesh according to the bounding box of the selected curves
 pub fn adjust_selection_attributes(
-    mouse_button_input: Res<Input<MouseButton>>,
+    // mouse_button_input: Res<Input<MouseButton>>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
-    mut query: Query<&Handle<Mesh>, With<SelectionBoxQuad>>,
-    shader_query: Query<&Handle<MyShader>, With<SelectionBoxQuad>>,
+    mut query: Query<&Handle<Mesh>, With<SelectedBoxQuad>>,
+    shader_query: Query<&Handle<MyShader>, With<SelectedBoxQuad>>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
     globals: ResMut<Globals>,
+    mut action_event_reader: EventReader<Action>,
+    user_state: Res<UserState>,
 ) {
     // TODO: make this system run only when necessary
-    if mouse_button_input.pressed(MouseButton::Left) {
+    let mut do_adjust = false;
+    // if mouse_button_input.pressed(MouseButton::Left) {
+    //     do_adjust = true;
+    // }
+    if let UserState::MovingAnchor(_moving_handle) = user_state.as_ref() {
+        do_adjust = true;
+    }
+    if let Some(Action::Selected) = action_event_reader.iter().next() {
+        do_adjust = true;
+    }
+
+    if do_adjust {
         let (mut minx, mut maxx, mut miny, mut maxy) =
             (1000000.0f32, -1000000.0f32, 1000000.0f32, -1000000.0f32);
 
@@ -1047,6 +1081,57 @@ pub fn adjust_selection_attributes(
             miny = miny.min(bound0.y);
             maxy = maxy.max(bound1.y);
         }
+        let shader_handle = shader_query.single();
+        let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
+        let up_factor = 1.10;
+        let x_pos = (maxx + minx) / 2.0;
+        let y_pox = (maxy + miny) / 2.0;
+        let x_width = (maxx - minx) * up_factor / 2.0;
+        let y_width = (maxy - miny) * up_factor / 2.0;
+
+        // send correct width to shader that will adjust the thickness of the box accordingly
+        let scale = globals.scale / 0.5;
+        shader_params.size = Vec2::new(x_width * 2.0 / scale, y_width * 2.0 / scale);
+
+        let vertex_positions = vec![
+            [x_pos - x_width, y_pox - y_width, 0.0],
+            [x_pos - x_width, y_pox + y_width, 0.0],
+            [x_pos + x_width, y_pox + y_width, 0.0],
+            [x_pos + x_width, y_pox - y_width, 0.0],
+        ];
+
+        for mesh_handle in query.iter_mut() {
+            let mesh = meshes.get_mut(mesh_handle).unwrap();
+            let v_pos = mesh.attribute_mut("Vertex_Position");
+
+            if let Some(array2) = v_pos {
+                *array2 = Float32x3(vertex_positions.clone());
+            }
+        }
+    }
+}
+
+// change the selection mesh according to the bounding box of the selected curves
+pub fn adjust_selecting_attributes(
+    user_state: ResMut<UserState>,
+    cursor: ResMut<Cursor>,
+    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mut query: Query<&Handle<Mesh>, With<SelectingBoxQuad>>,
+    shader_query: Query<&Handle<MyShader>, With<SelectingBoxQuad>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    globals: ResMut<Globals>,
+) {
+    // TODO: make this system run only when necessary
+    if let UserState::Selecting(click_position) = user_state.as_ref() {
+        let mouse_position = cursor.position;
+
+        let (mut minx, mut maxx, mut miny, mut maxy) = (
+            mouse_position.x.min(click_position.x),
+            mouse_position.x.max(click_position.x),
+            mouse_position.y.min(click_position.y),
+            mouse_position.y.max(click_position.y),
+        );
+
         let shader_handle = shader_query.single();
         let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
         let up_factor = 1.10;

@@ -6,8 +6,7 @@ use utilities::*;
 use bevy::{prelude::*, render::camera::OrthographicProjection};
 
 // TODO:
-// -2. Bug with group at latched points
-// -1. Save/Load is broken -> wobble in loaded groups
+// -2. Bug with group at latched points --> no bug when compute_position_with_lut
 // 0. Make independent of camera
 // 1. Attach UI to a UI camera
 // 4. Collapse the color UI

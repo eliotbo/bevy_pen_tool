@@ -1,8 +1,8 @@
-use super::buttons::{ButtonInteraction, ButtonState, UiButton};
+use super::buttons::{ButtonInteraction, UiButton};
 use crate::cam::Cam;
 use crate::util::{
     get_close_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad, ColorButton, Globals,
-    GrandParent, LatchData, MyShader, SelectionBoxQuad, UiAction, UiBoard,
+    GrandParent, LatchData, MyShader, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -69,6 +69,8 @@ pub enum Action {
     HideControls,
     ComputeLut,
     Delete,
+    SelectionBox,
+    Selected,
 }
 
 pub fn send_action(
@@ -86,7 +88,11 @@ pub fn send_action(
             UiButton::Load => action_event_writer.send(Action::Load),
             UiButton::Save => action_event_writer.send(Action::Save),
             UiButton::Group => action_event_writer.send(Action::Group),
-            UiButton::Selection => action_event_writer.send(Action::Select),
+            // is this correct?
+            UiButton::Selection => {
+                action_event_writer.send(Action::Select);
+                // action_event_writer.send(Action::SelectionBox);
+            }
 
             UiButton::Detach => action_event_writer.send(Action::Detach),
             UiButton::SpawnCurve => action_event_writer.send(Action::SpawnCurve),
@@ -100,6 +106,7 @@ pub fn send_action(
     }
 
     let mouse_just_pressed = mouse_button_input.just_pressed(MouseButton::Left);
+    let mouse_just_released = mouse_button_input.just_released(MouseButton::Left);
     let mouse_pressed = mouse_button_input.pressed(MouseButton::Left);
     let mut mouse_wheel_up = false;
     let mut mouse_wheel_down = false;
@@ -131,7 +138,11 @@ pub fn send_action(
         (true, false, false) if mouse_just_pressed => action_event_writer.send(Action::SpawnCurve),
         (true, true, false) if mouse_pressed => action_event_writer.send(Action::Latch),
         (false, false, true) if mouse_just_pressed => action_event_writer.send(Action::Detach),
-        (false, true, false) if mouse_just_pressed => action_event_writer.send(Action::Select),
+        (false, true, false) if mouse_just_pressed => {
+            // action_event_writer.send(Action::Select);
+            action_event_writer.send(Action::SelectionBox);
+        }
+        (false, true, false) if mouse_just_released => action_event_writer.send(Action::Selected),
         (false, true, false) if _pressed_g => action_event_writer.send(Action::Group),
         (false, true, false) if _pressed_h => action_event_writer.send(Action::HideAnchors),
         (true, true, false) if _pressed_h => action_event_writer.send(Action::HideControls),
@@ -141,6 +152,7 @@ pub fn send_action(
         (true, true, false) if _pressed_z => action_event_writer.send(Action::Redo),
         (false, true, false) if mouse_wheel_up => action_event_writer.send(Action::ScaleUp),
         (false, true, false) if mouse_wheel_down => action_event_writer.send(Action::ScaleDown),
+
         (false, false, false) if _pressed_delete => action_event_writer.send(Action::Delete),
         (true, false, false) if _pressed_t => action_event_writer.send(Action::ComputeLut),
         _ => {}
@@ -244,6 +256,7 @@ pub fn check_mouse_on_ui(
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct MoveAnchor {
     pub handle: Handle<Bezier>,
     pub anchor: Anchor,
@@ -259,6 +272,7 @@ pub fn check_mouse_on_canvas(
     globals: ResMut<Globals>,
     mut move_event_writer: EventWriter<MoveAnchor>,
     mut action_event_writer: EventWriter<Action>,
+    mut user_state: ResMut<UserState>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Left)
         && !keyboard_input.pressed(KeyCode::LShift)
@@ -277,11 +291,15 @@ pub fn check_mouse_on_canvas(
                 && !keyboard_input.pressed(KeyCode::LControl)
                 && keyboard_input.pressed(KeyCode::Space);
 
-            move_event_writer.send(MoveAnchor {
+            let moving_anchor = MoveAnchor {
                 handle,
                 anchor,
                 unlatch,
-            })
+            };
+            move_event_writer.send(moving_anchor.clone());
+
+            let user_state = user_state.as_mut();
+            *user_state = UserState::MovingAnchor(moving_anchor);
         } else {
             action_event_writer.send(Action::Unselect);
         }
@@ -301,6 +319,9 @@ pub fn check_mouse_on_canvas(
                 bezier.just_created = false;
             }
         }
+
+        // let user_state = user_state.as_mut();
+        // *user_state = UserState::Idle;
     }
 }
 

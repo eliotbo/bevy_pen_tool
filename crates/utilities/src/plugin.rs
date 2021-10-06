@@ -18,6 +18,8 @@ use crate::inputs::{
     rescale,
     save,
     selection,
+    selection_box_init,
+    selection_final,
     send_action,
     toggle_ui_button,
     unselect,
@@ -43,6 +45,7 @@ use crate::spawner::{
     spawn_curve_order_on_mouseclick,
     spawn_group_bounding_box,
     spawn_group_middle_quads,
+    spawn_selecting_bounding_box,
     spawn_selection_bounding_box,
     spawn_ui,
     //
@@ -82,9 +85,11 @@ impl Plugin for PenPlugin {
             .insert_resource(ClearColor(Color::hex("6e7f80").unwrap()))
             .insert_resource(Cursor::default())
             .insert_resource(Globals::default())
+            .insert_resource(UserState::default())
             .add_startup_system(setup.system().label("setup"))
             .add_startup_system(spawn_selection_bounding_box.system().after("setup"))
             .add_startup_system(spawn_ui.system().after("setup"))
+            .add_startup_system(spawn_selecting_bounding_box.after("setup"))
             .add_system(record_mouse_events_system.system().label("input"))
             .add_system(rescale.system().before("mouse_ui"))
             .add_system(check_mouse_on_ui.system().label("mouse_ui").after("input"))
@@ -147,9 +152,12 @@ impl Plugin for PenPlugin {
             .add_system(recompute_lut.system())
             // .add_system(undo.system())
             // .add_system(redo.system())
-            .add_system(selection.system().label("selection"))
-            .add_system(unselect)
-            .add_system(adjust_selection_attributes.system())
+            // .add_system(selection.label("selection"))
+            .add_system(selection_box_init.label("selection_box"))
+            .add_system(selection_final.label("select_final"))
+            // .add_system(unselect)
+            .add_system(adjust_selection_attributes.system().after("select_final"))
+            .add_system(adjust_selecting_attributes)
             .add_system(adjust_group_attributes.system())
             .add_system(hide_anchors.system())
             // .add_system(do_long_lut.system().label("long_lut"))
@@ -187,6 +195,7 @@ fn setup(
     let ends = asset_server.load::<Shader, _>("shaders/ends.frag");
     let button = asset_server.load::<Shader, _>("shaders/button.frag");
     let frag_bb = asset_server.load::<Shader, _>("shaders/bounding_box.frag");
+    let selecting = asset_server.load::<Shader, _>("shaders/selecting.frag");
     let controls_frag = asset_server.load::<Shader, _>("shaders/controls.frag");
 
     let hundred_millis = time::Duration::from_millis(100);
@@ -219,6 +228,11 @@ fn setup(
     let bb_pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
         vertex: vert.clone(),
         fragment: Some(frag_bb),
+    }));
+
+    let selecting_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
+        vertex: vert.clone(),
+        fragment: Some(selecting),
     }));
 
     let button_pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
@@ -263,6 +277,10 @@ fn setup(
         .pipeline_handles
         .insert("bounding_box", bb_pipeline_handle);
 
+    globals
+        .pipeline_handles
+        .insert("selecting", selecting_handle);
+
     globals.mesh_handles.insert("middles", mesh_handle_middle);
 
     globals.mesh_handles.insert("ends", mesh_handle_ends);
@@ -272,4 +290,6 @@ fn setup(
         .insert("ends_controls", mesh_handle_ends_controls);
 
     globals.mesh_handles.insert("button", mesh_handle_button);
+
+    thread::sleep(hundred_millis);
 }
