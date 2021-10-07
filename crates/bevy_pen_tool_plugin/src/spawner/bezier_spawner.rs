@@ -1,8 +1,7 @@
-use crate::inputs::{Action, ButtonState, Cursor, Latch, UiButton};
+use crate::inputs::{Cursor, Latch};
 use crate::util::{
     compute_lut, Anchor, AnchorEdge, Bezier, BezierPositions, BoundingBoxQuad, ControlPointQuad,
-    EndpointQuad, Globals, GrandParent, LatchData, Maps, MiddlePointQuad, MyShader, UiAction,
-    UiBoard,
+    EndpointQuad, Globals, GrandParent, LatchData, Maps, MiddlePointQuad, MyShader, UserState,
 };
 
 use bevy::{
@@ -14,100 +13,23 @@ use std::collections::HashMap;
 
 use rand::prelude::*;
 
-pub fn spawn_curve_order_on_mouseclick(
-    keyboard_input: Res<Input<KeyCode>>,
-    mut cursor: ResMut<Cursor>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
-    ui_query: Query<&UiBoard>,
-    mut globals: ResMut<Globals>,
-    mut event_writer: EventWriter<Latch>,
-    mut event_reader: EventReader<Action>,
-    button_query: Query<(&ButtonState, &UiButton)>,
-) {
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        let mut ui_action = false;
-        for ui_board in ui_query.iter() {
-            if ui_board.action != UiAction::None {
-                ui_action = true;
-                break;
-            }
-        }
-
-        let mut spawn_button_on = false;
-        for (button_state, ui_button) in button_query.iter() {
-            if ui_button == &UiButton::SpawnCurve {
-                spawn_button_on = button_state == &ButtonState::On;
-            }
-        }
-
-        // println!("ui_action: {:?}", ui_action);
-
-        if !ui_action
-            && ((keyboard_input.pressed(KeyCode::LShift)
-                && !keyboard_input.pressed(KeyCode::LControl)
-                && !keyboard_input.pressed(KeyCode::Space))
-                || spawn_button_on)
-        {
-            //TODO: use event instead
-            globals.do_spawn_curve = true;
-
-            // Check for latching on nearby curve endings
-            for bezier_handle in query.iter() {
-                //
-                if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
-                    //
-                    let max_click_distance = 5.0 * globals.scale;
-
-                    let start_close_enough =
-                        (bezier.positions.start - cursor.position).length() < max_click_distance;
-                    let end_close_enough =
-                        (bezier.positions.end - cursor.position).length() < max_click_distance;
-
-                    if start_close_enough && !bezier.quad_is_latched(AnchorEdge::Start) {
-                        //
-                        bezier.send_latch_on_spawn(AnchorEdge::Start, &mut event_writer);
-                        // println!("latched on start point");
-                        break;
-                    } else if end_close_enough && !bezier.quad_is_latched(AnchorEdge::End) {
-                        //
-                        bezier.send_latch_on_spawn(AnchorEdge::End, &mut event_writer);
-                        // println!("latched on end point");
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    if mouse_button_input.just_released(MouseButton::Left) {
-        cursor.latch = Vec::new();
-    }
-}
-
 pub fn spawn_bezier_system(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut cursor: ResMut<Cursor>,
-
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
     mut maps: ResMut<Maps>,
     mut latch_event_reader: EventReader<Latch>,
-    mut action_event_reader: EventReader<Action>,
+    mut user_state: ResMut<UserState>,
 ) {
-    if let Some(Action::SpawnCurve) = action_event_reader.iter().next() {
-        println!("spawn a curve please");
-    }
-
-    if globals.do_spawn_curve {
-        globals.do_spawn_curve = false;
+    if user_state.as_ref() == &UserState::SpawningCurve {
+        //
+        let us = user_state.as_mut();
+        *us = UserState::Idle;
         let clearcolor = clearcolor_struct.0;
-
-        globals.history = Vec::new();
 
         let mut rng = thread_rng();
         let mut spawner_id: u128 = rng.gen();
@@ -121,7 +43,7 @@ pub fn spawn_bezier_system(
         latches.insert(AnchorEdge::End, Vec::new());
 
         for latch_received in latch_event_reader.iter() {
-            // if let Some(latch) = cursor.latch.clone().get(0) {
+            //
             start = latch_received.position;
             control_start = latch_received.control_point;
             spawner_id = latch_received.latcher_id;
@@ -137,7 +59,6 @@ pub fn spawn_bezier_system(
 
         cursor.latch = Vec::new();
 
-        // println!("UN spawner latched cursor: ");
         let mut bezier = Bezier {
             positions: BezierPositions {
                 start,
@@ -150,12 +71,9 @@ pub fn spawn_bezier_system(
             color: None,
             do_compute_lut: true,
             lut: Vec::new(),
-            just_created: true,
             id: spawner_id,
             latches,
             grouped: false,
-            // latch_start,
-            // latch_end: None,
         };
         bezier.update_previous_pos();
 
@@ -164,7 +82,6 @@ pub fn spawn_bezier_system(
             &mut bezier_curves,
             &mut commands,
             &mut meshes,
-            // &mut pipelines,
             &mut my_shader_params,
             clearcolor,
             &mut globals,
@@ -178,7 +95,6 @@ pub fn spawn_bezier(
     bezier_curves: &mut ResMut<Assets<Bezier>>,
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
-    // mut pipelines: &mut ResMut<Assets<PipelineDescriptor>>,
     my_shader_params: &mut ResMut<Assets<MyShader>>,
     clearcolor: Color,
     globals: &mut ResMut<Globals>,
@@ -194,12 +110,10 @@ pub fn spawn_bezier(
     let ctrl_pipeline_handle = maps.pipeline_handles["controls"].clone();
 
     let ends_controls_mesh_handle = maps.mesh_handles["ends_controls"].clone();
-
     let ends_mesh_handle = maps.mesh_handles["ends"].clone();
-
     let middle_mesh_handle = maps.mesh_handles["middles"].clone();
 
-    let num_mid_quads = globals.num_points;
+    let num_mid_quads = globals.num_points_on_curve;
 
     let mut color = Color::hex("3CB44B").unwrap();
 
@@ -209,8 +123,6 @@ pub fn spawn_bezier(
         color = color_in_globals;
     }
     bezier.color = Some(color);
-    // println!("color : {:?}", bezier.color);
-    // let hide_anchors = globals.do_hide_anchors;
 
     //////////////////// Bounding box parameters ////////////////////
     // need to import the whole library in order to use the .min() and .max() methods: file issue?

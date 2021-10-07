@@ -4,9 +4,7 @@ use bevy::{
     prelude::*,
     reflect::TypeUuid,
     render::{
-        // camera::OrthographicProjection,
-        mesh::VertexAttributeValues::Float32x3,
-        pipeline::PipelineDescriptor,
+        mesh::VertexAttributeValues::Float32x3, pipeline::PipelineDescriptor,
         renderer::RenderResources,
     },
 };
@@ -22,10 +20,10 @@ use flo_curves::bezier::BezierCurve;
 use flo_curves::bezier::Curve;
 use flo_curves::*;
 
-use plotlib::page::Page;
-use plotlib::repr::Plot;
-use plotlib::style::LineStyle;
-use plotlib::view::ContinuousView;
+// use plotlib::page::Page;
+// use plotlib::repr::Plot;
+// use plotlib::style::LineStyle;
+// use plotlib::view::ContinuousView;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Copy, Hash)]
 pub enum AnchorEdge {
@@ -49,7 +47,7 @@ impl AnchorEdge {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum UserState {
     Idle,
     Selecting(Vec2),
@@ -131,36 +129,44 @@ pub struct ColorButton {
     pub size: Vec2,
 }
 
+// TODO: change all instances of LutDistance to LutPosition
+//
+// look-up tables (LUT):
+//
+// map from t-values (between 0 and 1) to distance on Bezier curve.
+// A t-values is converted to an index in the LUT
+type LutDistance = Vec<f64>;
+// map from t-values (between 0 and 1) to point on Bezier curve
+type LutPosition = Vec<Vec2>;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LutSaveLoad {
-    pub lut: Vec<((f64, f64), Vec<f64>)>,
+    pub lut: Vec<((f64, f64), LutDistance)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-// pub struct GroupSaveLoad {
-//     // the AnchorEdge corresponds to first anchor encountered when traversing the group
-//     pub curves: Vec<(AnchorEdge, Bezier)>,
-//     pub standalone_lut: (f32, Vec<Vec2>),
-//     pub lut: Vec<(AnchorEdge, (f64, f64), Vec<f64>)>,
-// }
-
 pub struct GroupSaveLoad {
     // the AnchorEdge corresponds to first anchor encountered when traversing the group
-    // pub curves: Vec<(AnchorEdge, Bezier)>,
-    pub lut: Vec<(Bezier, AnchorEdge, (f64, f64), Vec<f64>)>,
-    pub standalone_lut: (f32, Vec<Vec2>),
+    pub lut: Vec<(Bezier, AnchorEdge, (f64, f64), LutDistance)>,
+    pub standalone_lut: (f32, LutPosition),
 }
 
-#[derive(Debug, Clone, TypeUuid)]
+#[derive(Debug, Clone, TypeUuid, PartialEq)]
 #[uuid = "1e08866c-0b8a-484e-8bce-31333b21137e"]
 pub struct Group {
+    // TODO: rid Group of redundancy
     pub group: HashSet<(Entity, Handle<Bezier>)>,
     pub handles: HashSet<Handle<Bezier>>,
-    // Attempts to store the start and end points of a group. Fails if not fully connected
+    //
+    // Attempts to store the start and end points of a group.
+    // Fails if curves are not connected
     pub ends: Option<Vec<(Handle<Bezier>, AnchorEdge)>>,
-    // the tuple (f64, f64) represents (t_min, t_max), the min and max t-values for the curve
-    pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), Vec<f64>)>,
-    pub standalone_lut: (f32, Vec<Vec2>),
+    //
+    // vec of each curve's look-up table
+    // the tuple (f64, f64) represents (t_min, t_max), the min and max t-values for
+    // the curve
+    pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), LutDistance)>,
+    pub standalone_lut: (f32, LutPosition),
 }
 
 impl Default for Group {
@@ -224,6 +230,7 @@ impl Group {
             self.ends = None;
             return ();
         }
+        //
         // // if a curve is by itself, return the sole curve as a group
         // else if anchors.len() == 0 && handles.len() == 1 {
         //     ends.push((handle.clone(), AnchorEdge::Start));
@@ -232,6 +239,7 @@ impl Group {
         //     self.ends = Some(ends.clone());
         //     return ();
         // }
+        //
         else if anchors.len() == 1 {
             // println!("Anchors len : 1");
             ends.push((handle.clone(), anchors[0].clone().other()));
@@ -272,12 +280,10 @@ impl Group {
 
     pub fn group_lut(
         &mut self,
-        // ends: Vec<(Handle<Bezier>, AnchorEdge)>,
         bezier_curves: &mut ResMut<Assets<Bezier>>,
-        // globals: &mut ResMut<Globals>,
         id_handle_map: HashMap<u128, Handle<Bezier>>,
     ) {
-        // println!("got ends:  {:?}", self.ends);
+        // if the group is connected with latches, then go ahead and group
         if let Some(ends) = self.ends.clone() {
             let (starting_handle, starting_anchor) = if let Some((handle, anchor)) = ends.get(0) {
                 (handle.clone(), anchor.clone())
@@ -288,12 +294,12 @@ impl Group {
                 )
             };
 
-            let mut luts: Vec<(Vec<f64>, AnchorEdge, f32, Handle<Bezier>)> = Vec::new();
+            let mut luts: Vec<(LutDistance, AnchorEdge, f32, Handle<Bezier>)> = Vec::new();
 
             let mut sorted_handles: Vec<Handle<Bezier>> = vec![starting_handle.clone()];
 
             let initial_bezier = bezier_curves.get(starting_handle.clone()).unwrap();
-            // let mut total_length =  initial_bezier.length()
+            //
             luts.push((
                 initial_bezier.lut.clone(),
                 starting_anchor.other(),
@@ -304,7 +310,6 @@ impl Group {
             if let Some(mut latch) = initial_bezier.latches[&starting_anchor.other()].get(0) {
                 //
                 let mut found_connection = true;
-                // let mut returned_to_initial_latch = false;
 
                 // traverse a latched selection
                 // return None if traversal cannot be done through all curves
@@ -317,8 +322,7 @@ impl Group {
                         id_handle_map.get(&latch.latched_to_id).unwrap().clone();
 
                     if next_curve_handle == starting_handle {
-                        // unused value -> just for readability
-                        // returned_to_initial_latch = true;
+                        // returned to initial latch -> true
                         break;
                     }
 
@@ -350,7 +354,8 @@ impl Group {
                 .iter()
                 .fold(0.0, |acc, (_lut, _anchor, len, _handle)| acc + len);
             let mut min_t = 0.0;
-            let mut group_lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), Vec<f64>)> = Vec::new();
+            let mut group_lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), LutDistance)> =
+                Vec::new();
             // println!("luts : {:?}", luts);
             for (lut, anchor, length, handle) in luts.clone() {
                 let max_t = min_t + length / total_length;
@@ -421,7 +426,7 @@ impl Group {
             .map(|x| ((x) as f32) / (num_points as f32 - 1.0))
             .collect();
 
-        let mut standalone_lut: (f32, Vec<Vec2>) = (total_length, Vec::new());
+        let mut standalone_lut: (f32, LutPosition) = (total_length, Vec::new());
         for t in vrange {
             standalone_lut
                 .1
@@ -462,26 +467,33 @@ impl Default for Maps {
     }
 }
 
+// pub struct History {
+//     pub history: Vec<Handle<Bezier>>,
+// }
+
+pub struct Selection {
+    pub selected: Group,
+}
+
+impl Default for Selection {
+    fn default() -> Self {
+        Self {
+            selected: Group::default(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Globals {
     pub do_hide_anchors: bool,
     pub do_hide_bounding_boxes: bool,
-    pub do_spawn_curve: bool,
-    pub num_points: usize,
+    pub num_points_on_curve: usize,
     pub camera_scale: f32,
     pub scale: f32,
     pub picked_color: Option<Color>,
-    pub history: Vec<Handle<Bezier>>,
-    // pub bezier_handles: Vec<Handle<Bezier>>,
-    // pub mesh_handles: HashMap<&'static str, Handle<Mesh>>,
-    // pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
-    // pub id_handle_map: HashMap<u128, Handle<Bezier>>,
-    pub selected: Group,
-    // pub sounds: HashMap<&'static str, Handle<AudioSource>>,
     pub sound_on: bool,
     pub hide_control_points: bool,
     pub group_lut_num_points: u32,
-    // pub groups: Vec<Group>,
 }
 
 impl Default for Globals {
@@ -489,21 +501,13 @@ impl Default for Globals {
         Self {
             do_hide_bounding_boxes: true,
             do_hide_anchors: false,
-            do_spawn_curve: false,
-            num_points: 25,
             camera_scale: 0.15,
             scale: 1.0,
             picked_color: None,
-            history: Vec::new(),
-            // mesh_handles: HashMap::new(),
-            // pipeline_handles: HashMap::new(),
-            // id_handle_map: HashMap::new(),
-            selected: Group::default(),
-            // sounds: HashMap::new(),
             sound_on: true,
             hide_control_points: false,
+            num_points_on_curve: 25,
             group_lut_num_points: 100,
-            // groups: Vec::new(),
         }
     }
 }
@@ -553,15 +557,12 @@ impl Default for MyShader {
 #[uuid = "1e08866c-0b8a-437e-8bce-37733b21957e"]
 pub struct Bezier {
     pub positions: BezierPositions,
-    pub previous_positions: BezierPositions,
-    pub move_quad: Anchor, //MoveBezierElement,
+    pub previous_positions: BezierPositions, // was useful for an undo functionality
+    pub move_quad: Anchor,
     pub color: Option<Color>,
     pub do_compute_lut: bool,
-    pub lut: Vec<f64>,
+    pub lut: LutDistance,
     pub id: u128,
-    pub just_created: bool,
-    // pub latch_start: Option<LatchData>, // the u8 is 0 for control_start and 1 for control_end
-    // pub latch_end: Option<LatchData>,
     pub latches: HashMap<AnchorEdge, Vec<LatchData>>,
     pub grouped: bool,
 }
@@ -578,15 +579,11 @@ impl Default for Bezier {
             previous_positions: BezierPositions::default(),
             move_quad: Anchor::None,
             color: None,
-            // lut: look-up table for linearizing the distance on a Bezier curve as a function of the t-value
             do_compute_lut: true,
-            lut: Vec::new(),
-            just_created: true,
+            lut: Vec::new(), // look-up table for linearizing the distance on a Bezier curve as a function of the t-value
             id: rng.gen(),
             latches,
             grouped: false,
-            // latch_start: None, // id of the latch partner if applicable
-            // latch_end: None,
         }
     }
 }
@@ -1068,6 +1065,7 @@ pub fn adjust_selection_attributes(
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
     globals: ResMut<Globals>,
+    selection: ResMut<Selection>,
     mut action_event_reader: EventReader<Action>,
     user_state: Res<UserState>,
 ) {
@@ -1090,7 +1088,7 @@ pub fn adjust_selection_attributes(
         // We set the mesh attributes as a function of the bounding box.
         // This could be done by removing the mesh from the mesh asset
         // and adding a brand new mesh
-        for (_entity, selected_handle) in globals.selected.group.clone() {
+        for (_entity, selected_handle) in selection.selected.group.clone() {
             let bezier = bezier_curves.get(selected_handle).unwrap();
 
             let (bound0, bound1) = bezier.bounding_box();
@@ -1143,7 +1141,7 @@ pub fn adjust_selecting_attributes(
     if let UserState::Selecting(click_position) = user_state.as_ref() {
         let mouse_position = cursor.position;
 
-        let (mut minx, mut maxx, mut miny, mut maxy) = (
+        let (minx, maxx, miny, maxy) = (
             mouse_position.x.min(click_position.x),
             mouse_position.x.max(click_position.x),
             mouse_position.y.min(click_position.y),
@@ -1276,7 +1274,7 @@ pub fn compute_lut(curve: Curve<Coord2>, num_sections: usize) -> Vec<f64> {
         .collect();
 
     // TODO: get rid of redundant length_so_far computations
-    let mut look_up_table: Vec<f64> = Vec::new();
+    let mut look_up_table: LutDistance = Vec::new();
     for distance in vrange {
         let mut length_so_far = 0.0;
         for (idx, sl) in section_lengths.iter().enumerate() {
@@ -1307,7 +1305,7 @@ pub fn compute_lut_long(
     curve: Curve<Coord2>,
     num_sections: usize,
     mut time: Time,
-) -> Option<Vec<f64>> {
+) -> Option<LutDistance> {
     // let time_at_start = time.seconds_since_startup();
     time.update();
     let mut total_time = 0.0;
@@ -1332,7 +1330,7 @@ pub fn compute_lut_long(
     let eta0 = 0.00001;
     let mut eta;
     let gamma = 0.8;
-    let mut look_up_table: Vec<f64> = Vec::new();
+    let mut look_up_table: LutDistance = Vec::new();
     let mut t = 0.0;
     let mut dist_at_t = 0.0;
     let mut cost;
@@ -1398,8 +1396,7 @@ pub fn change_ends_and_controls_params(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     cursor: Res<Cursor>,
-    globals: ResMut<Globals>,
-    mut maps: ResMut<Maps>,
+    maps: ResMut<Maps>,
 ) {
     if cursor.latch.is_empty() {
         let mut latch_info: Option<(LatchData, Vec2, Vec2)> = None;

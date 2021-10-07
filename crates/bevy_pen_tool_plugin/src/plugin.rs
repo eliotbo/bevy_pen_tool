@@ -1,5 +1,3 @@
-use crate::cam::Cam;
-
 use crate::inputs::{
     begin_move_on_mouseclick,
     button_system,
@@ -17,12 +15,13 @@ use crate::inputs::{
     record_mouse_events_system,
     rescale,
     save,
-    selection,
+    // selection,
     selection_box_init,
     selection_final,
     send_action,
+    spawn_curve_order_on_mouseclick,
     toggle_ui_button,
-    unselect,
+    // unselect,
     // redo, undo,
     Action,
     Cursor,
@@ -42,7 +41,6 @@ use crate::moves::{
 };
 use crate::spawner::{
     spawn_bezier_system,
-    spawn_curve_order_on_mouseclick,
     spawn_group_bounding_box,
     spawn_group_middle_quads,
     spawn_selecting_bounding_box,
@@ -55,7 +53,6 @@ use crate::util::*;
 use bevy::{
     prelude::*,
     render::{
-        // camera::OrthographicProjection,
         pipeline::PipelineDescriptor,
         render_graph::{base, AssetRenderResourcesNode, RenderGraph},
         shader::ShaderStages,
@@ -85,6 +82,7 @@ impl Plugin for PenPlugin {
             .insert_resource(ClearColor(Color::hex("6e7f80").unwrap()))
             .insert_resource(Cursor::default())
             .insert_resource(Globals::default())
+            .insert_resource(Selection::default())
             .insert_resource(Maps::default())
             .insert_resource(UserState::default())
             .add_startup_system(setup.system().label("setup"))
@@ -114,10 +112,15 @@ impl Plugin for PenPlugin {
                     .after("spawn_curve"),
             )
             .add_system(
+                check_mouse_on_canvas
+                    .label("check_move")
+                    .after("spawn_curve"),
+            )
+            .add_system(
                 spawn_bezier_system
                     .system()
                     .label("spawn_bezier")
-                    .after("move_curve"),
+                    .after("check_move"),
             )
             .add_system(
                 spawn_group_middle_quads
@@ -162,14 +165,13 @@ impl Plugin for PenPlugin {
             .add_system(adjust_group_attributes.system())
             .add_system(hide_anchors.system())
             // .add_system(do_long_lut.system().label("long_lut"))
-            .add_system(save.system().after("long_lut"))
+            .add_system(save.system())
             .add_system(delete.system().label("delete"))
             .add_system(button_system.after("mouse_color"))
-            .add_system(move_ui.system().label("move_ui").after("selection"))
+            .add_system(move_ui.system().label("move_ui"))
             .add_system(toggle_ui_button.system())
             .add_system(hide_control_points)
-            .add_system(send_action)
-            .add_system(check_mouse_on_canvas.before("move_curve"));
+            .add_system(send_action);
     }
 }
 
@@ -179,7 +181,6 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     mut render_graph: ResMut<RenderGraph>,
-    mut globals: ResMut<Globals>,
     mut maps: ResMut<Maps>,
 ) {
     asset_server.watch_for_changes().unwrap();

@@ -1,8 +1,8 @@
-use super::buttons::{ButtonInteraction, UiButton};
-use crate::cam::Cam;
+use super::buttons::{ButtonInteraction, ButtonState, UiButton};
+// use crate::cam::Cam;
 use crate::util::{
     get_close_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad, ColorButton, Globals,
-    GrandParent, LatchData, MyShader, UiAction, UiBoard, UserState,
+    GrandParent, MyShader, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -73,6 +73,13 @@ pub enum Action {
     Selected,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MoveAnchor {
+    pub handle: Handle<Bezier>,
+    pub anchor: Anchor,
+    pub unlatch: bool,
+}
+
 pub fn send_action(
     mut ui_event_reader: EventReader<UiButton>,
     mut action_event_writer: EventWriter<Action>,
@@ -95,13 +102,14 @@ pub fn send_action(
             }
 
             UiButton::Detach => action_event_writer.send(Action::Detach),
-            UiButton::SpawnCurve => action_event_writer.send(Action::SpawnCurve),
+            // UiButton::SpawnCurve => action_event_writer.send(Action::SpawnCurve),
             UiButton::Hide => action_event_writer.send(Action::HideAnchors),
             UiButton::Sound => action_event_writer.send(Action::ToggleSound),
             UiButton::ScaleUp => action_event_writer.send(Action::ScaleUp),
             UiButton::ScaleDown => action_event_writer.send(Action::ScaleDown),
             UiButton::HideControls => action_event_writer.send(Action::HideControls),
             UiButton::Lut => action_event_writer.send(Action::ComputeLut),
+            _ => {}
         }
     }
 
@@ -164,7 +172,7 @@ pub fn record_mouse_events_system(
     mouse_button_input: Res<Input<MouseButton>>,
     mut cursor_res: ResMut<Cursor>,
     mut windows: ResMut<Windows>,
-    cam_transform_query: Query<&Transform, With<Cam>>,
+    cam_transform_query: Query<&Transform, With<OrthographicProjection>>,
     cam_ortho_query: Query<&OrthographicProjection>,
 ) {
     for event in cursor_moved_events.iter() {
@@ -215,7 +223,8 @@ pub fn check_mouse_on_ui(
 ) {
     for (global_transform, shader_handle, mut button_interaction, _ui_button) in query.iter_mut() {
         let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
-        //
+
+        // this looks incorrect, but it is due to buttons being children of the UI board
         let cam_scale = globals.scale * globals.scale;
         if cursor.within_rect(
             global_transform.translation.truncate(),
@@ -256,11 +265,80 @@ pub fn check_mouse_on_ui(
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct MoveAnchor {
-    pub handle: Handle<Bezier>,
-    pub anchor: Anchor,
-    pub unlatch: bool,
+// This is an action. It triggers upon left mouseclick
+pub fn spawn_curve_order_on_mouseclick(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut cursor: ResMut<Cursor>,
+    mut bezier_curves: ResMut<Assets<Bezier>>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+    ui_query: Query<&UiBoard>,
+    globals: ResMut<Globals>,
+    mut event_writer: EventWriter<Latch>,
+    button_query: Query<(&ButtonState, &UiButton)>,
+    mut user_state: ResMut<UserState>,
+) {
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        let mut ui_action = false;
+        for ui_board in ui_query.iter() {
+            if ui_board.action != UiAction::None {
+                ui_action = true;
+                break;
+            }
+        }
+
+        let mut spawn_button_on = false;
+        for (button_state, ui_button) in button_query.iter() {
+            if ui_button == &UiButton::SpawnCurve {
+                spawn_button_on = button_state == &ButtonState::On;
+            }
+        }
+
+        // println!("ui_action: {:?}", ui_action);
+
+        if !ui_action
+            && ((keyboard_input.pressed(KeyCode::LShift)
+                && !keyboard_input.pressed(KeyCode::LControl)
+                && !keyboard_input.pressed(KeyCode::Space))
+                || spawn_button_on)
+        {
+            //TODO: use event instead
+            // globals.do_spawn_curve = true;
+
+            let us = user_state.as_mut();
+            *us = UserState::SpawningCurve;
+
+            // Check for latching on nearby curve endings
+            for bezier_handle in query.iter() {
+                //
+                if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
+                    //
+                    let max_click_distance = 5.0 * globals.scale;
+
+                    let start_close_enough =
+                        (bezier.positions.start - cursor.position).length() < max_click_distance;
+                    let end_close_enough =
+                        (bezier.positions.end - cursor.position).length() < max_click_distance;
+
+                    if start_close_enough && !bezier.quad_is_latched(AnchorEdge::Start) {
+                        //
+                        bezier.send_latch_on_spawn(AnchorEdge::Start, &mut event_writer);
+                        // println!("latched on start point");
+                        break;
+                    } else if end_close_enough && !bezier.quad_is_latched(AnchorEdge::End) {
+                        //
+                        bezier.send_latch_on_spawn(AnchorEdge::End, &mut event_writer);
+                        // println!("latched on end point");
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if mouse_button_input.just_released(MouseButton::Left) {
+        cursor.latch = Vec::new();
+    }
 }
 
 pub fn check_mouse_on_canvas(
@@ -278,7 +356,7 @@ pub fn check_mouse_on_canvas(
         && !keyboard_input.pressed(KeyCode::LShift)
         && !keyboard_input.pressed(KeyCode::LControl)
         && !globals.do_hide_anchors
-        && !globals.do_spawn_curve
+        && !(user_state.as_ref() == &UserState::SpawningCurve)
     {
         if let Some((_distance, anchor, handle)) = get_close_anchor(
             3.0 * globals.scale,
@@ -314,9 +392,6 @@ pub fn check_mouse_on_canvas(
                 //
                 cursor.latch = Vec::new();
                 bezier.move_quad = Anchor::None;
-                // TODO: set the "just_created" field to false elsewhere once the right schedule
-                // of systems is in place
-                bezier.just_created = false;
             }
         }
 
@@ -351,8 +426,6 @@ pub fn pick_color(
                     pressed_button = (true, k);
 
                     globals.picked_color = Some(shader_params.color);
-
-                    // println!("chose color: {:?}", globals.picked_color);
 
                     ui_board.action = UiAction::PickingColor;
 

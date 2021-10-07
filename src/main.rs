@@ -1,29 +1,24 @@
-// use utilities::cam::{Cam, CamPlugin};
-// use utilities::plugin::PenPlugin;
+mod cam;
 
-use utilities::*;
+use bevy_pen_tool_plugin::{Bezier, Globals, Group, PenPlugin};
+use cam::Cam;
 
 use bevy::{math::Quat, prelude::*, render::camera::OrthographicProjection};
 
 // TODO:
-// -2. Bug with group at latched points --> no bug when compute_position_with_lut
-// 0. Make independent of camera
-// 1. Attach UI to a UI camera
-// 4. Collapse the color UI
-// 7. ungroup
-
-// 11. reduce use of Globals
-// 12. make save/load preserve groups
 // 13. make whole group move when selected
-// 14. make undo/redo
-
 // 16. Add RControl and RShift to keys
+
+// long-term
+// 1. Attach UI to a UI camera
+// 7. ungroup
+// 14. make undo/redo
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_startup_system(camera_setup)
-        .add_plugin(CamPlugin)
+        // .add_plugin(CamPlugin)
         .add_plugin(PenPlugin)
         .add_system(spawn_heli)
         .add_system(tests)
@@ -33,12 +28,14 @@ fn main() {
 }
 
 fn camera_setup(mut commands: Commands, mut globals: ResMut<Globals>) {
+    //
+    // bevy_pen_tool is not compatible with a Perspective Camera
     commands
         .spawn_bundle(OrthographicCameraBundle {
             transform: Transform::from_translation(Vec3::new(00.0, 0.0, 10.0))
                 .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
             orthographic_projection: OrthographicProjection {
-                scale: 0.3, //view.camera_scale,
+                scale: 0.19, //view.camera_scale,
                 far: 100000.0,
                 near: -100000.0,
                 // top: 115.0,
@@ -49,13 +46,15 @@ fn camera_setup(mut commands: Commands, mut globals: ResMut<Globals>) {
         })
         .insert(Cam::default());
 
+    // sets the number of rows in the animation position look-up table. More points will
+    // make an animation smoother, but will take more space in memory
     globals.group_lut_num_points = 100;
 }
 
 fn tests(
     keyboard_input: Res<Input<KeyCode>>,
-    groups: ResMut<Assets<Group>>,
-    globals: Res<Globals>,
+    // groups: ResMut<Assets<Group>>,
+    // globals: Res<Globals>,
 ) {
     if keyboard_input.just_pressed(KeyCode::V) {
         println!(" ");
@@ -72,7 +71,6 @@ struct FollowBezierAnimation;
 
 fn spawn_heli(
     mut commands: Commands,
-    mut globals: ResMut<Globals>,
     asset_server: Res<AssetServer>,
     keyboard_input: Res<Input<KeyCode>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -106,6 +104,7 @@ fn spawn_heli(
     }
 }
 
+// animates the helicopter blades
 fn turn_round_animation(mut query: Query<(&mut Transform, &TurnRoundAnimation)>) {
     for (mut transform, _) in query.iter_mut() {
         let quat = Quat::from_rotation_z(0.2);
@@ -113,40 +112,34 @@ fn turn_round_animation(mut query: Query<(&mut Transform, &TurnRoundAnimation)>)
     }
 }
 
+// moves the helicopter along the Group path
+// a Group is made up of many latched Bezier curves
 fn follow_bezier_group(
     mut query: Query<(&mut Transform, &FollowBezierAnimation)>,
-    mut globals: ResMut<Globals>,
     groups: Res<Assets<Group>>,
     bezier_curves: ResMut<Assets<Bezier>>,
     time: Res<Time>,
 ) {
     if let Some(group) = groups.iter().next() {
         let t_time = (time.seconds_since_startup() * 0.1) % 1.0;
-        let pos = group.1.compute_position_with_bezier(&bezier_curves, t_time);
-        // let pos2 = group
-        //     .1
-        //     // .compute_position_with_bezier(&bezier_curves, (t_time + 0.001) % 1.0);
-        //     .compute_position_with_lut(((t_time + 0.001) % 1.0) as f32);
+        let pos = group.1.compute_position_with_lut(t_time as f32);
 
-        let pos2 = group
+        // the heli looks ahead (10% of the curve length) to orient itself
+        let further_pos = group
             .1
-            // .compute_position_with_bezier(&bezier_curves, (t_time + 0.001) % 1.0);
             .compute_position_with_lut(((t_time + 0.1) % 1.0) as f32);
 
         for (mut transform, _bezier_animation) in query.iter_mut() {
             transform.translation.x = pos.x;
             transform.translation.y = pos.y;
 
-            let diff = pos - pos2;
+            // compute the forward direction
+            let diff = pos - further_pos;
             let target_angle = diff.y.atan2(diff.x) + 3.1415;
-            let (axis, mut current_angle) = transform.rotation.to_axis_angle();
             let mut next_angle = target_angle;
 
-            println!(
-                "angles: {}, {}",
-                target_angle * 180.0 / 3.1416,
-                current_angle * 180.0 / 3.1416,
-            );
+            let (_axis, current_angle) = transform.rotation.to_axis_angle();
+
             let max_angle = 3.0 / 180.0 * 3.1416;
 
             let target_360 = target_angle - 3.1416 * 2.0;
@@ -156,9 +149,9 @@ fn follow_bezier_group(
                 diff = diff_360;
             }
 
+            // clamp the angular speed of heli
             if diff.abs() > max_angle {
                 next_angle = current_angle + diff.signum() * max_angle;
-                println!("jutin");
             }
 
             transform.rotation = Quat::from_rotation_z(next_angle as f32);

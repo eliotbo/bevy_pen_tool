@@ -15,7 +15,7 @@ pub fn spawn_selection_bounding_box(
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     // mut render_graph: ResMut<RenderGraph>,
     globals: ResMut<Globals>,
-    mut maps: ResMut<Maps>,
+    maps: ResMut<Maps>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
 ) {
@@ -61,7 +61,7 @@ pub fn spawn_selecting_bounding_box(
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     // mut render_graph: ResMut<RenderGraph>,
     globals: ResMut<Globals>,
-    mut maps: ResMut<Maps>,
+    maps: ResMut<Maps>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
 ) {
@@ -110,7 +110,7 @@ pub fn spawn_group_bounding_box(
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
     mut group_event_reader: EventReader<Handle<Group>>,
-    mut maps: ResMut<Maps>,
+    maps: ResMut<Maps>,
     // group: &Group,
 ) {
     // Bounding Box for group
@@ -160,7 +160,7 @@ pub fn spawn_group_middle_quads(
     clearcolor_struct: Res<ClearColor>,
     // group_handle: Handle<Group>,
     groups: ResMut<Assets<Group>>,
-    mut maps: ResMut<Maps>,
+    maps: ResMut<Maps>,
     // mut group_event_reader: EventReader<Group>,
     mut group_event_reader: EventReader<Handle<Group>>,
 ) {

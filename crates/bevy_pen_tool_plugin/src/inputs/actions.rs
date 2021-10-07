@@ -1,14 +1,12 @@
-use super::buttons::{ButtonState, UiButton};
 use super::inputs::{Action, Cursor, MoveAnchor};
 use crate::spawner::spawn_bezier;
 use crate::GroupMiddleQuad;
 
 use crate::util::{
-    compute_lut, compute_lut_long, get_close_anchor, get_close_anchor_entity,
-    get_close_still_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad,
-    EndpointQuad, Globals, GrandParent, Group, GroupBoxQuad, GroupSaveLoad, LatchData, Loaded,
-    Maps, MiddlePointQuad, MyShader, OfficialLatch, SelectedBoxQuad, SelectingBoxQuad, UiAction,
-    UiBoard, UserState,
+    compute_lut, compute_lut_long, get_close_anchor_entity, get_close_still_anchor, Anchor,
+    AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, GrandParent,
+    Group, GroupBoxQuad, GroupSaveLoad, LatchData, Loaded, Maps, MiddlePointQuad, MyShader,
+    OfficialLatch, SelectedBoxQuad, SelectingBoxQuad, Selection, UserState,
 };
 
 use bevy::prelude::*;
@@ -31,7 +29,7 @@ pub fn recompute_lut(
     // mut ui_event_reader: EventReader<UiButton>,
     mut action_event_reader: EventReader<Action>,
     globals: ResMut<Globals>,
-    mut maps: ResMut<Maps>,
+    maps: ResMut<Maps>,
     time: Res<Time>,
 ) {
     if let Some(Action::ComputeLut) = action_event_reader.iter().next() {
@@ -74,7 +72,7 @@ pub fn recompute_lut(
 pub fn begin_move_on_mouseclick(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     globals: ResMut<Globals>,
-    mut maps: ResMut<Maps>,
+    maps: ResMut<Maps>,
     mut move_event_reader: EventReader<MoveAnchor>,
     audio: Res<Audio>,
 ) {
@@ -137,61 +135,64 @@ pub fn begin_move_on_mouseclick(
     }
 }
 
-pub fn selection(
-    mut globals: ResMut<Globals>,
-    cursor: ResMut<Cursor>,
-    bezier_curves: ResMut<Assets<Bezier>>,
-    groups: ResMut<Assets<Group>>,
-    mut visible_selection_query: Query<&mut Visible, With<SelectedBoxQuad>>,
-    group_query: Query<&Handle<Group>>,
-    query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
-    mut action_event_reader: EventReader<Action>,
-) {
-    if let Some(Action::Select) = action_event_reader.iter().next() {
-        println!("select");
-        if let Some((_distance, _anchor, entity, selected_handle)) = get_close_anchor_entity(
-            2.0 * globals.scale,
-            cursor.position,
-            &bezier_curves,
-            &query,
-            globals.scale,
-        ) {
-            // if the selected quad is part of a group, show group selection
-            for group_handle in group_query.iter() {
-                let group = groups.get(group_handle).unwrap();
-                //
-                if group.handles.contains(&selected_handle) {
-                    globals.selected = group.clone();
-                    for mut visible in visible_selection_query.iter_mut() {
-                        visible.is_visible = true;
-                    }
+// // Select by clicking on anchors
+// pub fn selection(
+//     mut globals: ResMut<Globals>,
+//     mut selection: ResMut<Selection>,
+//     cursor: ResMut<Cursor>,
+//     bezier_curves: ResMut<Assets<Bezier>>,
+//     groups: ResMut<Assets<Group>>,
+//     mut visible_selection_query: Query<&mut Visible, With<SelectedBoxQuad>>,
+//     group_query: Query<&Handle<Group>>,
+//     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+//     mut action_event_reader: EventReader<Action>,
+// ) {
+//     if let Some(Action::Select) = action_event_reader.iter().next() {
+//         println!("select");
+//         if let Some((_distance, _anchor, entity, selected_handle)) = get_close_anchor_entity(
+//             2.0 * globals.scale,
+//             cursor.position,
+//             &bezier_curves,
+//             &query,
+//             globals.scale,
+//         ) {
+//             // if the selected quad is part of a group, show group selection
+//             for group_handle in group_query.iter() {
+//                 let group = groups.get(group_handle).unwrap();
+//                 //
+//                 if group.handles.contains(&selected_handle) {
+//                     selection.selected = group.clone();
+//                     for mut visible in visible_selection_query.iter_mut() {
+//                         visible.is_visible = true;
+//                     }
 
-                    return ();
-                }
-            }
+//                     return ();
+//                 }
+//             }
 
-            let selected_entity = entity.clone();
+//             let selected_entity = entity.clone();
 
-            // add the selected quad to the selected group
-            globals
-                .selected
-                .group
-                .insert((selected_entity.clone(), selected_handle.clone()));
+//             // add the selected quad to the selected group
+//             selection
+//                 .selected
+//                 .group
+//                 .insert((selected_entity.clone(), selected_handle.clone()));
 
-            globals.selected.handles.insert(selected_handle.clone());
+//             selection.selected.handles.insert(selected_handle.clone());
 
-            // these will be computed when a group order has been emitted
-            globals.selected.ends = None;
-            globals.selected.lut = Vec::new();
+//             // these will be computed when a group order has been emitted
+//             selection.selected.ends = None;
+//             selection.selected.lut = Vec::new();
 
-            for mut visible in visible_selection_query.iter_mut() {
-                visible.is_visible = true;
-            }
-            // println!("selectd: {:?}", &globals.selected);
-        }
-    }
-}
+//             for mut visible in visible_selection_query.iter_mut() {
+//                 visible.is_visible = true;
+//             }
+//             // println!("selectd: {:?}", &globals.selected);
+//         }
+//     }
+// }
 
+// Select by dragging the edge of a box
 pub fn selection_box_init(
     globals: ResMut<Globals>,
     mut user_state: ResMut<UserState>,
@@ -223,7 +224,7 @@ pub fn selection_box_init(
 }
 
 pub fn selection_final(
-    mut globals: ResMut<Globals>,
+    mut selection: ResMut<Selection>,
     mut user_state: ResMut<UserState>,
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
@@ -275,7 +276,7 @@ pub fn selection_final(
                             for mut visible_selecting in query_set.q0().iter_mut() {
                                 visible_selecting.is_visible = false;
                             }
-                            globals.selected = selected;
+                            selection.selected = selected;
                             let us = user_state.as_mut();
                             *us = UserState::Idle;
                             return ();
@@ -288,8 +289,8 @@ pub fn selection_final(
                     selected.handles.insert(bezier_handle.clone());
                 }
             }
-            globals.selected = selected;
-            println!("selected: {:?}", globals.selected);
+            selection.selected = selected;
+            println!("selected: {:?}", selection.selected);
         }
         let us = user_state.as_mut();
         *us = UserState::Idle;
@@ -304,15 +305,15 @@ pub fn selection_final(
 }
 
 pub fn unselect(
-    mut globals: ResMut<Globals>,
+    mut selection: ResMut<Selection>,
     mut visible_selection_query: Query<&mut Visible, With<SelectedBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
 ) {
     if let Some(Action::Unselect) = action_event_reader.iter().next() {
-        globals.selected.group = HashSet::new();
-        globals.selected.handles = HashSet::new();
-        globals.selected.ends = None;
-        globals.selected.lut = Vec::new();
+        selection.selected.group = HashSet::new();
+        selection.selected.handles = HashSet::new();
+        selection.selected.ends = None;
+        selection.selected.lut = Vec::new();
 
         for mut visible in visible_selection_query.iter_mut() {
             visible.is_visible = false;
@@ -320,11 +321,13 @@ pub fn unselect(
     }
 }
 
+// group curves together to form a more complex path
 pub fn groupy(
     mut commands: Commands,
     mut groups: ResMut<Assets<Group>>,
     globals: ResMut<Globals>,
-    mut maps: ResMut<Maps>,
+    selection: ResMut<Selection>,
+    maps: ResMut<Maps>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
     group_query: Query<(Entity, &Handle<Group>), Or<(With<GroupBoxQuad>, With<GroupMiddleQuad>)>>,
@@ -349,7 +352,7 @@ pub fn groupy(
     if do_group {
         let id_handle_map: HashMap<u128, Handle<Bezier>> = maps.id_handle_map.clone();
 
-        let mut selected = globals.selected.clone();
+        let mut selected = selection.selected.clone();
 
         selected.find_connected_ends(&mut bezier_curves, id_handle_map.clone());
         // println!("connected ends: {:?}, ", selected.ends);
@@ -432,10 +435,9 @@ pub fn groupy(
 // }
 
 pub fn delete(
-    // keyboard_input: Res<Input<KeyCode>>,
     mut commands: Commands,
-    mut globals: ResMut<Globals>,
-    mut maps: ResMut<Maps>,
+    mut selection: ResMut<Selection>,
+    maps: ResMut<Maps>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
     mut visible_query: Query<&mut Visible, With<SelectedBoxQuad>>,
@@ -445,13 +447,11 @@ pub fn delete(
 ) {
     // if keyboard_input.pressed(KeyCode::Delete) {
     if let Some(Action::Delete) = action_event_reader.iter().next() {
-        // println!("{:?}", globals.selected.clone());
-
         // list of partners that need to be unlatched
         let mut latched_partners: Vec<Vec<LatchData>> = Vec::new();
         for (entity, bezier_handle) in query.iter() {
             //
-            for (_entity_selected, handle) in globals.selected.group.clone() {
+            for (_entity_selected, handle) in selection.selected.group.clone() {
                 //
                 let bezier = bezier_curves.get_mut(handle.clone()).unwrap();
 
@@ -467,7 +467,7 @@ pub fn delete(
         for (entity, group_handle) in query2.iter() {
             //
             let group = groups.get(group_handle).unwrap();
-            for (_entity_selected, bezier_handle) in globals.selected.group.clone() {
+            for (_entity_selected, bezier_handle) in selection.selected.group.clone() {
                 if group.handles.contains(&bezier_handle) {
                     commands.entity(entity).despawn_recursive();
                 }
@@ -498,8 +498,8 @@ pub fn delete(
         }
 
         // reset selection
-        globals.selected.group = HashSet::new();
-        globals.selected.handles = HashSet::new();
+        selection.selected.group = HashSet::new();
+        selection.selected.handles = HashSet::new();
     }
 }
 
@@ -712,22 +712,17 @@ pub fn save(
 }
 
 pub fn load(
-    // keyboard_input: Res<Input<KeyCode>>,
     query: Query<Entity, Or<(With<BoundingBoxQuad>, With<GroupBoxQuad>)>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    // mut groups: ResMut<Assets<Group>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
+    mut selection: ResMut<Selection>,
     mut maps: ResMut<Maps>,
-    // mut event_reader: EventReader<UiButton>,
-    mut event_writer: EventWriter<Group>,
     mut action_event_reader: EventReader<Action>,
     mut loaded_event_writer: EventWriter<Loaded>,
-    // mut query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 ) {
     if let Some(Action::Load) = action_event_reader.iter().next() {
         let clearcolor = clearcolor_struct.0;
@@ -742,24 +737,9 @@ pub fn load(
         for entity in query.iter() {
             commands.entity(entity).despawn_recursive();
         }
-        globals.history = Vec::new();
+
         globals.do_hide_anchors = false;
         globals.do_hide_bounding_boxes = true;
-
-        // let loaded_bezier_vec: Vec<Bezier> = serde_json::from_str(&contents).unwrap();
-        // for mut bezier in loaded_bezier_vec {
-        //     spawn_bezier(
-        //         &mut bezier,
-        //         &mut bezier_curves,
-        //         &mut commands,
-        //         &mut meshes,
-        //         // &mut pipelines,
-        //         &mut my_shader_params,
-        //         clearcolor,
-        //         &mut globals,
-        //     )
-        // }
-        // println!("{:?}", "loaded Bezier curves");
 
         let path = "curve_groups.txt";
         let mut file = std::fs::File::open(path).unwrap();
@@ -797,7 +777,7 @@ pub fn load(
                 group.lut.push((handle.clone(), anchor, t_ends, local_lut));
             }
         }
-        globals.selected = group.clone();
+        selection.selected = group.clone();
 
         // event_writer.send(group);
 
@@ -919,13 +899,13 @@ pub fn officiate_latch_partnership(
     mut latch_event_reader: EventReader<OfficialLatch>,
     globals: ResMut<Globals>,
     audio: Res<Audio>,
-    mut maps: ResMut<Maps>,
+    maps: ResMut<Maps>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
             let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
             bezier.set_latch(latch.clone());
-            println!("latched, {:?}", bezier.latches);
+            // println!("latched, {:?}", bezier.latches);
 
             if globals.sound_on {
                 if let Some(sound) = maps.sounds.get("latch") {
@@ -936,7 +916,7 @@ pub fn officiate_latch_partnership(
     }
 }
 
-//
+// makes UI and quads bigger or smaller using Ctrl + mousewheel
 pub fn rescale(
     mut grandparent_query: Query<&mut Transform, With<GrandParent>>,
     shader_param_query: Query<&Handle<MyShader>>,

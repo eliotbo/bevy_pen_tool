@@ -1,6 +1,6 @@
-use crate::util::{Globals, MyShader, UiBoard};
+use bevy_pen_tool_plugin::UiBoard;
 
-use bevy::{input::mouse::MouseWheel, prelude::*, render::camera::OrthographicProjection};
+use bevy::prelude::*;
 
 pub struct Cam {
     pub speed: f32,
@@ -29,48 +29,6 @@ impl Plugin for CamPlugin {
     fn build(&self, app: &mut App) {
         app.add_system(camera_movevement_system.system());
         // .add_system(zoom_camera.system());
-    }
-}
-
-pub fn _zoom_camera(
-    mut query: QuerySet<(
-        QueryState<(&mut OrthographicProjection, &mut Cam, &Transform)>,
-        QueryState<(&mut Transform, &mut UiBoard)>,
-    )>,
-    mut mouse_wheel_events: EventReader<MouseWheel>,
-    mut globals: ResMut<Globals>,
-    entity_query: Query<(Entity, &Handle<MyShader>)>,
-    mut res: ResMut<Assets<MyShader>>,
-) {
-    for event in mouse_wheel_events.iter() {
-        let mut cam_query = query.q0();
-        let mut cam_translation = Vec3::ZERO;
-
-        for (mut ortho_proj, mut cam, transform) in cam_query.iter_mut() {
-            let zoom_factor = 1.0 + event.y * 0.2;
-            ortho_proj.scale = ortho_proj.scale * zoom_factor;
-
-            globals.camera_scale = ortho_proj.scale;
-
-            cam.speed = ortho_proj.scale * 3.0 / 0.15;
-
-            for (_entity, params) in entity_query.iter() {
-                res.get_mut(params).unwrap().zoom = ortho_proj.scale;
-            }
-            cam_translation = transform.translation;
-        }
-
-        let mut ui_query = query.q1();
-        for (mut transform, mut ui_board) in ui_query.iter_mut() {
-            let scale = globals.camera_scale / 0.15;
-            transform.scale = Vec3::new(scale, scale, 1.0);
-            transform.translation.x = (ui_board.position.x * scale) + cam_translation.x;
-            transform.translation.y = (ui_board.position.y * scale) + cam_translation.y;
-
-            // ui_board.position = transform.translation.truncate();
-            ui_board.previous_position = transform.translation.truncate();
-            // ui_board.size = Vec2::new(40.0, 75.0) * scale;
-        }
     }
 }
 

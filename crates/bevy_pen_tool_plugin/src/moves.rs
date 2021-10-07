@@ -1,7 +1,7 @@
 use crate::inputs::Cursor;
 use crate::util::{
-    interpolate, AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals,
-    GrandParent, Group, GroupMiddleQuad, MiddlePointQuad, MyShader, UiAction, UiBoard,
+    AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, GrandParent,
+    Group, GroupMiddleQuad, MiddlePointQuad, MyShader, UiAction, UiBoard,
 };
 
 use bevy::prelude::*;
@@ -40,7 +40,7 @@ pub fn move_middle_quads(
     globals: ResMut<Globals>,
 ) {
     let number_of_bezier_curves = bezier_curves.len();
-    let num_points = globals.num_points + 1;
+    let num_points = globals.num_points_on_curve + 1;
     let vrange: Vec<f32> = (0..num_points * number_of_bezier_curves)
         .map(|x| ((x) as f32) / (num_points as f32 - 1.0))
         .collect();
@@ -92,12 +92,6 @@ pub fn move_group_middle_quads(
     // globals: ResMut<Globals>,
     groups: ResMut<Assets<Group>>,
 ) {
-    // let num_points = (globals.num_points + 1) * groups.len();
-    // let vrange: Vec<f32> = (0..num_points * number_of_bezier_curves)
-    // let vrange: Vec<f32> = (0..num_points)
-    //     .map(|x| ((x) as f32) / (num_points as f32 - 1.0))
-    //     .collect();
-
     let mut t = 0.0;
     // println!("START:");
     if let Some(last_handle_tuple) = groups.iter().next() {
@@ -120,8 +114,8 @@ pub fn move_group_middle_quads(
             shader_params.t = t_time as f32;
             // println!("time: {:?}", t_time);
 
-            // let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
-            let pos = group.compute_position_with_lut(t_time as f32);
+            let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
+            // let pos = group.compute_position_with_lut(t_time as f32);
 
             transform.translation.x = pos.x;
             transform.translation.y = pos.y;
@@ -183,7 +177,7 @@ pub fn move_end_quads(
                 && transform.translation.truncate() != bezier.positions.start)
                 || (*point == AnchorEdge::End
                     && transform.translation.truncate() != bezier.positions.end)
-                || bezier.just_created
+            // || bezier.just_created
             {
                 let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
                     bezier.ends_displacement(globals.scale);
@@ -239,13 +233,9 @@ pub fn move_control_quads(
             let rotated: bool = !((quad_angle.abs() - bezier_angle_90.abs()).abs() < 0.01);
 
             // if the quad's translation and rotation are not equal to the corresponding control point, fix them
-            if offset || rotated || bezier.just_created {
-                //
+            if offset || rotated {
                 transform.translation = control_point.extend(transform.translation.z);
-
                 transform.rotation = Quat::from_rotation_z(bezier_angle_90);
-
-                // println!("tac: {:?}, {:?}, {:?}", offset, rotated, id);
             }
         }
     }

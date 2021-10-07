@@ -22,8 +22,6 @@ pub fn spawn_ui(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut globals: ResMut<Globals>,
     mut maps: ResMut<Maps>,
-    // button_materials: Res<ButtonMaterials>,
-    // mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     let colors_str = vec![
         vec!["eee3e7", "ead5dc", "eec9d2", "f4b6c2", "f6abb6"],
@@ -33,7 +31,6 @@ pub fn spawn_ui(
         vec!["011f4b", "03396c", "005b96", "6497b1", "b3cde0"],
         vec!["051e3e", "251e3e", "451e3e", "651e3e", "851e3e"],
         vec!["4a4e4d", "0e9aa7", "3da4ab", "f6cd61", "fe8a71"],
-        // vec!["6e7f80", "536872", "708090", "536878", "36454f"],
         vec!["4b3832", "854442", "fff4e6", "3c2f2f", "be9b7b"],
         vec!["2e003e", "3d2352", "3d1e6d", "8874a3", "e4dcf1"],
     ];
