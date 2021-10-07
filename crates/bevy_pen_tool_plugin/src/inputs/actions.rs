@@ -203,10 +203,8 @@ pub fn selection_box_init(
             globals.scale,
         ) {
         } else {
-            println!("select_box_init");
             let us = user_state.as_mut();
             *us = UserState::Selecting(cursor.position);
-            println!("changed UserState to Selecting");
 
             for mut visible in visible_selection_query.iter_mut() {
                 visible.is_visible = true;
@@ -233,8 +231,6 @@ pub fn selection_final(
     mut action_event_reader: EventReader<Action>,
 ) {
     if let Some(Action::Selected) = action_event_reader.iter().next() {
-        println!("select_box_final");
-
         // let mut changed_user_state = false;
         let mut selected = Group::default();
         if let UserState::Selecting(click_position) = user_state.as_ref() {
@@ -283,7 +279,6 @@ pub fn selection_final(
                 }
             }
             selection.selected = selected;
-            println!("selected: {:?}", selection.selected);
         }
 
         // return the UserState to Idle when finished selecting
@@ -481,7 +476,6 @@ pub fn delete(
                     if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
                         // println!("selectd: {:?}", &latch_local);
                         *latch_local = Vec::new();
-                        println!("deleted partner latches");
                     }
                 }
             }
@@ -681,8 +675,6 @@ pub fn save(
         let mut output = File::create(path).unwrap();
         let _result = output.write(serialized.as_bytes());
 
-        println!("{:?}", "saved individual Bezier curves");
-
         let mut group_vec = Vec::new();
         for group_handle in group_query.iter() {
             let group = groups.get_mut(group_handle).unwrap();
@@ -702,10 +694,11 @@ pub fn save(
         let mut output = File::create(path).unwrap();
         let _result = output.write(serialized.as_bytes());
 
-        println!("{:?}", "saved groups");
+        println!("{:?}", "saved");
     }
 }
 
+// only loads groups
 pub fn load(
     query: Query<Entity, Or<(With<BoundingBoxQuad>, With<GroupBoxQuad>)>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
@@ -721,12 +714,6 @@ pub fn load(
 ) {
     if let Some(Action::Load) = action_event_reader.iter().next() {
         let clearcolor = clearcolor_struct.0;
-
-        // let path = "bezier.txt";
-        // let mut file = std::fs::File::open(path).unwrap();
-
-        // let mut contents = String::new();
-        // file.read_to_string(&mut contents).unwrap();
 
         // delete all current groups and curves before spawning the saved ones
         for entity in query.iter() {
@@ -753,8 +740,6 @@ pub fn load(
                 lut: Vec::new(),
             },
         };
-
-        println!("group_load_save length: {:?}", loaded_groups_vec.len());
 
         for group_load_save in loaded_groups_vec {
             for (mut bezier, anchor, t_ends, local_lut) in group_load_save.lut {

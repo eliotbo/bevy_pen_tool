@@ -280,9 +280,6 @@ impl Group {
             }
         }
 
-        println!("num con : {}", num_con);
-        println!("num curves: {}", num_curves);
-
         if num_con + 2 > num_curves {
             self.ends = Some(ends.clone());
         }
@@ -1338,7 +1335,6 @@ pub fn compute_lut_long(
     // let v = ContinuousView::new().add(f1);
 
     // Page::single(&v).save("function.svg").expect("saving svg");
-    // println!("saving svg");
 
     let eta0 = 0.00001;
     let mut eta;

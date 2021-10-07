@@ -295,8 +295,6 @@ pub fn spawn_curve_order_on_mouseclick(
             }
         }
 
-        // println!("ui_action: {:?}", ui_action);
-
         if !ui_action
             && ((keyboard_input.pressed(KeyCode::LShift)
                 && !keyboard_input.pressed(KeyCode::LControl)
@@ -319,14 +317,12 @@ pub fn spawn_curve_order_on_mouseclick(
                         (bezier.positions.end - cursor.position).length() < max_click_distance;
 
                     if start_close_enough && !bezier.quad_is_latched(AnchorEdge::Start) {
-                        //
+                        // latched
                         bezier.send_latch_on_spawn(AnchorEdge::Start, &mut event_writer);
-                        // println!("latched on start point");
                         break;
                     } else if end_close_enough && !bezier.quad_is_latched(AnchorEdge::End) {
-                        //
+                        // latched
                         bezier.send_latch_on_spawn(AnchorEdge::End, &mut event_writer);
-                        // println!("latched on end point");
                         break;
                     }
                 }
@@ -343,8 +339,8 @@ pub fn spawn_curve_order_on_mouseclick(
 // checks if a mouseclick happened on an anchor, if so it sends a UserState::MovingAnchor event
 pub fn check_mouse_on_canvas(
     keyboard_input: Res<Input<KeyCode>>,
-    mut cursor: ResMut<Cursor>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
+    cursor: ResMut<Cursor>,
+    bezier_curves: ResMut<Assets<Bezier>>,
     mouse_button_input: Res<Input<MouseButton>>,
     query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
     globals: ResMut<Globals>,
@@ -467,7 +463,7 @@ pub fn pick_color(
             let cam_scale = globals.scale * globals.scale;
             for (k, (transform, shader_param_handle, _color_button)) in query.iter().enumerate() {
                 let shader_params = my_shader_params.get(shader_param_handle).unwrap().clone();
-                // println!("{:?}", cam_scale);
+
                 if cursor.within_rect(
                     transform.translation.truncate(),
                     shader_params.size * 1.15 * cam_scale,

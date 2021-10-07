@@ -5,14 +5,35 @@ use cam::{Cam, CamPlugin};
 
 use bevy::{math::Quat, prelude::*, render::camera::OrthographicProjection};
 
+// How to
+//
+// 1. run main.rs
+// 2. explore and have fun
+// 3. spawn multiple curves
+// 4. compute the look-up tables for each curve by pressing Shift + T
+// (step 4 can be repeated anytime an anchor or control point is moved)
+// 5. latch the curves together if they are not already latched at spawn
+// 6. moves the anchors and control points to a desired position
+// (there is a "hide control points" button for when they overlap with anchors)
+// 7. select the latched curves by clicking and dragging a selection box
+// 8. group the curves with Ctrl + G and repeat step 4
+// 9. save the look-up table with Ctrl + S
+// 10. use the look-up table in your app (see the simple_animation.rs example)
+
+// Notes
+//
+// - bevy_pen_tool does not work with a Perspective Camera (only Orthographic)
+// - cannot save multiple groups at once, only a single one
+// - currently, the plugin only works with bevy version 0.5, rev="615d43b",
+//      but this will change
+
 // TODO:
-// 13. make whole group move when selected
-// 16. Add RControl and RShift to keys
+// - make whole group move when selected
+// - Attach UI to a UI camera
 
 // long-term
-// 1. Attach UI to a UI camera
-// 7. ungroup
-// 14. make undo/redo
+// - ungroup
+// - make undo/redo
 
 fn main() {
     App::new()
@@ -54,7 +75,6 @@ struct FollowBezierAnimation;
 fn spawn_heli(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    keyboard_input: Res<Input<KeyCode>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     let heli_handle = asset_server.load("textures/heli.png");

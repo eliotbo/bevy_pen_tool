@@ -42,12 +42,7 @@ pub fn spawn_bezier_system(
         // because the algorithm for finding position along the curves fail
         let epsilon = 0.01;
         let mut control_start: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
-        let mut control_end: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
-
-        // if globals.hide_control_points {
-        //     control_end = cursor.position;
-        //     control_start = cursor.position;
-        // }
+        let control_end: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
 
         let mut latches = HashMap::new();
         latches.insert(AnchorEdge::Start, Vec::new());
@@ -145,9 +140,6 @@ pub fn spawn_bezier(
 
     let bound0 = Vec2::new(ax as f32, ay as f32);
     let bound1 = Vec2::new(bx as f32, by as f32);
-    // let bounds = (bound0, bound1);
-
-    // let bigger_size = (bound1 - bound0) * 1.04;
 
     let qq = 0.0;
     let bigger_size = (bound1 - bound0) + Vec2::new(qq, qq);
@@ -159,10 +151,6 @@ pub fn spawn_bezier(
     let ctr0_pos = bezier.positions.control_start; // - bb_pos;
     let ctr1_pos = bezier.positions.control_end - bb_pos;
 
-    // println!("nah: {:?}", bezier.positions.control_start);
-    // println!("ctrl_0: {:?}", ctr0_pos);
-    // println!("bb: {:?}", bb_pos);
-
     let mesh_handle_bb = meshes.add(Mesh::from(shape::Quad {
         size: bigger_size,
         flip: false,
@@ -170,7 +158,6 @@ pub fn spawn_bezier(
 
     // since bezier is cloned, be careful about modifying it after the cloning, it won't have any side-effects
     let bezier_handle = bezier_curves.add(bezier.clone());
-    println!("spawned {:?}", bezier_handle);
 
     maps.id_handle_map.insert(bezier.id, bezier_handle.clone());
     //////////////////// Bounding box ////////////////////
