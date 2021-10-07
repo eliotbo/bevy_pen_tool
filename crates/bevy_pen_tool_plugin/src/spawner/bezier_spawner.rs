@@ -13,6 +13,7 @@ use std::collections::HashMap;
 
 use rand::prelude::*;
 
+// TODO: merge spawn_bezier_system and spawn_bezier
 pub fn spawn_bezier_system(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut commands: Commands,
@@ -28,7 +29,8 @@ pub fn spawn_bezier_system(
     if user_state.as_ref() == &UserState::SpawningCurve {
         //
         let us = user_state.as_mut();
-        *us = UserState::Idle;
+        *us = UserState::MovingAnchor;
+
         let clearcolor = clearcolor_struct.0;
 
         let mut rng = thread_rng();
@@ -36,7 +38,13 @@ pub fn spawn_bezier_system(
 
         let mut start = cursor.position;
         let mut control_start: Vec2 = cursor.position + Vec2::new(5.0, 5.0);
-        let control_end: Vec2 = cursor.position + Vec2::new(5.0, 5.0);
+
+        let mut control_end: Vec2 = cursor.position + Vec2::new(5.0, 5.0);
+
+        // if globals.hide_control_points {
+        //     control_end = cursor.position;
+        //     control_start = cursor.position;
+        // }
 
         let mut latches = HashMap::new();
         latches.insert(AnchorEdge::Start, Vec::new());
@@ -263,6 +271,14 @@ pub fn spawn_bezier(
     let ctrl_render_piplines =
         RenderPipelines::from_pipelines(vec![RenderPipeline::new(ctrl_pipeline_handle)]);
 
+    let mut visible_ctrl = Visible {
+        is_visible: true,
+        is_transparent: true,
+    };
+    if globals.hide_control_points {
+        visible_ctrl.is_visible = false;
+    };
+
     for k in 0..2 {
         let z_ctr = pos_z + 50.0 + (k as f32) * 10.0;
         let mut ctr_pos_transform = Transform::from_translation(ctr0_pos.extend(z_ctr));
@@ -276,7 +292,7 @@ pub fn spawn_bezier(
         let child = commands
             .spawn_bundle(MeshBundle {
                 mesh: ends_controls_mesh_handle.clone(),
-                visible: visible_anchors.clone(),
+                visible: visible_ctrl.clone(),
                 render_pipelines: ctrl_render_piplines.clone(),
                 transform: ctr_pos_transform,
                 ..Default::default()

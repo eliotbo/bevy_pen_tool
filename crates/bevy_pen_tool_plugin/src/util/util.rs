@@ -53,7 +53,7 @@ pub enum UserState {
     Selecting(Vec2),
     Selected(Group),
     SpawningCurve,
-    MovingAnchor(MoveAnchor),
+    MovingAnchor,
 }
 
 impl Default for UserState {
@@ -144,11 +144,18 @@ pub struct LutSaveLoad {
     pub lut: Vec<((f64, f64), LutDistance)>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StandaloneLut {
+    pub path_length: f32,
+    pub lut: LutPosition,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroupSaveLoad {
     // the AnchorEdge corresponds to first anchor encountered when traversing the group
     pub lut: Vec<(Bezier, AnchorEdge, (f64, f64), LutDistance)>,
-    pub standalone_lut: (f32, LutPosition),
+    // pub standalone_lut: (f32, LutPosition),
+    pub standalone_lut: StandaloneLut,
 }
 
 #[derive(Debug, Clone, TypeUuid, PartialEq)]
@@ -166,7 +173,7 @@ pub struct Group {
     // the tuple (f64, f64) represents (t_min, t_max), the min and max t-values for
     // the curve
     pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), LutDistance)>,
-    pub standalone_lut: (f32, LutPosition),
+    pub standalone_lut: StandaloneLut,
 }
 
 impl Default for Group {
@@ -176,7 +183,10 @@ impl Default for Group {
             handles: HashSet::new(),
             lut: Vec::new(),
             ends: None,
-            standalone_lut: (0.0, Vec::new()),
+            standalone_lut: StandaloneLut {
+                path_length: 0.0,
+                lut: Vec::new(),
+            },
         }
     }
 }
@@ -426,10 +436,13 @@ impl Group {
             .map(|x| ((x) as f32) / (num_points as f32 - 1.0))
             .collect();
 
-        let mut standalone_lut: (f32, LutPosition) = (total_length, Vec::new());
+        let mut standalone_lut: StandaloneLut = StandaloneLut {
+            path_length: total_length,
+            lut: Vec::new(),
+        };
         for t in vrange {
             standalone_lut
-                .1
+                .lut
                 .push(self.compute_position_with_bezier(bezier_curves, t as f64));
         }
 
@@ -439,7 +452,7 @@ impl Group {
     // this is now used inside the plugin, but this would be the function used in
     // an application where the look-up table (lut) would be loaded
     pub fn compute_position_with_lut(&self, t: f32) -> Vec2 {
-        let lut = self.standalone_lut.1.clone();
+        let lut = self.standalone_lut.lut.clone();
         let idx_f64 = t * (lut.len() - 1) as f32;
         let p1 = lut[(idx_f64 as usize)];
         let p2 = lut[idx_f64 as usize + 1];
@@ -920,7 +933,7 @@ pub fn interpolate_vec2(p0: Vec2, p1: Vec2, rem: f32) -> Vec2 {
     return p0 + rem * (p1 - p0);
 }
 
-// // Could use these functions to make the plugin flo_curve independent
+// // Could use these functions to make the plugin independent from flo_curve
 // pub fn lerp(p0: Coord2, p1: Coord2, t: f64) -> Coord2 {
 //     return p0 + t * (p1 - p0);
 // }
@@ -941,11 +954,11 @@ pub fn get_close_anchor(
     max_dist: f32,
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
-    query: &Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+    query: &Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
     // mut globals: ResMut<Globals>,
     scale: f32,
 ) -> Option<(f32, Anchor, Handle<Bezier>)> {
-    for bezier_handle in query.iter() {
+    for (bezier_handle, _) in query.iter() {
         if let Some(bezier) = bezier_curves.get(bezier_handle) {
             let ((start_displacement, end_displacement), (_start_rotation, _end_rotation)) =
                 bezier.ends_displacement(scale);
@@ -1074,7 +1087,7 @@ pub fn adjust_selection_attributes(
     // if mouse_button_input.pressed(MouseButton::Left) {
     //     do_adjust = true;
     // }
-    if let UserState::MovingAnchor(_moving_handle) = user_state.as_ref() {
+    if let UserState::MovingAnchor = user_state.as_ref() {
         do_adjust = true;
     }
     if let Some(Action::Selected) = action_event_reader.iter().next() {

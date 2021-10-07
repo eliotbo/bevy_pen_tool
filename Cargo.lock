@@ -482,6 +482,8 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_pen_tool_plugin",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 mod cam;
 
-use bevy_pen_tool_plugin::{Bezier, Globals, Group, PenPlugin};
-use cam::Cam;
+use bevy_pen_tool_plugin::{Globals, Group, PenPlugin};
+use cam::{Cam, CamPlugin};
 
 use bevy::{math::Quat, prelude::*, render::camera::OrthographicProjection};
 
@@ -17,13 +17,12 @@ use bevy::{math::Quat, prelude::*, render::camera::OrthographicProjection};
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugin(CamPlugin)
         .add_startup_system(camera_setup)
-        // .add_plugin(CamPlugin)
         .add_plugin(PenPlugin)
-        .add_system(spawn_heli)
-        .add_system(tests)
+        .add_startup_system(spawn_heli)
         .add_system(follow_bezier_group.label("animation"))
-        .add_system(turn_round_animation.label("turn").after("animation"))
+        .add_system(turn_round_animation)
         .run();
 }
 
@@ -35,11 +34,9 @@ fn camera_setup(mut commands: Commands, mut globals: ResMut<Globals>) {
             transform: Transform::from_translation(Vec3::new(00.0, 0.0, 10.0))
                 .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
             orthographic_projection: OrthographicProjection {
-                scale: 0.19, //view.camera_scale,
+                scale: 0.19,
                 far: 100000.0,
                 near: -100000.0,
-                // top: 115.0,
-                // dummy
                 ..Default::default()
             },
             ..OrthographicCameraBundle::new_2d()
@@ -51,21 +48,6 @@ fn camera_setup(mut commands: Commands, mut globals: ResMut<Globals>) {
     globals.group_lut_num_points = 100;
 }
 
-fn tests(
-    keyboard_input: Res<Input<KeyCode>>,
-    // groups: ResMut<Assets<Group>>,
-    // globals: Res<Globals>,
-) {
-    if keyboard_input.just_pressed(KeyCode::V) {
-        println!(" ");
-        println!(" ");
-        println!(" ");
-        println!(" ");
-        println!(" ");
-        println!(" ");
-    }
-}
-
 struct TurnRoundAnimation;
 struct FollowBezierAnimation;
 
@@ -75,33 +57,39 @@ fn spawn_heli(
     keyboard_input: Res<Input<KeyCode>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::V) {
-        let heli_handle = asset_server.load("textures/heli.png");
-        let size = Vec2::new(50.0, 50.0);
-        let heli_sprite = commands
-            .spawn_bundle(SpriteBundle {
-                material: materials.add(heli_handle.into()),
-                // mesh: mesh_handle_button.clone(),
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -222.0)),
-                sprite: Sprite::new(size),
-                ..Default::default()
-            })
-            .insert(FollowBezierAnimation)
-            .id();
-        let copter_handle = asset_server.load("textures/copter.png");
-        let copter_sprite = commands
-            .spawn_bundle(SpriteBundle {
-                material: materials.add(copter_handle.into()),
-                // mesh: mesh_handle_button.clone(),
-                transform: Transform::from_translation(Vec3::new(6.0, 2.0, -122.0)),
-                sprite: Sprite::new(size),
-                ..Default::default()
-            })
-            .insert(TurnRoundAnimation)
-            .id();
+    let heli_handle = asset_server.load("textures/heli.png");
+    let size = Vec2::new(50.0, 50.0);
+    let heli_sprite = commands
+        .spawn_bundle(SpriteBundle {
+            material: materials.add(heli_handle.into()),
+            // mesh: mesh_handle_button.clone(),
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, -222.0)),
+            sprite: Sprite::new(size),
+            visible: Visible {
+                is_visible: false,
+                is_transparent: true,
+            },
+            ..Default::default()
+        })
+        .insert(FollowBezierAnimation)
+        .id();
+    let copter_handle = asset_server.load("textures/copter.png");
+    let copter_sprite = commands
+        .spawn_bundle(SpriteBundle {
+            material: materials.add(copter_handle.into()),
+            // mesh: mesh_handle_button.clone(),
+            transform: Transform::from_translation(Vec3::new(6.0, 2.0, -122.0)),
+            sprite: Sprite::new(size),
+            visible: Visible {
+                is_visible: false,
+                is_transparent: true,
+            },
+            ..Default::default()
+        })
+        .insert(TurnRoundAnimation)
+        .id();
 
-        commands.entity(heli_sprite).push_children(&[copter_sprite]);
-    }
+    commands.entity(heli_sprite).push_children(&[copter_sprite]);
 }
 
 // animates the helicopter blades
@@ -116,11 +104,18 @@ fn turn_round_animation(mut query: Query<(&mut Transform, &TurnRoundAnimation)>)
 // a Group is made up of many latched Bezier curves
 fn follow_bezier_group(
     mut query: Query<(&mut Transform, &FollowBezierAnimation)>,
+    mut visible_query: Query<
+        &mut Visible,
+        Or<(With<FollowBezierAnimation>, With<TurnRoundAnimation>)>,
+    >,
     groups: Res<Assets<Group>>,
-    bezier_curves: ResMut<Assets<Bezier>>,
     time: Res<Time>,
 ) {
     if let Some(group) = groups.iter().next() {
+        for mut visible in visible_query.iter_mut() {
+            visible.is_visible = true;
+        }
+
         let t_time = (time.seconds_since_startup() * 0.1) % 1.0;
         let pos = group.1.compute_position_with_lut(t_time as f32);
 

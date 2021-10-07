@@ -1,6 +1,6 @@
 use super::inputs::{Action, Cursor, MoveAnchor};
 use crate::spawner::spawn_bezier;
-use crate::GroupMiddleQuad;
+use crate::{GroupMiddleQuad, StandaloneLut};
 
 use crate::util::{
     compute_lut, compute_lut_long, get_close_anchor_entity, get_close_still_anchor, Anchor,
@@ -694,7 +694,7 @@ pub fn save(
 
             group.compute_standalone_lut(&mut bezier_curves, globals.group_lut_num_points);
             let lut_serialized = serde_json::to_string_pretty(&group.standalone_lut).unwrap();
-            let lut_path = "group_lut.txt";
+            let lut_path = "assets/lut/my_group_lut.txt";
             let mut lut_output = File::create(lut_path).unwrap();
             let _lut_result = lut_output.write(lut_serialized.as_bytes());
 
@@ -727,11 +727,11 @@ pub fn load(
     if let Some(Action::Load) = action_event_reader.iter().next() {
         let clearcolor = clearcolor_struct.0;
 
-        let path = "bezier.txt";
-        let mut file = std::fs::File::open(path).unwrap();
+        // let path = "bezier.txt";
+        // let mut file = std::fs::File::open(path).unwrap();
 
-        let mut contents = String::new();
-        file.read_to_string(&mut contents).unwrap();
+        // let mut contents = String::new();
+        // file.read_to_string(&mut contents).unwrap();
 
         // delete all current groups and curves before spawning the saved ones
         for entity in query.iter() {
@@ -753,7 +753,10 @@ pub fn load(
             handles: HashSet::new(),
             lut: Vec::new(),
             ends: None,
-            standalone_lut: (0.0, Vec::new()),
+            standalone_lut: StandaloneLut {
+                path_length: 0.0,
+                lut: Vec::new(),
+            },
         };
 
         println!("group_load_save length: {:?}", loaded_groups_vec.len());

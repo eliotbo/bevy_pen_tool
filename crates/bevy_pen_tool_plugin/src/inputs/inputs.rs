@@ -1,8 +1,8 @@
 use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
-    get_close_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad, ColorButton, Globals,
-    GrandParent, MyShader, UiAction, UiBoard, UserState,
+    get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad,
+    ColorButton, Globals, GrandParent, MyShader, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -265,6 +265,7 @@ pub fn check_mouse_on_ui(
     }
 }
 
+// TODO: merge spawn_curve_order_on_mouseclick() and check_mouse_on_canvas
 // This is an action. It triggers upon left mouseclick
 pub fn spawn_curve_order_on_mouseclick(
     keyboard_input: Res<Input<KeyCode>>,
@@ -341,12 +342,13 @@ pub fn spawn_curve_order_on_mouseclick(
     }
 }
 
+// checks if a mouseclick happened on an anchor, if so it sends a UserState::MovingAnchor event
 pub fn check_mouse_on_canvas(
     keyboard_input: Res<Input<KeyCode>>,
     mut cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mouse_button_input: Res<Input<MouseButton>>,
-    query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+    query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
     globals: ResMut<Globals>,
     mut move_event_writer: EventWriter<MoveAnchor>,
     mut action_event_writer: EventWriter<Action>,
@@ -358,27 +360,61 @@ pub fn check_mouse_on_canvas(
         && !globals.do_hide_anchors
         && !(user_state.as_ref() == &UserState::SpawningCurve)
     {
-        if let Some((_distance, anchor, handle)) = get_close_anchor(
-            3.0 * globals.scale,
-            cursor.position,
-            &bezier_curves,
-            &query,
-            globals.scale,
-        ) {
-            let unlatch = !keyboard_input.pressed(KeyCode::LShift)
-                && !keyboard_input.pressed(KeyCode::LControl)
-                && keyboard_input.pressed(KeyCode::Space);
+        let mut clicked_on_anchor_ctrl = false;
 
-            let moving_anchor = MoveAnchor {
-                handle,
-                anchor,
-                unlatch,
-            };
-            move_event_writer.send(moving_anchor.clone());
+        // case of nothing is hidden
+        if !globals.hide_control_points {
+            if let Some((_distance, anchor, handle)) = get_close_anchor(
+                3.0 * globals.scale,
+                cursor.position,
+                &bezier_curves,
+                &query,
+                globals.scale,
+            ) {
+                clicked_on_anchor_ctrl = true;
 
-            let user_state = user_state.as_mut();
-            *user_state = UserState::MovingAnchor(moving_anchor);
-        } else {
+                let unlatch = !keyboard_input.pressed(KeyCode::LShift)
+                    && !keyboard_input.pressed(KeyCode::LControl)
+                    && keyboard_input.pressed(KeyCode::Space);
+
+                let moving_anchor = MoveAnchor {
+                    handle,
+                    anchor,
+                    unlatch,
+                };
+                move_event_writer.send(moving_anchor.clone());
+
+                let user_state = user_state.as_mut();
+                *user_state = UserState::MovingAnchor;
+            }
+        }
+
+        // if the control points are hidden, we can only click on the anchors
+        if !clicked_on_anchor_ctrl {
+            if let Some((_dist, anchor_edge, handle)) =
+                get_close_still_anchor(3.0 * globals.scale, cursor.position, &bezier_curves, &query)
+            {
+                clicked_on_anchor_ctrl = true;
+
+                let unlatch = !keyboard_input.pressed(KeyCode::LShift)
+                    && !keyboard_input.pressed(KeyCode::LControl)
+                    && keyboard_input.pressed(KeyCode::Space);
+
+                let anchor: Anchor = anchor_edge.to_anchor();
+                let moving_anchor = MoveAnchor {
+                    handle,
+                    anchor,
+                    unlatch,
+                };
+                move_event_writer.send(moving_anchor.clone());
+
+                let user_state = user_state.as_mut();
+                *user_state = UserState::MovingAnchor;
+            }
+        }
+
+        // case of clicked on nothing
+        if !clicked_on_anchor_ctrl {
             action_event_writer.send(Action::Unselect);
         }
     }
@@ -386,7 +422,7 @@ pub fn check_mouse_on_canvas(
     // let go of all any moving quad upon mouse button release
     if mouse_button_input.just_released(MouseButton::Left) {
         //
-        for bezier_handle in query.iter() {
+        for (bezier_handle, _unused) in query.iter() {
             //
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
                 //
