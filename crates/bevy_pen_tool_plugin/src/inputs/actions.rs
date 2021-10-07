@@ -1,20 +1,12 @@
 use super::inputs::{Action, Cursor, MoveAnchor};
 use crate::spawner::spawn_bezier;
+use crate::util::*;
 use crate::{GroupMiddleQuad, StandaloneLut};
-
-use crate::util::{
-    compute_lut, compute_lut_long, get_close_anchor_entity, get_close_still_anchor, Anchor,
-    AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, GrandParent,
-    Group, GroupBoxQuad, GroupSaveLoad, LatchData, Loaded, Maps, MiddlePointQuad, MyShader,
-    OfficialLatch, SelectedBoxQuad, SelectingBoxQuad, Selection, UserState,
-};
 
 use bevy::prelude::*;
 
-// use rand::prelude::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
-// use std::ops::DerefMut;
 
 use std::fs::File;
 use std::io::Read;
@@ -223,6 +215,7 @@ pub fn selection_box_init(
     }
 }
 
+// inserts curves inside box in the Selection resource
 pub fn selection_final(
     mut selection: ResMut<Selection>,
     mut user_state: ResMut<UserState>,
@@ -292,6 +285,8 @@ pub fn selection_final(
             selection.selected = selected;
             println!("selected: {:?}", selection.selected);
         }
+
+        // return the UserState to Idle when finished selecting
         let us = user_state.as_mut();
         *us = UserState::Idle;
 

@@ -1,53 +1,6 @@
-use crate::inputs::{
-    begin_move_on_mouseclick,
-    button_system,
-    check_mouse_on_canvas,
-    check_mouse_on_ui,
-    delete,
-    groupy,
-    hide_anchors,
-    hide_control_points,
-    latch2,
-    load,
-    officiate_latch_partnership,
-    pick_color,
-    recompute_lut,
-    record_mouse_events_system,
-    rescale,
-    save,
-    // selection,
-    selection_box_init,
-    selection_final,
-    send_action,
-    spawn_curve_order_on_mouseclick,
-    toggle_ui_button,
-    // unselect,
-    // redo, undo,
-    Action,
-    Cursor,
-    Latch,
-    MoveAnchor,
-
-    UiButton,
-};
-use crate::moves::{
-    move_bb_quads,
-    move_control_quads,
-    move_end_quads,
-    move_group_middle_quads,
-    move_middle_quads,
-    move_ui,
-    //
-};
-use crate::spawner::{
-    spawn_bezier_system,
-    spawn_group_bounding_box,
-    spawn_group_middle_quads,
-    spawn_selecting_bounding_box,
-    spawn_selection_bounding_box,
-    spawn_ui,
-    //
-};
+use crate::inputs::*;
+use crate::moves::*;
+use crate::spawner::*;
 use crate::util::*;
 
 use bevy::{
@@ -171,7 +124,8 @@ impl Plugin for PenPlugin {
             .add_system(move_ui.system().label("move_ui"))
             .add_system(toggle_ui_button.system())
             .add_system(hide_control_points)
-            .add_system(send_action);
+            .add_system(send_action)
+            .add_system(mouse_release_actions);
     }
 }
 

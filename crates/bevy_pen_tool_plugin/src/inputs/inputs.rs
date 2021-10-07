@@ -303,9 +303,6 @@ pub fn spawn_curve_order_on_mouseclick(
                 && !keyboard_input.pressed(KeyCode::Space))
                 || spawn_button_on)
         {
-            //TODO: use event instead
-            // globals.do_spawn_curve = true;
-
             let us = user_state.as_mut();
             *us = UserState::SpawningCurve;
 
@@ -337,6 +334,7 @@ pub fn spawn_curve_order_on_mouseclick(
         }
     }
 
+    // TODO: verify if this is still needed
     if mouse_button_input.just_released(MouseButton::Left) {
         cursor.latch = Vec::new();
     }
@@ -389,7 +387,7 @@ pub fn check_mouse_on_canvas(
             }
         }
 
-        // if the control points are hidden, we can only click on the anchors
+        // if the control points are hidden, user can only click on the anchors
         if !clicked_on_anchor_ctrl {
             if let Some((_dist, anchor_edge, handle)) =
                 get_close_still_anchor(3.0 * globals.scale, cursor.position, &bezier_curves, &query)
@@ -418,10 +416,28 @@ pub fn check_mouse_on_canvas(
             action_event_writer.send(Action::Unselect);
         }
     }
+}
 
-    // let go of all any moving quad upon mouse button release
+pub fn mouse_release_actions(
+    mouse_button_input: Res<Input<MouseButton>>,
+    mut bezier_curves: ResMut<Assets<Bezier>>,
+    query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
+    mut user_state: ResMut<UserState>,
+    // keyboard_input: Res<Input<KeyCode>>,
+    mut cursor: ResMut<Cursor>,
+) {
     if mouse_button_input.just_released(MouseButton::Left) {
         //
+        // set global user state to Idle
+
+        let user_state = user_state.as_mut();
+        if let UserState::Selected(_) = user_state {
+        } else if let UserState::Selecting(_) = user_state {
+        } else {
+            *user_state = UserState::Idle;
+        }
+
+        // let go of all any moving quad upon mouse button release
         for (bezier_handle, _unused) in query.iter() {
             //
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
@@ -430,9 +446,6 @@ pub fn check_mouse_on_canvas(
                 bezier.move_quad = Anchor::None;
             }
         }
-
-        // let user_state = user_state.as_mut();
-        // *user_state = UserState::Idle;
     }
 }
 

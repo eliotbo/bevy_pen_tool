@@ -37,9 +37,12 @@ pub fn spawn_bezier_system(
         let mut spawner_id: u128 = rng.gen();
 
         let mut start = cursor.position;
-        let mut control_start: Vec2 = cursor.position + Vec2::new(5.0, 5.0);
 
-        let mut control_end: Vec2 = cursor.position + Vec2::new(5.0, 5.0);
+        // the control points cannot be exactly in the same positions as the anchors
+        // because the algorithm for finding position along the curves fail
+        let epsilon = 0.01;
+        let mut control_start: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
+        let mut control_end: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
 
         // if globals.hide_control_points {
         //     control_end = cursor.position;

@@ -3,8 +3,14 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 
+//
+//
+//
 // This example shows how to load a look-up table created with bevy_pen_tool
 // and how to run the corresponding animation totally independently of bevy_pen_tool
+//
+//
+//
 
 // look-up table
 #[derive(Serialize, Deserialize)]
