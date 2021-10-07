@@ -7,8 +7,8 @@ use crate::util::{
     compute_lut, compute_lut_long, get_close_anchor, get_close_anchor_entity,
     get_close_still_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad,
     EndpointQuad, Globals, GrandParent, Group, GroupBoxQuad, GroupSaveLoad, LatchData, Loaded,
-    MiddlePointQuad, MyShader, OfficialLatch, SelectedBoxQuad, SelectingBoxQuad, UiAction, UiBoard,
-    UserState,
+    Maps, MiddlePointQuad, MyShader, OfficialLatch, SelectedBoxQuad, SelectingBoxQuad, UiAction,
+    UiBoard, UserState,
 };
 
 use bevy::prelude::*;
@@ -31,6 +31,7 @@ pub fn recompute_lut(
     // mut ui_event_reader: EventReader<UiButton>,
     mut action_event_reader: EventReader<Action>,
     globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
     time: Res<Time>,
 ) {
     if let Some(Action::ComputeLut) = action_event_reader.iter().next() {
@@ -60,7 +61,7 @@ pub fn recompute_lut(
             for group_handle in query_group.iter() {
                 let group = groups.get_mut(group_handle).unwrap();
                 if group.handles.contains(bezier_handle) {
-                    let id_handle_map = globals.id_handle_map.clone();
+                    let id_handle_map = maps.id_handle_map.clone();
                     group.group_lut(&mut bezier_curves, id_handle_map);
                     group.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
                 }
@@ -73,6 +74,7 @@ pub fn recompute_lut(
 pub fn begin_move_on_mouseclick(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
     mut move_event_reader: EventReader<MoveAnchor>,
     audio: Res<Audio>,
 ) {
@@ -119,14 +121,14 @@ pub fn begin_move_on_mouseclick(
     // unlatch partner
     if let Some(latch) = latch_partners.get(0) {
         //
-        if let Some(handle) = globals.id_handle_map.get(&latch.latched_to_id) {
+        if let Some(handle) = maps.id_handle_map.get(&latch.latched_to_id) {
             //
             let bezier = bezier_curves.get_mut(handle).unwrap();
             //
             if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
                 *latch_local = Vec::new();
                 if globals.sound_on {
-                    if let Some(sound) = globals.sounds.get("unlatch") {
+                    if let Some(sound) = maps.sounds.get("unlatch") {
                         audio.play(sound.clone());
                     }
                 }
@@ -322,6 +324,7 @@ pub fn groupy(
     mut commands: Commands,
     mut groups: ResMut<Assets<Group>>,
     globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
     group_query: Query<(Entity, &Handle<Group>), Or<(With<GroupBoxQuad>, With<GroupMiddleQuad>)>>,
@@ -344,7 +347,7 @@ pub fn groupy(
     }
 
     if do_group {
-        let id_handle_map: HashMap<u128, Handle<Bezier>> = globals.id_handle_map.clone();
+        let id_handle_map: HashMap<u128, Handle<Bezier>> = maps.id_handle_map.clone();
 
         let mut selected = globals.selected.clone();
 
@@ -358,7 +361,7 @@ pub fn groupy(
         }
 
         if globals.sound_on {
-            if let Some(sound) = globals.sounds.get("group") {
+            if let Some(sound) = maps.sounds.get("group") {
                 audio.play(sound.clone());
             }
         }
@@ -432,6 +435,7 @@ pub fn delete(
     // keyboard_input: Res<Input<KeyCode>>,
     mut commands: Commands,
     mut globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
     mut visible_query: Query<&mut Visible, With<SelectedBoxQuad>>,
@@ -475,7 +479,7 @@ pub fn delete(
             //
             if let Some(latch) = latch_vec.get(0) {
                 //
-                if let Some(handle) = globals.id_handle_map.get(&latch.latched_to_id) {
+                if let Some(handle) = maps.id_handle_map.get(&latch.latched_to_id) {
                     //
                     let bezier = bezier_curves.get_mut(handle).unwrap();
 
@@ -718,6 +722,7 @@ pub fn load(
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
     // mut event_reader: EventReader<UiButton>,
     mut event_writer: EventWriter<Group>,
     mut action_event_reader: EventReader<Action>,
@@ -784,6 +789,7 @@ pub fn load(
                     &mut my_shader_params,
                     clearcolor,
                     &mut globals,
+                    &mut maps,
                 );
                 group.group.insert((entity.clone(), handle.clone()));
                 group.handles.insert(handle.clone());
@@ -913,6 +919,7 @@ pub fn officiate_latch_partnership(
     mut latch_event_reader: EventReader<OfficialLatch>,
     globals: ResMut<Globals>,
     audio: Res<Audio>,
+    mut maps: ResMut<Maps>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
@@ -921,7 +928,7 @@ pub fn officiate_latch_partnership(
             println!("latched, {:?}", bezier.latches);
 
             if globals.sound_on {
-                if let Some(sound) = globals.sounds.get("latch") {
+                if let Some(sound) = maps.sounds.get("latch") {
                     audio.play(sound.clone());
                 }
             }

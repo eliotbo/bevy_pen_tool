@@ -444,6 +444,24 @@ impl Group {
     }
 }
 
+pub struct Maps {
+    pub mesh_handles: HashMap<&'static str, Handle<Mesh>>,
+    pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
+    pub id_handle_map: HashMap<u128, Handle<Bezier>>,
+    pub sounds: HashMap<&'static str, Handle<AudioSource>>,
+}
+
+impl Default for Maps {
+    fn default() -> Self {
+        Maps {
+            mesh_handles: HashMap::new(),
+            pipeline_handles: HashMap::new(),
+            id_handle_map: HashMap::new(),
+            sounds: HashMap::new(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Globals {
     pub do_hide_anchors: bool,
@@ -455,11 +473,11 @@ pub struct Globals {
     pub picked_color: Option<Color>,
     pub history: Vec<Handle<Bezier>>,
     // pub bezier_handles: Vec<Handle<Bezier>>,
-    pub mesh_handles: HashMap<&'static str, Handle<Mesh>>,
-    pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
-    pub id_handle_map: HashMap<u128, Handle<Bezier>>,
+    // pub mesh_handles: HashMap<&'static str, Handle<Mesh>>,
+    // pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
+    // pub id_handle_map: HashMap<u128, Handle<Bezier>>,
     pub selected: Group,
-    pub sounds: HashMap<&'static str, Handle<AudioSource>>,
+    // pub sounds: HashMap<&'static str, Handle<AudioSource>>,
     pub sound_on: bool,
     pub hide_control_points: bool,
     pub group_lut_num_points: u32,
@@ -477,14 +495,14 @@ impl Default for Globals {
             scale: 1.0,
             picked_color: None,
             history: Vec::new(),
-            mesh_handles: HashMap::new(),
-            pipeline_handles: HashMap::new(),
-            id_handle_map: HashMap::new(),
+            // mesh_handles: HashMap::new(),
+            // pipeline_handles: HashMap::new(),
+            // id_handle_map: HashMap::new(),
             selected: Group::default(),
-            sounds: HashMap::new(),
+            // sounds: HashMap::new(),
             sound_on: true,
             hide_control_points: false,
-            group_lut_num_points: 500,
+            group_lut_num_points: 100,
             // groups: Vec::new(),
         }
     }
@@ -1375,16 +1393,18 @@ pub fn compute_lut_long(
     return Some(look_up_table);
 }
 
+// TODO: refactor
 pub fn change_ends_and_controls_params(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     cursor: Res<Cursor>,
     globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
 ) {
     if cursor.latch.is_empty() {
         let mut latch_info: Option<(LatchData, Vec2, Vec2)> = None;
 
-        // use an event here instead of scanning for a moving quad
+        // TODO: use an event here instead of scanning for a moving quad
         for bezier_handle in query.iter_mut() {
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
                 bezier.update_positions_cursor(&cursor);
@@ -1399,7 +1419,7 @@ pub fn change_ends_and_controls_params(
         if let Some((partner_latch, mover_position, opposite_control)) = latch_info {
             // println!("{:?}", mover_position);
             // println!("moving latch");
-            if let Some(bezier_handle) = globals.id_handle_map.get(&partner_latch.latched_to_id) {
+            if let Some(bezier_handle) = maps.id_handle_map.get(&partner_latch.latched_to_id) {
                 let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
                 bezier.update_latched_position(
                     partner_latch.partners_edge,

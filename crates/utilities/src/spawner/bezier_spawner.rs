@@ -1,7 +1,8 @@
 use crate::inputs::{Action, ButtonState, Cursor, Latch, UiButton};
 use crate::util::{
     compute_lut, Anchor, AnchorEdge, Bezier, BezierPositions, BoundingBoxQuad, ControlPointQuad,
-    EndpointQuad, Globals, GrandParent, LatchData, MiddlePointQuad, MyShader, UiAction, UiBoard,
+    EndpointQuad, Globals, GrandParent, LatchData, Maps, MiddlePointQuad, MyShader, UiAction,
+    UiBoard,
 };
 
 use bevy::{
@@ -94,6 +95,7 @@ pub fn spawn_bezier_system(
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
     mut latch_event_reader: EventReader<Latch>,
     mut action_event_reader: EventReader<Action>,
 ) {
@@ -166,6 +168,7 @@ pub fn spawn_bezier_system(
             &mut my_shader_params,
             clearcolor,
             &mut globals,
+            &mut maps,
         );
     }
 }
@@ -179,21 +182,22 @@ pub fn spawn_bezier(
     my_shader_params: &mut ResMut<Assets<MyShader>>,
     clearcolor: Color,
     globals: &mut ResMut<Globals>,
+    maps: &mut ResMut<Maps>,
 ) -> (Entity, Handle<Bezier>) {
     let curve0 = bezier.to_curve();
 
     bezier.lut = compute_lut(curve0, 100);
 
-    let ecm_pipeline_handle = globals.pipeline_handles["mids"].clone();
-    let ends_pipeline_handle = globals.pipeline_handles["ends"].clone();
-    let bb_pipeline_handle = globals.pipeline_handles["bounding_box"].clone();
-    let ctrl_pipeline_handle = globals.pipeline_handles["controls"].clone();
+    let ecm_pipeline_handle = maps.pipeline_handles["mids"].clone();
+    let ends_pipeline_handle = maps.pipeline_handles["ends"].clone();
+    let bb_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
+    let ctrl_pipeline_handle = maps.pipeline_handles["controls"].clone();
 
-    let ends_controls_mesh_handle = globals.mesh_handles["ends_controls"].clone();
+    let ends_controls_mesh_handle = maps.mesh_handles["ends_controls"].clone();
 
-    let ends_mesh_handle = globals.mesh_handles["ends"].clone();
+    let ends_mesh_handle = maps.mesh_handles["ends"].clone();
 
-    let middle_mesh_handle = globals.mesh_handles["middles"].clone();
+    let middle_mesh_handle = maps.mesh_handles["middles"].clone();
 
     let num_mid_quads = globals.num_points;
 
@@ -245,9 +249,7 @@ pub fn spawn_bezier(
     let bezier_handle = bezier_curves.add(bezier.clone());
     println!("spawned {:?}", bezier_handle);
 
-    globals
-        .id_handle_map
-        .insert(bezier.id, bezier_handle.clone());
+    maps.id_handle_map.insert(bezier.id, bezier_handle.clone());
     //////////////////// Bounding box ////////////////////
 
     let visible_bb = Visible {

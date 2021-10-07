@@ -85,6 +85,7 @@ impl Plugin for PenPlugin {
             .insert_resource(ClearColor(Color::hex("6e7f80").unwrap()))
             .insert_resource(Cursor::default())
             .insert_resource(Globals::default())
+            .insert_resource(Maps::default())
             .insert_resource(UserState::default())
             .add_startup_system(setup.system().label("setup"))
             .add_startup_system(spawn_selection_bounding_box.system().after("setup"))
@@ -179,6 +180,7 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     mut render_graph: ResMut<RenderGraph>,
     mut globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
 ) {
     asset_server.watch_for_changes().unwrap();
 
@@ -186,9 +188,9 @@ fn setup(
     let unlatch_sound: Handle<AudioSource> = asset_server.load("sounds/unlatch.mp3");
     let group_sound: Handle<AudioSource> = asset_server.load("sounds/group.mp3");
 
-    globals.sounds.insert("latch", latch_sound);
-    globals.sounds.insert("unlatch", unlatch_sound);
-    globals.sounds.insert("group", group_sound);
+    maps.sounds.insert("latch", latch_sound);
+    maps.sounds.insert("unlatch", unlatch_sound);
+    maps.sounds.insert("group", group_sound);
 
     let frag = asset_server.load::<Shader, _>("shaders/bezier.frag");
     let vert = asset_server.load::<Shader, _>("shaders/bezier.vert");
@@ -260,36 +262,26 @@ fn setup(
         flip: false,
     }));
 
-    globals
-        .pipeline_handles
-        .insert("ends", ends_pipeline_handle);
-    globals
-        .pipeline_handles
+    maps.pipeline_handles.insert("ends", ends_pipeline_handle);
+    maps.pipeline_handles
         .insert("controls", controls_pipeline_handle);
-    globals
-        .pipeline_handles
-        .insert("mids", mids_pipeline_handle);
-    globals
-        .pipeline_handles
+    maps.pipeline_handles.insert("mids", mids_pipeline_handle);
+    maps.pipeline_handles
         .insert("button", button_pipeline_handle);
 
-    globals
-        .pipeline_handles
+    maps.pipeline_handles
         .insert("bounding_box", bb_pipeline_handle);
 
-    globals
-        .pipeline_handles
-        .insert("selecting", selecting_handle);
+    maps.pipeline_handles.insert("selecting", selecting_handle);
 
-    globals.mesh_handles.insert("middles", mesh_handle_middle);
+    maps.mesh_handles.insert("middles", mesh_handle_middle);
 
-    globals.mesh_handles.insert("ends", mesh_handle_ends);
+    maps.mesh_handles.insert("ends", mesh_handle_ends);
 
-    globals
-        .mesh_handles
+    maps.mesh_handles
         .insert("ends_controls", mesh_handle_ends_controls);
 
-    globals.mesh_handles.insert("button", mesh_handle_button);
+    maps.mesh_handles.insert("button", mesh_handle_button);
 
     thread::sleep(hundred_millis);
 }

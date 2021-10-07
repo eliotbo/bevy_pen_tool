@@ -27,8 +27,8 @@ fn main() {
         .add_plugin(PenPlugin)
         .add_system(spawn_heli)
         .add_system(tests)
-        .add_system(turn_round_animation)
-        .add_system(follow_bezier_group)
+        .add_system(follow_bezier_group.label("animation"))
+        .add_system(turn_round_animation.label("turn").after("animation"))
         .run();
 }
 
@@ -69,6 +69,7 @@ fn tests(
 
 struct TurnRoundAnimation;
 struct FollowBezierAnimation;
+
 fn spawn_heli(
     mut commands: Commands,
     mut globals: ResMut<Globals>,
@@ -94,7 +95,7 @@ fn spawn_heli(
             .spawn_bundle(SpriteBundle {
                 material: materials.add(copter_handle.into()),
                 // mesh: mesh_handle_button.clone(),
-                transform: Transform::from_translation(Vec3::new(3.0, 2.0, -122.0)),
+                transform: Transform::from_translation(Vec3::new(6.0, 2.0, -122.0)),
                 sprite: Sprite::new(size),
                 ..Default::default()
             })
@@ -105,15 +106,15 @@ fn spawn_heli(
     }
 }
 
-fn turn_round_animation(mut query: Query<&mut Transform, With<TurnRoundAnimation>>) {
-    for mut transform in query.iter_mut() {
-        let quat = Quat::from_rotation_z(0.1);
+fn turn_round_animation(mut query: Query<(&mut Transform, &TurnRoundAnimation)>) {
+    for (mut transform, _) in query.iter_mut() {
+        let quat = Quat::from_rotation_z(0.2);
         transform.rotate(quat);
     }
 }
 
 fn follow_bezier_group(
-    mut query: Query<&mut Transform, With<FollowBezierAnimation>>,
+    mut query: Query<(&mut Transform, &FollowBezierAnimation)>,
     mut globals: ResMut<Globals>,
     groups: Res<Assets<Group>>,
     bezier_curves: ResMut<Assets<Bezier>>,
@@ -122,17 +123,45 @@ fn follow_bezier_group(
     if let Some(group) = groups.iter().next() {
         let t_time = (time.seconds_since_startup() * 0.1) % 1.0;
         let pos = group.1.compute_position_with_bezier(&bezier_curves, t_time);
+        // let pos2 = group
+        //     .1
+        //     // .compute_position_with_bezier(&bezier_curves, (t_time + 0.001) % 1.0);
+        //     .compute_position_with_lut(((t_time + 0.001) % 1.0) as f32);
+
         let pos2 = group
             .1
-            .compute_position_with_bezier(&bezier_curves, (t_time + 0.001) % 1.0);
-        for mut transform in query.iter_mut() {
+            // .compute_position_with_bezier(&bezier_curves, (t_time + 0.001) % 1.0);
+            .compute_position_with_lut(((t_time + 0.1) % 1.0) as f32);
+
+        for (mut transform, _bezier_animation) in query.iter_mut() {
             transform.translation.x = pos.x;
             transform.translation.y = pos.y;
 
             let diff = pos - pos2;
-            let angle = diff.y.atan2(diff.x) + 3.1415;
-            let quat = Quat::from_rotation_arc(pos2.extend(0.0), pos.extend(0.0));
-            transform.rotation = Quat::from_rotation_z(angle as f32);
+            let target_angle = diff.y.atan2(diff.x) + 3.1415;
+            let (axis, mut current_angle) = transform.rotation.to_axis_angle();
+            let mut next_angle = target_angle;
+
+            println!(
+                "angles: {}, {}",
+                target_angle * 180.0 / 3.1416,
+                current_angle * 180.0 / 3.1416,
+            );
+            let max_angle = 3.0 / 180.0 * 3.1416;
+
+            let target_360 = target_angle - 3.1416 * 2.0;
+            let mut diff = target_angle - current_angle;
+            let diff_360 = target_360 - current_angle;
+            if diff_360.abs() < diff.abs() {
+                diff = diff_360;
+            }
+
+            if diff.abs() > max_angle {
+                next_angle = current_angle + diff.signum() * max_angle;
+                println!("jutin");
+            }
+
+            transform.rotation = Quat::from_rotation_z(next_angle as f32);
         }
     }
 }

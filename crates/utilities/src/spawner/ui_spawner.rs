@@ -1,6 +1,6 @@
 use crate::inputs::{ButtonInteraction, ButtonState, UiButton};
 use crate::util::{
-    ColorButton, Globals, GrandParent, Icon, MyShader, OnOffMaterial, UiAction, UiBoard,
+    ColorButton, Globals, GrandParent, Icon, Maps, MyShader, OnOffMaterial, UiAction, UiBoard,
 };
 
 use bevy::{
@@ -21,6 +21,7 @@ pub fn spawn_ui(
     mut my_shader_params: ResMut<Assets<MyShader>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
     // button_materials: Res<ButtonMaterials>,
     // mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
@@ -64,12 +65,10 @@ pub fn spawn_ui(
         fragment: Some(ui_frag.clone()),
     }));
 
-    globals
-        .pipeline_handles
+    maps.pipeline_handles
         .insert("button", button_pipeline_handle.clone());
 
-    globals
-        .pipeline_handles
+    maps.pipeline_handles
         .insert("ui", ui_pipeline_handle.clone());
 
     let color_ui_size = Vec2::new(40.0, 75.0);
@@ -84,12 +83,10 @@ pub fn spawn_ui(
         flip: false,
     }));
 
-    globals
-        .mesh_handles
+    maps.mesh_handles
         .insert("color_ui", mesh_handle_color_ui.clone());
 
-    globals
-        .mesh_handles
+    maps.mesh_handles
         .insert("button_ui", mesh_handle_button_ui.clone());
 
     globals.picked_color = Some(colors[0][0]);
@@ -145,8 +142,7 @@ pub fn spawn_ui(
         flip: false,
     }));
 
-    globals
-        .mesh_handles
+    maps.mesh_handles
         .insert("button", mesh_handle_button.clone());
     let shader_params_latch = my_shader_params.add(MyShader {
         color: Color::hex("4a4e4d").unwrap(),
@@ -175,7 +171,7 @@ pub fn spawn_ui(
 
     commands.entity(main_ui).push_children(&[button]);
 
-    let ends_pipeline_handle = globals.pipeline_handles["ends"].clone();
+    let ends_pipeline_handle = maps.pipeline_handles["ends"].clone();
 
     let icon_size = Vec2::new(button_width / 4.0, button_width / 2.0);
     let mesh_handle_icon = meshes.add(Mesh::from(shape::Quad {
@@ -183,8 +179,7 @@ pub fn spawn_ui(
         flip: false,
     }));
 
-    globals
-        .mesh_handles
+    maps.mesh_handles
         .insert("latch_button_icons", mesh_handle_icon.clone());
 
     let shader_params_icon1 = my_shader_params.add(MyShader {
@@ -976,8 +971,7 @@ pub fn spawn_ui(
         size: color_button_size,
         flip: false,
     }));
-    globals
-        .mesh_handles
+    maps.mesh_handles
         .insert("color_button", mesh_handle_color_button.clone());
 
     for (j, color_vec) in colors.iter().enumerate() {

@@ -1,5 +1,5 @@
 use crate::util::{
-    Bezier, Globals, Group, GroupBoxQuad, GroupMiddleQuad, MyShader, SelectedBoxQuad,
+    Bezier, Globals, Group, GroupBoxQuad, GroupMiddleQuad, Maps, MyShader, SelectedBoxQuad,
     SelectingBoxQuad,
 };
 
@@ -15,6 +15,7 @@ pub fn spawn_selection_bounding_box(
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     // mut render_graph: ResMut<RenderGraph>,
     globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
 ) {
@@ -37,7 +38,7 @@ pub fn spawn_selection_bounding_box(
         flip: false,
     }));
     let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, -455.0));
-    let bb_group_pipeline_handle = globals.pipeline_handles["bounding_box"].clone();
+    let bb_group_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
 
     commands
         .spawn_bundle(MeshBundle {
@@ -60,6 +61,7 @@ pub fn spawn_selecting_bounding_box(
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     // mut render_graph: ResMut<RenderGraph>,
     globals: ResMut<Globals>,
+    mut maps: ResMut<Maps>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
 ) {
@@ -82,7 +84,7 @@ pub fn spawn_selecting_bounding_box(
         flip: false,
     }));
     let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, -650.0));
-    let bb_group_pipeline_handle = globals.pipeline_handles["selecting"].clone();
+    let bb_group_pipeline_handle = maps.pipeline_handles["selecting"].clone();
 
     commands
         .spawn_bundle(MeshBundle {
@@ -108,6 +110,7 @@ pub fn spawn_group_bounding_box(
     mut my_shader_params: ResMut<Assets<MyShader>>,
     clearcolor_struct: Res<ClearColor>,
     mut group_event_reader: EventReader<Handle<Group>>,
+    mut maps: ResMut<Maps>,
     // group: &Group,
 ) {
     // Bounding Box for group
@@ -131,7 +134,7 @@ pub fn spawn_group_bounding_box(
             flip: false,
         }));
         let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, -455.0));
-        let bb_group_pipeline_handle = globals.pipeline_handles["bounding_box"].clone();
+        let bb_group_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
 
         commands
             .spawn_bundle(MeshBundle {
@@ -157,6 +160,7 @@ pub fn spawn_group_middle_quads(
     clearcolor_struct: Res<ClearColor>,
     // group_handle: Handle<Group>,
     groups: ResMut<Assets<Group>>,
+    mut maps: ResMut<Maps>,
     // mut group_event_reader: EventReader<Group>,
     mut group_event_reader: EventReader<Handle<Group>>,
 ) {
@@ -165,7 +169,7 @@ pub fn spawn_group_middle_quads(
             is_visible: true,
             is_transparent: true,
         };
-        let middle_mesh_handle = globals.mesh_handles["middles"].clone();
+        let middle_mesh_handle = maps.mesh_handles["middles"].clone();
 
         let pos_z = -1111.11;
 
@@ -184,7 +188,7 @@ pub fn spawn_group_middle_quads(
             .collect();
         // println!("total length: {:?}", vrange);
 
-        let ecm_pipeline_handle = globals.pipeline_handles["mids"].clone();
+        let ecm_pipeline_handle = maps.pipeline_handles["mids"].clone();
         let render_piplines =
             RenderPipelines::from_pipelines(vec![RenderPipeline::new(ecm_pipeline_handle)]);
 
