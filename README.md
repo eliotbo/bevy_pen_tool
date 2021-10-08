@@ -19,7 +19,6 @@ TODO:
 | ![load](https://user-images.githubusercontent.com/6177048/133933736-6bed8165-fe08-4401-9bb1-e580d2f3e31a.png) | Left Control + Left Shift + S | Load set of saved curves (does not currently preserve groups or latches)|
 | ![hidectrl](https://user-images.githubusercontent.com/6177048/136477042-37ec4d17-4c6c-4959-a7b8-6bde042b5401.png) | Left Control + Left Shift + H | Hide the control points |
 | ![compute_lut](https://user-images.githubusercontent.com/6177048/136477061-96c02668-e44f-4e54-a92b-3f7ccd98dc6f.png) | Left Shift + T | Compute look-up table (linearizes animations) |
-
 | ![toggle_sound](https://user-images.githubusercontent.com/6177048/133933748-4769bd96-f6c6-4863-9de5-e283f614b6f4.png) | None | Toggle sound |
 
 
@@ -45,7 +44,7 @@ TODO:
 - cannot save multiple groups at once, only a single one
 - currently, the plugin only works with bevy version 0.5, rev="615d43b", but this will change rather soon
 - pressing load will delete everything on the canvas before loading
-
+- the gif below is a bit out of date: selection is now done by dragging the edge of a box
 
 
 
