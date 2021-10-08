@@ -26,10 +26,12 @@ use bevy::{math::Quat, prelude::*, render::camera::OrthographicProjection};
 // - cannot save multiple groups at once, only a single one
 // - currently, the plugin only works with bevy version 0.5, rev="615d43b",
 //      but this will change
+// - pressing load will delete everything on the canvas before loading
 
 // TODO:
 // - make whole group move when selected
 // - Attach UI to a UI camera
+// - popups for save/load
 
 // long-term
 // - ungroup
