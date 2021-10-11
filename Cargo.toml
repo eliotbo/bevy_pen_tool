@@ -15,8 +15,15 @@ bevy = { version = "0.5", git = "https://github.com/bevyengine/bevy", rev="615d4
 bevy_pen_tool_plugin = { path = "crates/bevy_pen_tool_plugin", version = "0.1.0" }
 serde_json = "1.0.59"
 serde = { version = "1", features = ["derive"] }
+lyon = "0.17.5"
 
+bevy_prototype_debug_lines = {version  = "bevy-main"}
 
 [[example]]
 name = "simple_animation"
 path = "examples/simple_animation.rs"
+
+
+[[example]]
+name = "mesh_making"
+path = "examples/mesh_making.rs"
