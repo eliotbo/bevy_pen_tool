@@ -125,8 +125,9 @@ fn make_mesh(
     println!("The generated vertices are: {:?}.", &buffers.vertices[..]);
     println!("The generated indices are: {:?}.", &buffers.indices[..]);
 }
-
+#[derive(Component)]
 struct Triangle;
+
 fn show_triangle(
     mut commands: Commands,
     keyboard_input: Res<Input<KeyCode>>,
@@ -176,6 +177,7 @@ fn camera_setup(mut commands: Commands) {
     });
 }
 
+#[derive(Component)]
 struct Animation;
 
 fn spawn_quad(mut commands: Commands, mut materials: ResMut<Assets<ColorMaterial>>, lut: Res<Lut>) {

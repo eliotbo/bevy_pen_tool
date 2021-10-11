@@ -71,7 +71,10 @@ fn camera_setup(mut commands: Commands, mut globals: ResMut<Globals>) {
     globals.group_lut_num_points = 100;
 }
 
+#[derive(Component)]
 struct TurnRoundAnimation;
+
+#[derive(Component)]
 struct FollowBezierAnimation;
 
 fn spawn_heli(

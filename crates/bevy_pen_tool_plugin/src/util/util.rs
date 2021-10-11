@@ -63,25 +63,40 @@ impl Default for UserState {
 }
 
 pub struct Loaded;
+
+#[derive(Component)]
 pub struct GrandParent;
+
+#[derive(Component)]
 pub struct Icon;
+
+#[derive(Component)]
 pub struct OnOffMaterial {
     pub material: Handle<ColorMaterial>,
 }
+
+#[derive(Component)]
 pub struct EndpointQuad(pub AnchorEdge);
 
+#[derive(Component)]
 pub struct ControlPointQuad(pub AnchorEdge);
 
+#[derive(Component)]
 pub struct MiddlePointQuad;
 
+#[derive(Component)]
 pub struct GroupMiddleQuad(pub usize);
 
-#[derive(Debug)]
+#[derive(Debug, Component)]
 pub struct BoundingBoxQuad;
 
+#[derive(Component)]
 pub struct SelectedBoxQuad;
+
+#[derive(Component)]
 pub struct SelectingBoxQuad;
 
+#[derive(Component)]
 pub struct GroupBoxQuad;
 
 #[derive(Debug)]
@@ -109,6 +124,7 @@ pub enum Anchor {
 //     }
 // }
 
+#[derive(Component)]
 pub struct UiBoard {
     pub expanded: bool,
     pub size: Vec2,
@@ -125,6 +141,7 @@ pub enum UiAction {
     None,
 }
 
+#[derive(Component)]
 pub struct ColorButton {
     pub size: Vec2,
 }

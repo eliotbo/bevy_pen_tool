@@ -2,7 +2,7 @@ use crate::util::{Globals, MyShader, OnOffMaterial};
 
 use bevy::prelude::*;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Component)]
 pub enum ButtonInteraction {
     Clicked,
     Pressed,
@@ -12,13 +12,13 @@ pub enum ButtonInteraction {
 }
 
 // type for buttons that keep their state
-#[derive(PartialEq)]
+#[derive(PartialEq, Component)]
 pub enum ButtonState {
     On,
     Off,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Component)]
 pub enum UiButton {
     Latch,
     Redo,

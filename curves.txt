@@ -2,140 +2,6 @@
   {
     "positions": {
       "start": [
-        -0.9609241,
-        31.705809
-      ],
-      "end": [
-        90.85066,
-        32.70136
-      ],
-      "control_start": [
-        2.178261,
-        56.71087
-      ],
-      "control_end": [
-        74.86299,
-        57.49454
-      ]
-    },
-    "previous_positions": {
-      "start": [
-        -0.9609241,
-        31.705809
-      ],
-      "end": [
-        90.85066,
-        32.70136
-      ],
-      "control_start": [
-        2.178261,
-        56.71087
-      ],
-      "control_end": [
-        95.85066,
-        37.701363
-      ]
-    },
-    "move_quad": "None",
-    "color": {
-      "Rgba": {
-        "red": 0.7019608,
-        "green": 0.8039216,
-        "blue": 0.8784314,
-        "alpha": 1.0
-      }
-    },
-    "do_compute_lut": false,
-    "lut": [],
-    "id": 305965724743285454187668187433083818852,
-    "latches": {
-      "End": [
-        {
-          "latched_to_id": 179008656367043267435111197067290442697,
-          "self_edge": "End",
-          "partners_edge": "Start"
-        }
-      ],
-      "Start": [
-        {
-          "latched_to_id": 110000139851941409017668927965885666126,
-          "self_edge": "Start",
-          "partners_edge": "End"
-        }
-      ]
-    },
-    "grouped": true
-  },
-  {
-    "positions": {
-      "start": [
-        90.85066,
-        32.70136
-      ],
-      "end": [
-        92.27833,
-        -25.149548
-      ],
-      "control_start": [
-        106.83833,
-        7.9081764
-      ],
-      "control_end": [
-        71.93617,
-        24.615292
-      ]
-    },
-    "previous_positions": {
-      "start": [
-        90.85066,
-        32.70136
-      ],
-      "end": [
-        92.27833,
-        -25.149548
-      ],
-      "control_start": [
-        106.83833,
-        7.9081764
-      ],
-      "control_end": [
-        97.27833,
-        -20.149548
-      ]
-    },
-    "move_quad": "None",
-    "color": {
-      "Rgba": {
-        "red": 0.7019608,
-        "green": 0.8039216,
-        "blue": 0.8784314,
-        "alpha": 1.0
-      }
-    },
-    "do_compute_lut": false,
-    "lut": [],
-    "id": 179008656367043267435111197067290442697,
-    "latches": {
-      "Start": [
-        {
-          "latched_to_id": 305965724743285454187668187433083818852,
-          "self_edge": "Start",
-          "partners_edge": "End"
-        }
-      ],
-      "End": [
-        {
-          "latched_to_id": 210384472580196391011062426508946790342,
-          "self_edge": "End",
-          "partners_edge": "Start"
-        }
-      ]
-    },
-    "grouped": true
-  },
-  {
-    "positions": {
-      "start": [
         92.27833,
         -25.149548
       ],
@@ -327,6 +193,140 @@
       "End": [
         {
           "latched_to_id": 305965724743285454187668187433083818852,
+          "self_edge": "End",
+          "partners_edge": "Start"
+        }
+      ]
+    },
+    "grouped": true
+  },
+  {
+    "positions": {
+      "start": [
+        -0.9609241,
+        31.705809
+      ],
+      "end": [
+        90.85066,
+        32.70136
+      ],
+      "control_start": [
+        2.178261,
+        56.71087
+      ],
+      "control_end": [
+        74.86299,
+        57.49454
+      ]
+    },
+    "previous_positions": {
+      "start": [
+        -0.9609241,
+        31.705809
+      ],
+      "end": [
+        90.85066,
+        32.70136
+      ],
+      "control_start": [
+        2.178261,
+        56.71087
+      ],
+      "control_end": [
+        95.85066,
+        37.701363
+      ]
+    },
+    "move_quad": "None",
+    "color": {
+      "Rgba": {
+        "red": 0.7019608,
+        "green": 0.8039216,
+        "blue": 0.8784314,
+        "alpha": 1.0
+      }
+    },
+    "do_compute_lut": false,
+    "lut": [],
+    "id": 305965724743285454187668187433083818852,
+    "latches": {
+      "End": [
+        {
+          "latched_to_id": 179008656367043267435111197067290442697,
+          "self_edge": "End",
+          "partners_edge": "Start"
+        }
+      ],
+      "Start": [
+        {
+          "latched_to_id": 110000139851941409017668927965885666126,
+          "self_edge": "Start",
+          "partners_edge": "End"
+        }
+      ]
+    },
+    "grouped": true
+  },
+  {
+    "positions": {
+      "start": [
+        90.85066,
+        32.70136
+      ],
+      "end": [
+        92.27833,
+        -25.149548
+      ],
+      "control_start": [
+        106.83833,
+        7.9081764
+      ],
+      "control_end": [
+        71.93617,
+        24.615292
+      ]
+    },
+    "previous_positions": {
+      "start": [
+        90.85066,
+        32.70136
+      ],
+      "end": [
+        92.27833,
+        -25.149548
+      ],
+      "control_start": [
+        106.83833,
+        7.9081764
+      ],
+      "control_end": [
+        97.27833,
+        -20.149548
+      ]
+    },
+    "move_quad": "None",
+    "color": {
+      "Rgba": {
+        "red": 0.7019608,
+        "green": 0.8039216,
+        "blue": 0.8784314,
+        "alpha": 1.0
+      }
+    },
+    "do_compute_lut": false,
+    "lut": [],
+    "id": 179008656367043267435111197067290442697,
+    "latches": {
+      "Start": [
+        {
+          "latched_to_id": 305965724743285454187668187433083818852,
+          "self_edge": "Start",
+          "partners_edge": "End"
+        }
+      ],
+      "End": [
+        {
+          "latched_to_id": 210384472580196391011062426508946790342,
           "self_edge": "End",
           "partners_edge": "Start"
         }

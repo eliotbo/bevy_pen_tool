@@ -2,6 +2,7 @@ use bevy_pen_tool_plugin::UiBoard;
 
 use bevy::prelude::*;
 
+#[derive(Component)]
 pub struct Cam {
     pub speed: f32,
     pub key_left: KeyCode,
