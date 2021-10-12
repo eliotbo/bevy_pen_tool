@@ -1,7 +1,8 @@
 use crate::inputs::Cursor;
 use crate::util::{
-    AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, GrandParent,
-    Group, GroupMiddleQuad, MiddlePointQuad, MyShader, UiAction, UiBoard,
+    AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad, EndpointQuad, FollowBezierAnimation,
+    Globals, GrandParent, Group, GroupMiddleQuad, MiddlePointQuad, MyShader, TurnRoundAnimation,
+    UiAction, UiBoard,
 };
 
 use bevy::prelude::*;
@@ -237,6 +238,73 @@ pub fn move_control_quads(
                 transform.translation = control_point.extend(transform.translation.z);
                 transform.rotation = Quat::from_rotation_z(bezier_angle_90);
             }
+        }
+    }
+}
+
+// helicopter animation
+
+// animates the helicopter blades
+pub fn turn_round_animation(mut query: Query<(&mut Transform, &TurnRoundAnimation)>) {
+    for (mut transform, _) in query.iter_mut() {
+        let quat = Quat::from_rotation_z(0.2);
+        transform.rotate(quat);
+    }
+}
+
+// moves the helicopter along the Group path
+// a Group is made up of many latched Bezier curves
+pub fn follow_bezier_group(
+    mut query: Query<(&mut Transform, &FollowBezierAnimation)>,
+    mut visible_query: Query<
+        &mut Visible,
+        Or<(With<FollowBezierAnimation>, With<TurnRoundAnimation>)>,
+    >,
+    groups: Res<Assets<Group>>,
+    time: Res<Time>,
+) {
+    if let Some(group) = groups.iter().next() {
+        for mut visible in visible_query.iter_mut() {
+            visible.is_visible = true;
+        }
+
+        let path_length = group.1.standalone_lut.path_length as f64;
+
+        let multiplier: f64 = 500.0 / path_length;
+        let t_time = (time.seconds_since_startup() * (0.1 * multiplier)) % 1.0;
+        let pos = group.1.compute_position_with_lut(t_time as f32);
+
+        // the heli looks ahead (10% of the curve length) to orient itself
+        let further_pos = group
+            .1
+            .compute_position_with_lut(((t_time + 0.15 * multiplier) % 1.0) as f32);
+
+        for (mut transform, _bezier_animation) in query.iter_mut() {
+            transform.translation.x = pos.x;
+            transform.translation.y = pos.y;
+
+            // compute the forward direction
+            let diff = pos - further_pos;
+            let target_angle = diff.y.atan2(diff.x) + 3.1415;
+            let mut next_angle = target_angle;
+
+            let (_axis, current_angle) = transform.rotation.to_axis_angle();
+
+            let max_angle = 3.0 / 180.0 * 3.1416;
+
+            let target_360 = target_angle - 3.1416 * 2.0;
+            let mut diff = target_angle - current_angle;
+            let diff_360 = target_360 - current_angle;
+            if diff_360.abs() < diff.abs() {
+                diff = diff_360;
+            }
+
+            // clamp the angular speed of heli
+            if diff.abs() > max_angle {
+                next_angle = current_angle + diff.signum() * max_angle;
+            }
+
+            transform.rotation = Quat::from_rotation_z(next_angle as f32);
         }
     }
 }

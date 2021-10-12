@@ -71,6 +71,8 @@ pub enum Action {
     Delete,
     SelectionBox,
     Selected,
+    SpawnHeli,
+    MakeMesh,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -109,6 +111,8 @@ pub fn send_action(
             UiButton::ScaleDown => action_event_writer.send(Action::ScaleDown),
             UiButton::HideControls => action_event_writer.send(Action::HideControls),
             UiButton::Lut => action_event_writer.send(Action::ComputeLut),
+            UiButton::Helicopter => action_event_writer.send(Action::SpawnHeli),
+            UiButton::MakeMesh => action_event_writer.send(Action::MakeMesh),
             _ => {}
         }
     }

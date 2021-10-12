@@ -65,6 +65,9 @@ impl Default for UserState {
 pub struct Loaded;
 
 #[derive(Component)]
+pub struct GroupMesh(pub Color);
+
+#[derive(Component)]
 pub struct GrandParent;
 
 #[derive(Component)]
@@ -101,6 +104,13 @@ pub struct GroupBoxQuad;
 
 #[derive(Debug)]
 pub struct OfficialLatch(pub LatchData, pub Handle<Bezier>);
+
+// helicopter animation
+#[derive(Component)]
+pub struct TurnRoundAnimation;
+
+#[derive(Component)]
+pub struct FollowBezierAnimation;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Copy)]
 pub enum Anchor {
@@ -402,7 +412,8 @@ impl Group {
         let mut curve_index = 0;
         let mut pos = Vec2::ZERO;
         for (_handle, _anchor, (t_min, t_max), _lut) in &self.lut {
-            if &t >= t_min && &t <= &(t_max + 0.00000000001) {
+            // println!("t: {}, t_min: {}, t_max: {}, ", t, t_min, t_max);
+            if &t >= t_min && &t <= &(t_max + 0.000001) {
                 break;
             } else {
                 curve_index += 1;
@@ -419,17 +430,19 @@ impl Group {
                 t_0_1 = 1.0 - t_0_1;
             }
 
-            t_0_1 = t_0_1.clamp(0.00000000001, 0.99999999999);
+            t_0_1 = t_0_1.clamp(0.00000000001, 0.9999);
 
             let idx_f64 = t_0_1 * (lut.len() - 1) as f64;
             let p1 = lut[(idx_f64 as usize)];
             let p2 = lut[idx_f64 as usize + 1];
 
-            // TODO: is the minus one useful here?
             let rem = idx_f64 % 1.0;
             let t_distance = interpolate(p1, p2, rem);
             let pos_coord2 = curve.point_at_pos(t_distance);
+
             pos = Vec2::new(pos_coord2.0 as f32, pos_coord2.1 as f32);
+        } else {
+            panic!("couldn't get a curve at index: {}. ", curve_index);
         }
 
         return pos;
@@ -446,18 +459,18 @@ impl Group {
             total_length += bezier.length();
         }
 
-        let vrange: Vec<f32> = (0..num_points)
-            .map(|x| ((x) as f32) / (num_points as f32 - 1.0))
+        let t_range: Vec<f64> = (0..num_points)
+            .map(|x| ((x) as f64) / (num_points as f64 - 1.0))
             .collect();
 
         let mut standalone_lut: StandaloneLut = StandaloneLut {
             path_length: total_length,
             lut: Vec::new(),
         };
-        for t in vrange {
-            standalone_lut
-                .lut
-                .push(self.compute_position_with_bezier(bezier_curves, t as f64));
+        for t in t_range {
+            let val = self.compute_position_with_bezier(bezier_curves, t);
+
+            standalone_lut.lut.push(val);
         }
 
         self.standalone_lut = standalone_lut;
@@ -1264,29 +1277,7 @@ pub fn adjust_group_attributes(
     }
 }
 
-// // Before saving the curves, we compute a lower-memory-and-higher-accuracy look-up table using accelerated gradient
-// // descent
-// pub fn do_long_lut(
-//     keyboard_input: Res<Input<KeyCode>>,
-//     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
-//     mut bezier_curves: ResMut<Assets<Bezier>>,
-//     time: Res<Time>,
-// ) {
-//     if keyboard_input.pressed(KeyCode::LControl) && keyboard_input.just_pressed(KeyCode::S) {
-//         // let last_handle_option: Option<Handle<Bezier>> = None;
-//         for handle in query.iter() {
-//             let bezier = bezier_curves.get_mut(handle).unwrap();
-//             let curve = bezier.to_curve();
-//             if let Some(lut_gradient_descent) = compute_lut_long(curve, 100, time.clone()) {
-//                 bezier.lut = lut_gradient_descent;
-//                 // println!("computed LUT with accelerated  gradient descent");
-//             } else {
-//                 println!("failed to find look-up table using accelerated gradient descent");
-//             }
-//         }
-//     }
-// }
-
+// returns a map from real distance to t-value
 pub fn compute_lut(curve: Curve<Coord2>, num_sections: usize) -> Vec<f64> {
     let mut section_lengths: Vec<f64> = Vec::new();
     let whole_distance = curve.estimate_length();
@@ -1296,13 +1287,13 @@ pub fn compute_lut(curve: Curve<Coord2>, num_sections: usize) -> Vec<f64> {
         section_lengths.push(curve.section(t_min, t_max).estimate_length())
     }
 
-    let vrange: Vec<f64> = (0..num_sections)
+    let t_range: Vec<f64> = (0..num_sections)
         .map(|x| (whole_distance * (x) as f64) / (num_sections as f64 - 1.0))
         .collect();
 
     // TODO: get rid of redundant length_so_far computations
     let mut look_up_table: LutDistance = Vec::new();
-    for distance in vrange {
+    for distance in t_range {
         let mut length_so_far = 0.0;
         for (idx, sl) in section_lengths.iter().enumerate() {
             if distance - 0.0001 <= length_so_far {
@@ -1341,7 +1332,7 @@ pub fn compute_lut_long(
     // let section_lengths: Vec<f64> = Vec::new();
     let whole_distance = curve.estimate_length();
     // Curved sectioned uniformly
-    let vrange: Vec<f64> = (0..num_sections)
+    let t_range: Vec<f64> = (0..num_sections)
         .map(|x| (whole_distance * (x) as f64) / (num_sections as f64 - 1.0))
         .collect();
 
@@ -1365,9 +1356,8 @@ pub fn compute_lut_long(
     let target_cost = (0.01 * whole_distance / 100.0).max(0.01);
 
     let mut rng = thread_rng();
-    // println!("{:?}", target_cost);
-    // for (dist_idx, distance) in vrange.clone().iter().enumerate() {
-    for distance in vrange.iter() {
+
+    for distance in t_range.iter() {
         cost = (dist_at_t - distance) * (dist_at_t - distance);
         momentum = 0.0;
         let mut k = 0.0;

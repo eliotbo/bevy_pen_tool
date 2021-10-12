@@ -493,6 +493,7 @@ dependencies = [
  "bevy",
  "flo_curves",
  "itertools",
+ "lyon",
  "plotlib",
  "rand",
  "serde",

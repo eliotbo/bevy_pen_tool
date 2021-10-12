@@ -35,6 +35,8 @@ pub enum UiButton {
     ScaleDown,
     HideControls,
     Lut,
+    MakeMesh,
+    Helicopter,
 }
 
 pub fn button_system(

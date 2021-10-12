@@ -4,6 +4,7 @@ use crate::util::*;
 use crate::{GroupMiddleQuad, StandaloneLut};
 
 use bevy::prelude::*;
+use bevy::render::wireframe::{Wireframe, WireframeConfig, WireframePlugin};
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -655,8 +656,11 @@ pub fn save(
     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     group_query: Query<&Handle<Group>, With<GroupBoxQuad>>,
+    mesh_query: Query<(&Handle<Mesh>, &GroupMesh)>,
     mut groups: ResMut<Assets<Group>>,
     // mut event_reader: EventReader<UiButton>,
+    meshes: Res<Assets<Mesh>>,
+
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
 ) {
@@ -693,6 +697,30 @@ pub fn save(
         let path = "curve_groups.txt";
         let mut output = File::create(path).unwrap();
         let _result = output.write(serialized.as_bytes());
+
+        if let Some((mesh_handle, GroupMesh(color))) = mesh_query.iter().next() {
+            let mesh = meshes.get(mesh_handle).unwrap();
+            let vertex_attributes = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
+            let indices_u32 = mesh.indices().unwrap();
+
+            match (vertex_attributes, indices_u32) {
+                (
+                    bevy::render::mesh::VertexAttributeValues::Float32x3(vertices),
+                    bevy::render::mesh::Indices::U32(indices),
+                ) => {
+                    // saving format 3-tuple with:
+                    // Vec<[f32;3]> for vertex attributes
+                    // Vec<u32> for indices
+                    // Color for the mesh color
+                    let mesh_info = (vertices, indices, color);
+                    let mesh_serialized = serde_json::to_string_pretty(&mesh_info).unwrap();
+                    let mesh_path = "assets/meshes/my_mesh.txt";
+                    let mut mesh_output = File::create(mesh_path).unwrap();
+                    let _mesh_result = mesh_output.write(mesh_serialized.as_bytes());
+                }
+                _ => {}
+            }
+        }
 
         println!("{:?}", "saved");
     }
@@ -934,6 +962,52 @@ pub fn rescale(
                 shader_param.zoom = 0.15 / globals.scale;
                 shader_param.size *= 1.0 / zoom_factor;
             }
+        }
+    }
+}
+
+pub fn spawn_heli(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut action_event_reader: EventReader<Action>,
+    groups: Res<Assets<Group>>,
+) {
+    if let Some(Action::SpawnHeli) = action_event_reader.iter().next() {
+        if let Some(_) = groups.iter().next() {
+            let heli_handle = asset_server.load("textures/heli.png");
+            let size = Vec2::new(25.0, 25.0);
+            let heli_sprite = commands
+                .spawn_bundle(SpriteBundle {
+                    material: materials.add(heli_handle.into()),
+                    // mesh: mesh_handle_button.clone(),
+                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, -222.0)),
+                    sprite: Sprite::new(size),
+                    visible: Visible {
+                        is_visible: true,
+                        is_transparent: true,
+                    },
+                    ..Default::default()
+                })
+                .insert(FollowBezierAnimation)
+                .id();
+            let copter_handle = asset_server.load("textures/copter.png");
+            let copter_sprite = commands
+                .spawn_bundle(SpriteBundle {
+                    material: materials.add(copter_handle.into()),
+                    // mesh: mesh_handle_button.clone(),
+                    transform: Transform::from_translation(Vec3::new(3.0, 1.0, -122.0)),
+                    sprite: Sprite::new(size),
+                    visible: Visible {
+                        is_visible: true,
+                        is_transparent: true,
+                    },
+                    ..Default::default()
+                })
+                .insert(TurnRoundAnimation)
+                .id();
+
+            commands.entity(heli_sprite).push_children(&[copter_sprite]);
         }
     }
 }

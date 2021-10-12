@@ -1,4 +1,13 @@
-use bevy::{prelude::*, render::camera::OrthographicProjection};
+use bevy::render::mesh::Indices;
+use bevy::render::pipeline::PrimitiveTopology;
+use bevy::{
+    prelude::*,
+    render::{
+        camera::OrthographicProjection,
+        pipeline::{PipelineDescriptor, RenderPipeline},
+        shader::{ShaderStage, ShaderStages},
+    },
+};
 
 use serde::{Deserialize, Serialize};
 use std::io::Read;
@@ -66,6 +75,9 @@ fn make_mesh(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut lut: ResMut<Lut>,
     mut inds: ResMut<Inds>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut pipelines: ResMut<Assets<PipelineDescriptor>>,
+    mut shaders: ResMut<Assets<Shader>>,
 ) {
     // let lut = Lut::load();
 
@@ -100,7 +112,8 @@ fn make_mesh(
     }
 
     let mut new_lut = Vec::new();
-    let mut new_indices = Vec::new();
+    let mut mesh_attributes: Vec<[f32; 3]> = Vec::new();
+    let mut new_indices: Vec<u32> = Vec::new();
     // show points from look-up table
     for position in buffers.vertices[..].iter() {
         let v = Vec3::new(position.x, position.y, -100.0);
@@ -113,17 +126,41 @@ fn make_mesh(
             ..Default::default()
         });
         new_lut.push(Vec2::new(position.x, position.y));
+        mesh_attributes.push([position.x, position.y, 0.0]);
     }
 
-    for ind in buffers.indices[..].iter() {
+    for ind in buffers.indices[..].iter().rev() {
         new_indices.push(ind.clone() as u32);
     }
 
     lut.lut = new_lut;
-    inds.indices = new_indices;
+    inds.indices = new_indices.clone();
 
-    println!("The generated vertices are: {:?}.", &buffers.vertices[..]);
-    println!("The generated indices are: {:?}.", &buffers.indices[..]);
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+    mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, mesh_attributes);
+    mesh.set_indices(Some(Indices::U32(new_indices)));
+
+    println!(
+        "The generated vertices are: {:?}.",
+        &mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+    );
+    println!("The generated indices are: {:?}.", &mesh.indices());
+
+    let mesh_handle = meshes.add(mesh);
+
+    let pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
+        vertex: shaders.add(Shader::from_glsl(ShaderStage::Vertex, VERTEX_SHADER)),
+        fragment: Some(shaders.add(Shader::from_glsl(ShaderStage::Fragment, FRAGMENT_SHADER))),
+    }));
+
+    commands.spawn_bundle(MeshBundle {
+        mesh: mesh_handle,
+        render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+            pipeline_handle,
+        )]),
+        // transform: Transform::from_translation(Vec3::new(-100.0, 75.0, -100.0)),
+        ..Default::default()
+    });
 }
 #[derive(Component)]
 struct Triangle;
@@ -162,8 +199,8 @@ fn show_triangle(
 }
 
 fn camera_setup(mut commands: Commands) {
-    //
-    // bevy_pen_tool is not compatible with Perspective Cameras
+    // //
+    // // bevy_pen_tool is not compatible with Perspective Cameras
     commands.spawn_bundle(OrthographicCameraBundle {
         transform: Transform::from_translation(Vec3::new(00.0, 0.0, 10.0))
             .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
@@ -175,6 +212,10 @@ fn camera_setup(mut commands: Commands) {
         },
         ..OrthographicCameraBundle::new_2d()
     });
+
+    // commands
+    //     // And use an orthographic projection
+    //     .spawn_bundle(OrthographicCameraBundle::new_2d());
 }
 
 #[derive(Component)]
@@ -227,3 +268,29 @@ fn follow_path(mut query: Query<(&mut Transform, &Animation)>, time: Res<Time>, 
         transform.translation = pos.extend(transform.translation.z);
     }
 }
+
+const VERTEX_SHADER: &str = r"
+#version 450
+layout(location = 0) in vec3 Vertex_Position;
+// layout(location = 1) in vec3 Vertex_Color;
+// layout(location = 1) out vec3 v_Color;
+layout(set = 0, binding = 0) uniform CameraViewProj {
+    mat4 ViewProj;
+};
+layout(set = 1, binding = 0) uniform Transform {
+    mat4 Model;
+};
+void main() {
+    // v_Color = Vertex_Color;
+    gl_Position = ViewProj * Model * vec4(Vertex_Position, 1.0);
+}
+";
+
+const FRAGMENT_SHADER: &str = r"
+#version 450
+// layout(location = 1) in vec3 v_Color;
+layout(location = 0) out vec4 o_Target;
+void main() {
+    o_Target = vec4(1.0,1.0,0.0, 1.0);
+}
+";

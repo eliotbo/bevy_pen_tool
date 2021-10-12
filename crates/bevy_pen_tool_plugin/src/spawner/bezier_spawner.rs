@@ -40,7 +40,7 @@ pub fn spawn_bezier_system(
 
         // the control points cannot be exactly in the same positions as the anchors
         // because the algorithm for finding position along the curves fail
-        let epsilon = 0.01;
+        let epsilon = 5.01;
         let mut control_start: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
         let control_end: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
 
@@ -183,7 +183,7 @@ pub fn spawn_bezier(
 
     // TODO: make the depth deterministic
     let mut rng = thread_rng();
-    let pos_z = -rng.gen::<f32>() * 10000.0;
+    let pos_z = -rng.gen::<f32>() * 5000.0;
     let mut init_pos = Transform::from_translation(bb_pos.extend(pos_z + 30.0));
     init_pos.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
@@ -222,8 +222,8 @@ pub fn spawn_bezier(
     let mut start_pt_transform = Transform::from_translation(start_pt_pos.extend(pos_z + 30.0));
     let mut end_pt_transform = Transform::from_translation(end_pt_pos.extend(pos_z + 40.0));
 
-    start_pt_transform.rotation = start_rotation; // Quat::from_rotation_z(controls_angles.0);
-    end_pt_transform.rotation = end_rotation; //Quat::from_rotation_z(controls_angles.1);
+    start_pt_transform.rotation = start_rotation;
+    end_pt_transform.rotation = end_rotation;
 
     let child_start = commands
         .spawn_bundle(MeshBundle {

@@ -17,3 +17,4 @@ itertools = "0.10.1"
 serde = { version = "1", features = ["derive"] }
 rand = "0.8.0"
 plotlib = "0.5.1"
+lyon = "0.17.5"

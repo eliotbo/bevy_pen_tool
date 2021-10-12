@@ -74,7 +74,7 @@ pub fn spawn_ui(
         flip: false,
     }));
 
-    let button_ui_size = Vec2::new(40.0, 35.0);
+    let button_ui_size = Vec2::new(40.0, 45.0);
     let mesh_handle_button_ui = meshes.add(Mesh::from(shape::Quad {
         size: button_ui_size,
         flip: false,
@@ -929,6 +929,94 @@ pub fn spawn_ui(
         .entity(scale_down_button)
         .push_children(&[scale_down_sprite]);
 
+    //
+    //
+    //
+    ///////////////////// make mesh button /////////////////////
+    let shader_params_mesh = my_shader_params.add(MyShader {
+        color: Color::hex("4a4e4d").unwrap(),
+        size: button_size,
+        ..Default::default()
+    });
+    let mesh_button = commands
+        .spawn_bundle(MeshBundle {
+            mesh: mesh_handle_button.clone(),
+            visible: visible_ui.clone(),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                button_pipeline_handle.clone(),
+            )]),
+            transform: Transform::from_translation(Vec3::new(
+                -button_width * 0.5,
+                -button_width * 2.0,
+                -430.0,
+            )),
+            ..Default::default()
+        })
+        .insert(ButtonInteraction::None)
+        .insert(shader_params_mesh.clone())
+        .insert(UiButton::MakeMesh)
+        .id();
+
+    commands.entity(main_ui).push_children(&[mesh_button]);
+
+    let mesh_material = asset_server.load("textures/mesh.png");
+    let mesh_sprite = commands
+        .spawn_bundle(SpriteBundle {
+            material: materials.add(mesh_material.into()),
+            // mesh: mesh_handle_button.clone(),
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 11.0)),
+            sprite: Sprite::new(button_size / 1.3),
+            ..Default::default()
+        })
+        .insert(UiButton::MakeMesh)
+        .id();
+
+    commands.entity(mesh_button).push_children(&[mesh_sprite]);
+
+    //
+    //
+    //
+    ///////////////////// spawn heli button /////////////////////
+    let shader_params_heli = my_shader_params.add(MyShader {
+        color: Color::hex("4a4e4d").unwrap(),
+        size: button_size,
+        ..Default::default()
+    });
+    let heli_button = commands
+        .spawn_bundle(MeshBundle {
+            mesh: mesh_handle_button.clone(),
+            visible: visible_ui.clone(),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                button_pipeline_handle.clone(),
+            )]),
+            transform: Transform::from_translation(Vec3::new(
+                button_width * 0.5,
+                -button_width * 2.0,
+                -430.0,
+            )),
+            ..Default::default()
+        })
+        .insert(ButtonInteraction::None)
+        .insert(shader_params_heli.clone())
+        .insert(UiButton::Helicopter)
+        .id();
+
+    commands.entity(main_ui).push_children(&[heli_button]);
+
+    let heli_material = asset_server.load("textures/heli_button.png");
+    let heli_sprite = commands
+        .spawn_bundle(SpriteBundle {
+            material: materials.add(heli_material.into()),
+            // mesh: mesh_handle_button.clone(),
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 11.0)),
+            sprite: Sprite::new(button_size / 1.3),
+            ..Default::default()
+        })
+        .insert(UiButton::Helicopter)
+        .id();
+
+    commands.entity(heli_button).push_children(&[heli_sprite]);
+
     /////////////////////// buttons ui ////////////////////////////
     //
     //
@@ -937,7 +1025,7 @@ pub fn spawn_ui(
     //
     //////////////////////////// color ui /////////////////////////
 
-    let color_ui_position = Vec3::new(0.0, -55.0 * globals.scale, -500.0);
+    let color_ui_position = Vec3::new(0.0, -65.0 * globals.scale, -500.0);
 
     let shader_params_color_ui = my_shader_params.add(MyShader {
         color: Color::hex("131B23").unwrap(),
