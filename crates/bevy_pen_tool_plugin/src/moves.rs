@@ -148,7 +148,7 @@ pub fn move_bb_quads(
 
         // makes the quad bigger than the bounding box so that we can have smooth edges made in the shader
         let bigger_size = (bound1 - bound0) * 1.1;
-        // let bb_size = (bound1 - bound0);
+
         let bb_pos = (bound1 + bound0) / 2.0;
 
         // println!("{:?}, {:?}", bb_size,);
@@ -178,11 +178,9 @@ pub fn move_end_quads(
                 && transform.translation.truncate() != bezier.positions.start)
                 || (*point == AnchorEdge::End
                     && transform.translation.truncate() != bezier.positions.end)
-            // || bezier.just_created
             {
                 let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
                     bezier.ends_displacement(globals.scale);
-                // println!("{}", globals.scale);
 
                 if *point == AnchorEdge::Start {
                     transform.translation = (bezier.positions.start + start_displacement)
@@ -193,8 +191,6 @@ pub fn move_end_quads(
                         (bezier.positions.end + end_displacement).extend(transform.translation.z);
                     transform.rotation = end_rotation;
                 }
-
-                // bezier.do_compute_lut = true;
             }
         }
     }
@@ -242,9 +238,9 @@ pub fn move_control_quads(
     }
 }
 
-// helicopter animation
-
-// animates the helicopter blades
+////////// helicopter animation
+//
+// // animates the helicopter blades
 pub fn turn_round_animation(mut query: Query<(&mut Transform, &TurnRoundAnimation)>) {
     for (mut transform, _) in query.iter_mut() {
         let quat = Quat::from_rotation_z(0.2);
@@ -252,8 +248,9 @@ pub fn turn_round_animation(mut query: Query<(&mut Transform, &TurnRoundAnimatio
     }
 }
 
-// moves the helicopter along the Group path
-// a Group is made up of many latched Bezier curves
+////////// helicopter animation
+//
+// // moves the helicopter along the Group path
 pub fn follow_bezier_group(
     mut query: Query<(&mut Transform, &FollowBezierAnimation)>,
     mut visible_query: Query<
@@ -274,37 +271,22 @@ pub fn follow_bezier_group(
         let t_time = (time.seconds_since_startup() * (0.1 * multiplier)) % 1.0;
         let pos = group.1.compute_position_with_lut(t_time as f32);
 
-        // the heli looks ahead (10% of the curve length) to orient itself
+        // the heli looks ahead (5% of the curve length) to orient itself
         let further_pos = group
             .1
-            .compute_position_with_lut(((t_time + 0.15 * multiplier) % 1.0) as f32);
+            .compute_position_with_lut(((t_time + 0.05 * multiplier) % 1.0) as f32);
+
+        let forward_direction = (further_pos - pos).normalize();
 
         for (mut transform, _bezier_animation) in query.iter_mut() {
             transform.translation.x = pos.x;
             transform.translation.y = pos.y;
 
-            // compute the forward direction
-            let diff = pos - further_pos;
-            let target_angle = diff.y.atan2(diff.x) + 3.1415;
-            let mut next_angle = target_angle;
+            let current_looking_dir = transform.rotation.mul_vec3(Vec3::X);
 
-            let (_axis, current_angle) = transform.rotation.to_axis_angle();
+            let quat = Quat::from_rotation_arc(current_looking_dir, forward_direction.extend(0.0));
 
-            let max_angle = 3.0 / 180.0 * 3.1416;
-
-            let target_360 = target_angle - 3.1416 * 2.0;
-            let mut diff = target_angle - current_angle;
-            let diff_360 = target_360 - current_angle;
-            if diff_360.abs() < diff.abs() {
-                diff = diff_360;
-            }
-
-            // clamp the angular speed of heli
-            if diff.abs() > max_angle {
-                next_angle = current_angle + diff.signum() * max_angle;
-            }
-
-            transform.rotation = Quat::from_rotation_z(next_angle as f32);
+            transform.rotation = transform.rotation.mul_quat(quat);
         }
     }
 }

@@ -494,6 +494,7 @@ dependencies = [
  "flo_curves",
  "itertools",
  "lyon",
+ "obj-exporter",
  "plotlib",
  "rand",
  "serde",
@@ -2516,6 +2517,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "obj-exporter"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d133460dfa7bb530c954eb6c98c4c4ac983cc2ec70840f3a9cf9bf6cf3bee824"
+dependencies = [
+ "lazy_static",
+ "wavefront_obj",
+]
+
+[[package]]
 name = "objc"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3462,6 +3473,12 @@ name = "wasm-bindgen-shared"
 version = "0.2.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0237232789cf037d5480773fe568aac745bfe2afbc11a863e97901780a6b47cc"
+
+[[package]]
+name = "wavefront_obj"
+version = "5.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33c9cbb65c5aac6493000cdabe11f49588d19b547ccd7501f44fc96a6b9406ff"
 
 [[package]]
 name = "web-sys"

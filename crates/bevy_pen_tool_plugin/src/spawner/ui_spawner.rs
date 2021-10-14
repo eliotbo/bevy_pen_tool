@@ -990,7 +990,7 @@ pub fn spawn_ui(
                 button_pipeline_handle.clone(),
             )]),
             transform: Transform::from_translation(Vec3::new(
-                button_width * 0.5,
+                button_width * 1.5,
                 -button_width * 2.0,
                 -430.0,
             )),
@@ -1016,6 +1016,50 @@ pub fn spawn_ui(
         .id();
 
     commands.entity(heli_button).push_children(&[heli_sprite]);
+
+    //
+    //
+    //
+    ///////////////////// spawn road button /////////////////////
+    let shader_params_road = my_shader_params.add(MyShader {
+        color: Color::hex("4a4e4d").unwrap(),
+        size: button_size,
+        ..Default::default()
+    });
+    let road_button = commands
+        .spawn_bundle(MeshBundle {
+            mesh: mesh_handle_button.clone(),
+            visible: visible_ui.clone(),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                button_pipeline_handle.clone(),
+            )]),
+            transform: Transform::from_translation(Vec3::new(
+                button_width * 0.5,
+                -button_width * 2.0,
+                -430.0,
+            )),
+            ..Default::default()
+        })
+        .insert(ButtonInteraction::None)
+        .insert(shader_params_road.clone())
+        .insert(UiButton::SpawnRoad)
+        .id();
+
+    commands.entity(main_ui).push_children(&[road_button]);
+
+    let road_material = asset_server.load("textures/road_icon.png");
+    let road_sprite = commands
+        .spawn_bundle(SpriteBundle {
+            material: materials.add(road_material.into()),
+            // mesh: mesh_handle_button.clone(),
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 11.0)),
+            sprite: Sprite::new(button_size / 1.3),
+            ..Default::default()
+        })
+        .insert(UiButton::SpawnRoad)
+        .id();
+
+    commands.entity(road_button).push_children(&[road_sprite]);
 
     /////////////////////// buttons ui ////////////////////////////
     //

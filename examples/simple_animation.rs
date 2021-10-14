@@ -59,6 +59,7 @@ fn camera_setup(mut commands: Commands) {
     });
 }
 
+#[derive(Component)]
 struct Animation;
 
 fn spawn_quad(mut commands: Commands, mut materials: ResMut<Assets<ColorMaterial>>, lut: Res<Lut>) {

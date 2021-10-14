@@ -73,6 +73,7 @@ pub enum Action {
     Selected,
     SpawnHeli,
     MakeMesh,
+    SpawnRoad,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -113,6 +114,7 @@ pub fn send_action(
             UiButton::Lut => action_event_writer.send(Action::ComputeLut),
             UiButton::Helicopter => action_event_writer.send(Action::SpawnHeli),
             UiButton::MakeMesh => action_event_writer.send(Action::MakeMesh),
+            UiButton::SpawnRoad => action_event_writer.send(Action::SpawnRoad),
             _ => {}
         }
     }

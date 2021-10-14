@@ -9,7 +9,6 @@ use bevy::{
         pipeline::PipelineDescriptor,
         render_graph::{base, AssetRenderResourcesNode, RenderGraph},
         shader::ShaderStages,
-        wireframe::{WireframeConfig, WireframePlugin},
     },
 };
 
@@ -22,8 +21,7 @@ pub struct PenPlugin;
 
 impl Plugin for PenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(WireframePlugin)
-            .add_asset::<MyShader>()
+        app.add_asset::<MyShader>()
             .add_asset::<Bezier>()
             .add_asset::<Group>()
             .add_event::<Group>()
@@ -131,6 +129,7 @@ impl Plugin for PenPlugin {
             .add_system(make_mesh)
             .add_system(turn_round_animation)
             .add_system(follow_bezier_group)
+            .add_system(make_road)
             .add_system(mouse_release_actions);
     }
 }
@@ -142,10 +141,7 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     mut render_graph: ResMut<RenderGraph>,
     mut maps: ResMut<Maps>,
-    mut wireframe_config: ResMut<WireframeConfig>,
 ) {
-    wireframe_config.global = false;
-
     asset_server.watch_for_changes().unwrap();
 
     let latch_sound: Handle<AudioSource> = asset_server.load("sounds/latch.mp3");

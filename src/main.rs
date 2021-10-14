@@ -32,6 +32,8 @@ use bevy::{math::Quat, prelude::*, render::camera::OrthographicProjection};
 // - make whole group move when selected
 // - Attach UI to a UI camera
 // - popups for save/load
+// - add Delete to readme
+// - change drag a rectangle to drag a selection window
 
 // long-term
 // - ungroup

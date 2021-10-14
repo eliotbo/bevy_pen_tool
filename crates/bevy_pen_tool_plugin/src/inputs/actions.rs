@@ -698,6 +698,7 @@ pub fn save(
         let mut output = File::create(path).unwrap();
         let _result = output.write(serialized.as_bytes());
 
+        //////// save mesh in obj format ///////////////////
         if let Some((mesh_handle, GroupMesh(color))) = mesh_query.iter().next() {
             let mesh = meshes.get(mesh_handle).unwrap();
             let vertex_attributes = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
@@ -708,15 +709,72 @@ pub fn save(
                     bevy::render::mesh::VertexAttributeValues::Float32x3(vertices),
                     bevy::render::mesh::Indices::U32(indices),
                 ) => {
-                    // saving format 3-tuple with:
-                    // Vec<[f32;3]> for vertex attributes
-                    // Vec<u32> for indices
-                    // Color for the mesh color
-                    let mesh_info = (vertices, indices, color);
-                    let mesh_serialized = serde_json::to_string_pretty(&mesh_info).unwrap();
-                    let mesh_path = "assets/meshes/my_mesh.txt";
-                    let mut mesh_output = File::create(mesh_path).unwrap();
-                    let _mesh_result = mesh_output.write(mesh_serialized.as_bytes());
+                    let obj_vertices = vertices
+                        .clone()
+                        .iter()
+                        .map(|arr| obj_exporter::Vertex {
+                            x: arr[0] as f64,
+                            y: arr[1] as f64,
+                            z: arr[2] as f64,
+                        })
+                        .collect::<Vec<obj_exporter::Vertex>>();
+
+                    // let mut obj_inds_vecs: Vec<Vec<u32>> =
+                    // indices.chunks(3).map(|x| x.to_vec()).collect();
+                    let obj_inds_vecs: Vec<(usize, usize, usize)> = indices
+                        .chunks_exact(3)
+                        .map(|z| {
+                            let mut x = z.iter();
+                            return (
+                                *x.next().unwrap() as usize,
+                                *x.next().unwrap() as usize,
+                                *x.next().unwrap() as usize,
+                            );
+                        })
+                        .collect();
+
+                    let normals = vec![obj_exporter::Vertex {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 1.0,
+                    }];
+
+                    let set = obj_exporter::ObjSet {
+                        material_library: None,
+                        objects: vec![obj_exporter::Object {
+                            name: "My_mesh".to_owned(),
+                            vertices: obj_vertices,
+                            tex_vertices: vec![],
+                            normals,
+                            geometry: vec![obj_exporter::Geometry {
+                                material_name: None,
+                                shapes: obj_inds_vecs
+                                    .into_iter()
+                                    .map(|(x, y, z)| obj_exporter::Shape {
+                                        primitive: obj_exporter::Primitive::Triangle(
+                                            (x, Some(x), Some(0)),
+                                            (y, Some(y), Some(0)),
+                                            (z, Some(z), Some(0)),
+                                        ),
+                                        groups: vec![],
+                                        smoothing_groups: vec![],
+                                    })
+                                    .collect(),
+                            }],
+                        }],
+                    };
+
+                    obj_exporter::export_to_file(&set, "my_mesh.obj").unwrap();
+
+                    // // saving format 3-tuple with:
+                    // // Vec<[f32;3]> for vertex attributes
+                    // // Vec<u32> for indices
+                    // // Color for the mesh color
+                    // let mesh_info = (vertices, indices, color);
+                    // let mesh_serialized = serde_json::to_string_pretty(&mesh_info).unwrap();
+                    // let mesh_path = "assets/meshes/my_mesh.txt";
+                    // let mut mesh_output = File::create(mesh_path).unwrap();
+                    // let _mesh_result = mesh_output.write(mesh_serialized.as_bytes());
                 }
                 _ => {}
             }

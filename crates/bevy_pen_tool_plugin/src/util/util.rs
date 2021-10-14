@@ -68,6 +68,9 @@ pub struct Loaded;
 pub struct GroupMesh(pub Color);
 
 #[derive(Component)]
+pub struct RoadMesh(pub Color);
+
+#[derive(Component)]
 pub struct GrandParent;
 
 #[derive(Component)]
@@ -448,6 +451,53 @@ impl Group {
         return pos;
     }
 
+    pub fn compute_normal_with_bezier(
+        &self,
+        bezier_curves: &ResMut<Assets<Bezier>>,
+        t: f64,
+    ) -> Vec2 {
+        let mut curve_index = 0;
+        let mut normal = Vec2::ZERO;
+        for (_handle, _anchor, (t_min, t_max), _lut) in &self.lut {
+            // println!("t: {}, t_min: {}, t_max: {}, ", t, t_min, t_max);
+            if &t >= t_min && &t <= &(t_max + 0.000001) {
+                break;
+            } else {
+                curve_index += 1;
+            }
+        }
+        if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
+            let bezier = bezier_curves.get(handle.clone()).unwrap();
+
+            // some of this code is shared with move_middle_quads()
+            let curve = bezier.to_curve();
+            let mut t_0_1 = (t as f64 - t_min) / (t_max - t_min);
+
+            if anchor == &AnchorEdge::Start {
+                t_0_1 = 1.0 - t_0_1;
+            }
+
+            t_0_1 = t_0_1.clamp(0.00000000001, 0.9999);
+
+            let idx_f64 = t_0_1 * (lut.len() - 1) as f64;
+            let p1 = lut[(idx_f64 as usize)];
+            let p2 = lut[idx_f64 as usize + 1];
+
+            let rem = idx_f64 % 1.0;
+            let t_distance = interpolate(p1, p2, rem);
+
+            use flo_curves::bezier::NormalCurve;
+
+            let normal_coord2 = curve.normal_at_pos(t_distance).to_unit_vector();
+
+            normal = Vec2::new(normal_coord2.x() as f32, normal_coord2.y() as f32);
+        } else {
+            panic!("couldn't get a curve at index: {}. ", curve_index);
+        }
+
+        return normal;
+    }
+
     pub fn compute_standalone_lut(
         &mut self,
         bezier_curves: &ResMut<Assets<Bezier>>,
@@ -534,6 +584,7 @@ pub struct Globals {
     pub sound_on: bool,
     pub hide_control_points: bool,
     pub group_lut_num_points: u32,
+    pub road_width: f32,
 }
 
 impl Default for Globals {
@@ -548,6 +599,7 @@ impl Default for Globals {
             hide_control_points: false,
             num_points_on_curve: 25,
             group_lut_num_points: 100,
+            road_width: 8.0,
         }
     }
 }
@@ -1277,6 +1329,7 @@ pub fn adjust_group_attributes(
     }
 }
 
+// TODO: this should be a method under the Bezier struct
 // returns a map from real distance to t-value
 pub fn compute_lut(curve: Curve<Coord2>, num_sections: usize) -> Vec<f64> {
     let mut section_lengths: Vec<f64> = Vec::new();

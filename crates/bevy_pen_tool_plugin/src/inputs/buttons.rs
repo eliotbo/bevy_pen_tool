@@ -37,6 +37,7 @@ pub enum UiButton {
     Lut,
     MakeMesh,
     Helicopter,
+    SpawnRoad,
 }
 
 pub fn button_system(
