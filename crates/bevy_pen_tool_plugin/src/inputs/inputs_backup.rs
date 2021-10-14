@@ -150,9 +150,9 @@ pub fn send_action(
         keyboard_input.pressed(KeyCode::LControl),
         keyboard_input.pressed(KeyCode::Space),
     ) {
-        // (true, false, false) if mouse_just_pressed => action_event_writer.send(Action::SpawnCurve),
+        (true, false, false) if mouse_just_pressed => action_event_writer.send(Action::SpawnCurve),
         (true, true, false) if mouse_pressed => action_event_writer.send(Action::Latch),
-        // (false, false, true) if mouse_just_pressed => action_event_writer.send(Action::Detach),
+        (false, false, true) if mouse_just_pressed => action_event_writer.send(Action::Detach),
         (false, true, false) if mouse_just_pressed => {
             // action_event_writer.send(Action::Select);
             action_event_writer.send(Action::SelectionBox);
@@ -216,7 +216,7 @@ pub fn record_mouse_events_system(
 }
 
 pub enum MouseClickEvent {
-    OnUiBoard,
+    OnUi,
     OnColorButton(Color),
     OnUiButton(UiButton),
     OnBezier((Anchor, Handle<Bezier>)),
@@ -249,7 +249,7 @@ pub fn check_mouseclick_on_objects(
                 ui_transform.translation.truncate(),
                 ui_board.size * globals.scale,
             ) {
-                events.push(MouseClickEvent::OnUiBoard);
+                events.push(MouseClickEvent::OnUi);
             }
         }
 
@@ -304,20 +304,12 @@ pub fn check_mouseclick_on_objects(
             }
         }
 
-        // list of priorities from highest to lowest
-        // 1. OnUiButton / OnColorButton
-        // 2. OnUiBoard
-        // 3. OnBezier / OnAnchorEdge
-        for event in events.iter() {
-            MouseClickEvent::OnUiButton;
-        }
-
         for event in events {
             mouse_event_writer.send(event);
         }
 
         // case of clicked on nothing
-        // if events.is_empty() {}
+        if events.is_empty() {}
     }
 }
 

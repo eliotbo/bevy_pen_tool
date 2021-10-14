@@ -9,23 +9,15 @@ use bevy::prelude::*;
 
 pub fn move_ui(
     cursor: ResMut<Cursor>,
-    mouse_button_input: Res<Input<MouseButton>>,
     mut ui_query: Query<(&mut Transform, &mut UiBoard), With<GrandParent>>,
-    // mut globals: ResMut<Globals>,
 ) {
-    for (mut transform, mut ui_board) in ui_query.iter_mut() {
+    for (mut transform, ui_board) in ui_query.iter_mut() {
         //
-        if mouse_button_input.pressed(MouseButton::Left) && ui_board.action == UiAction::MovingUi {
+        if ui_board.action == UiAction::MovingUi {
             //
             let z_pos = transform.translation.z;
             transform.translation =
                 ui_board.previous_position.extend(z_pos) + cursor.pos_relative_to_click.extend(0.0);
-            // ui_board.position = transform.translation.truncate();
-        }
-
-        if mouse_button_input.just_released(MouseButton::Left) {
-            ui_board.action = UiAction::None;
-            ui_board.previous_position = transform.translation.truncate();
         }
     }
 }

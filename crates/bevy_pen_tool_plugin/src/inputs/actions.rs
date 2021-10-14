@@ -764,7 +764,7 @@ pub fn save(
                         }],
                     };
 
-                    obj_exporter::export_to_file(&set, "my_mesh.obj").unwrap();
+                    obj_exporter::export_to_file(&set, "assets/meshes/my_mesh.obj").unwrap();
 
                     // // saving format 3-tuple with:
                     // // Vec<[f32;3]> for vertex attributes

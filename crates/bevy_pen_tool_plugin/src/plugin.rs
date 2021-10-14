@@ -24,6 +24,7 @@ impl Plugin for PenPlugin {
         app.add_asset::<MyShader>()
             .add_asset::<Bezier>()
             .add_asset::<Group>()
+            .add_event::<MouseClickEvent>()
             .add_event::<Group>()
             .add_event::<OfficialLatch>()
             .add_event::<MoveAnchor>()
@@ -130,6 +131,7 @@ impl Plugin for PenPlugin {
             .add_system(turn_round_animation)
             .add_system(follow_bezier_group)
             .add_system(make_road)
+            .add_system(check_mouseclick_on_objects)
             .add_system(mouse_release_actions);
     }
 }
