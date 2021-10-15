@@ -279,12 +279,12 @@ pub fn selection_final(
                     selected.handles.insert(bezier_handle.clone());
                 }
             }
-            selection.selected = selected;
+            selection.selected = selected.clone();
         }
 
         // return the UserState to Idle when finished selecting
         let us = user_state.as_mut();
-        *us = UserState::Idle;
+        *us = UserState::Selected(selected);
 
         for mut visible_selected in query_set.q1().iter_mut() {
             visible_selected.is_visible = true;
@@ -299,12 +299,16 @@ pub fn unselect(
     mut selection: ResMut<Selection>,
     mut visible_selection_query: Query<&mut Visible, With<SelectedBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
+    mut user_state: ResMut<UserState>,
 ) {
     if let Some(Action::Unselect) = action_event_reader.iter().next() {
         selection.selected.group = HashSet::new();
         selection.selected.handles = HashSet::new();
         selection.selected.ends = None;
         selection.selected.lut = Vec::new();
+
+        let us = user_state.as_mut();
+        *us = UserState::Idle;
 
         for mut visible in visible_selection_query.iter_mut() {
             visible.is_visible = false;

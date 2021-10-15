@@ -30,14 +30,16 @@ use bevy::{math::Quat, prelude::*, render::camera::OrthographicProjection};
 
 // TODO:
 // - make whole group move when selected
-// - Attach UI to a UI camera
+
 // - popups for save/load
 // - add Delete to readme
 // - change drag a rectangle to drag a selection window
+// - fix bug with selecting window appearing on default position for a frame
 
 // long-term
 // - ungroup
 // - make undo/redo
+// - Attach UI to a UI camera
 
 fn main() {
     App::new()

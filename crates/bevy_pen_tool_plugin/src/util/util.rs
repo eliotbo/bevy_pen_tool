@@ -25,7 +25,7 @@ use flo_curves::*;
 // use plotlib::style::LineStyle;
 // use plotlib::view::ContinuousView;
 
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Copy, Hash)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, Hash)]
 pub enum AnchorEdge {
     Start,
     End,
@@ -1161,15 +1161,14 @@ pub fn adjust_selection_attributes(
     mut action_event_reader: EventReader<Action>,
     user_state: Res<UserState>,
 ) {
-    // TODO: make this system run only when necessary
     let mut do_adjust = false;
-    // if mouse_button_input.pressed(MouseButton::Left) {
-    //     do_adjust = true;
-    // }
+
     if let UserState::MovingAnchor = user_state.as_ref() {
         do_adjust = true;
     }
-    if let Some(Action::Selected) = action_event_reader.iter().next() {
+
+    let us = user_state.as_ref();
+    if let UserState::Selected(_) = us {
         do_adjust = true;
     }
 

@@ -50,7 +50,7 @@ impl Cursor {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Action {
     Latch,
     Redo,
@@ -74,6 +74,7 @@ pub enum Action {
     SpawnHeli,
     MakeMesh,
     SpawnRoad,
+    StartMoveAnchor,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -99,13 +100,12 @@ pub fn send_action(
             UiButton::Load => action_event_writer.send(Action::Load),
             UiButton::Save => action_event_writer.send(Action::Save),
             UiButton::Group => action_event_writer.send(Action::Group),
-            // is this correct?
-            UiButton::Selection => {
-                action_event_writer.send(Action::Select);
-                // action_event_writer.send(Action::SelectionBox);
-            }
-
-            UiButton::Detach => action_event_writer.send(Action::Detach),
+            // // is this correct?
+            // UiButton::Selection => {
+            //     action_event_writer.send(Action::Select);
+            //     // action_event_writer.send(Action::SelectionBox);
+            // }
+            // UiButton::Detach => action_event_writer.send(Action::Detach),
             // UiButton::SpawnCurve => action_event_writer.send(Action::SpawnCurve),
             UiButton::Hide => action_event_writer.send(Action::HideAnchors),
             UiButton::Sound => action_event_writer.send(Action::ToggleSound),
@@ -120,8 +120,6 @@ pub fn send_action(
         }
     }
 
-    let mouse_just_pressed = mouse_button_input.just_pressed(MouseButton::Left);
-    let mouse_just_released = mouse_button_input.just_released(MouseButton::Left);
     let mouse_pressed = mouse_button_input.pressed(MouseButton::Left);
     let mut mouse_wheel_up = false;
     let mut mouse_wheel_down = false;
@@ -153,11 +151,11 @@ pub fn send_action(
         // (true, false, false) if mouse_just_pressed => action_event_writer.send(Action::SpawnCurve),
         (true, true, false) if mouse_pressed => action_event_writer.send(Action::Latch),
         // (false, false, true) if mouse_just_pressed => action_event_writer.send(Action::Detach),
-        (false, true, false) if mouse_just_pressed => {
-            // action_event_writer.send(Action::Select);
-            action_event_writer.send(Action::SelectionBox);
-        }
-        (false, true, false) if mouse_just_released => action_event_writer.send(Action::Selected),
+
+        // TODO: move to mouseclick event router
+        // (false, true, false) if mouse_just_pressed => {
+        //     action_event_writer.send(Action::SelectionBox);
+        // }
         (false, true, false) if _pressed_g => action_event_writer.send(Action::Group),
         (false, true, false) if _pressed_h => action_event_writer.send(Action::HideAnchors),
         (true, true, false) if _pressed_h => action_event_writer.send(Action::HideControls),
@@ -167,7 +165,6 @@ pub fn send_action(
         (true, true, false) if _pressed_z => action_event_writer.send(Action::Redo),
         (false, true, false) if mouse_wheel_up => action_event_writer.send(Action::ScaleUp),
         (false, true, false) if mouse_wheel_down => action_event_writer.send(Action::ScaleDown),
-
         (false, false, false) if _pressed_delete => action_event_writer.send(Action::Delete),
         (true, false, false) if _pressed_t => action_event_writer.send(Action::ComputeLut),
         _ => {}
@@ -217,90 +214,40 @@ pub fn record_mouse_events_system(
 
 pub enum MouseClickEvent {
     OnUiBoard,
-    OnColorButton(Color),
+    OnColorButton((Color, Handle<MyShader>)),
     OnUiButton(UiButton),
-    OnBezier((Anchor, Handle<Bezier>)),
-    OnAchorEdge((AnchorEdge, Handle<Bezier>)),
-    OnCanvas,
+    OnAnchor((Anchor, Handle<Bezier>, bool)), // the bool is for unlatching
+    OnAnchorEdge((AnchorEdge, Handle<Bezier>)),
+    SpawnOnBezier((AnchorEdge, Handle<Bezier>)),
+    SpawnOnCanvas,
 }
 
 pub fn check_mouseclick_on_objects(
     cursor: ResMut<Cursor>,
+    keyboard_input: Res<Input<KeyCode>>,
     my_shader_params: ResMut<Assets<MyShader>>,
     globals: ResMut<Globals>,
     mouse_button_input: Res<Input<MouseButton>>,
-    mut button_query: Query<(&GlobalTransform, &Handle<MyShader>, &UiButton)>,
+    mut button_query: Query<(&ButtonState, &GlobalTransform, &Handle<MyShader>, &UiButton)>,
+
     mut color_button_query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
     mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
     bezier_query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut mouse_event_writer: EventWriter<MouseClickEvent>,
+    mut action_event_writer: EventWriter<Action>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Left) {
         let cam_scale = globals.scale * globals.scale;
-        let mut events: Vec<MouseClickEvent> = Vec::new();
 
-        //
-        // check for mouseclick on UI Board
-        for (ui_transform, ui_board) in ui_query.iter_mut() {
-            if
-            // ui_board.action == UiAction::None &&
-            cursor.within_rect(
-                ui_transform.translation.truncate(),
-                ui_board.size * globals.scale,
-            ) {
-                events.push(MouseClickEvent::OnUiBoard);
-            }
-        }
-
-        //
-        // check for mouseclick on anchors (including control points)
-        if let Some((_distance, anchor, handle)) = get_close_anchor(
-            3.0 * globals.scale,
-            cursor.position,
-            &bezier_curves,
-            &bezier_query,
-            globals.scale,
-        ) {
-            events.push(MouseClickEvent::OnBezier((anchor, handle)));
-        }
-
-        //
-        // check for mouseclick on anchors (excluding control points)
-        if let Some((_dist, anchor_edge, handle)) = get_close_still_anchor(
-            3.0 * globals.scale,
-            cursor.position,
-            &bezier_curves,
-            &bezier_query,
-        ) {
-            events.push(MouseClickEvent::OnAchorEdge((anchor_edge, handle)));
-        }
-
-        //
-        // check for mouseclick on UI buttons
-        for (button_transform, shader_handle, ui_button) in button_query.iter_mut() {
-            //
-            let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
-            //
-            if cursor.within_rect(
-                button_transform.translation.truncate(),
-                shader_params.size * 0.95 * cam_scale,
-            ) {
-                events.push(MouseClickEvent::OnUiButton(ui_button.clone()));
-                break;
-            }
-        }
-        //
-        // check for mouseclick on color buttons
-        for (transform, shader_param_handle, _color_button) in color_button_query.iter() {
-            let shader_params = my_shader_params.get(shader_param_handle).unwrap().clone();
-
-            if cursor.within_rect(
-                transform.translation.truncate(),
-                shader_params.size * 1.15 * cam_scale,
-            ) {
-                events.push(MouseClickEvent::OnColorButton(shader_params.color.clone()));
-                break;
+        // TODO: too much boilerplate to check if a button is on...
+        let mut spawn_button_on = false;
+        let mut unlatch_button_on = false;
+        for (button_state, _button_trans, _shader_handle, ui_button) in button_query.iter_mut() {
+            if ui_button == &UiButton::SpawnCurve {
+                spawn_button_on = button_state == &ButtonState::On;
+            } else if ui_button == &UiButton::Detach {
+                unlatch_button_on = button_state == &ButtonState::On;
             }
         }
 
@@ -308,275 +255,257 @@ pub fn check_mouseclick_on_objects(
         // 1. OnUiButton / OnColorButton
         // 2. OnUiBoard
         // 3. OnBezier / OnAnchorEdge
-        for event in events.iter() {
-            MouseClickEvent::OnUiButton;
+
+        //
+        // check for mouseclick on UI buttons
+        for (_state, button_transform, shader_handle, ui_button) in button_query.iter_mut() {
+            //
+            let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
+            //
+            if cursor.within_rect(
+                button_transform.translation.truncate(),
+                shader_params.size * 0.95 * cam_scale,
+            ) {
+                mouse_event_writer.send(MouseClickEvent::OnUiButton(ui_button.clone()));
+
+                return ();
+            }
+        }
+        //
+        // check for mouseclick on color buttons
+        for (transform, shader_param_handle, _color_button) in color_button_query.iter() {
+            let mut shader_params = my_shader_params
+                .get(shader_param_handle.clone())
+                .unwrap()
+                .clone();
+
+            if cursor.within_rect(
+                transform.translation.truncate(),
+                shader_params.size * 1.15 * cam_scale,
+            ) {
+                mouse_event_writer.send(MouseClickEvent::OnColorButton((
+                    shader_params.color.clone(),
+                    shader_param_handle.clone(),
+                )));
+                return ();
+            }
         }
 
-        for event in events {
-            mouse_event_writer.send(event);
+        //
+        // check for mouseclick on UI Board
+        for (ui_transform, mut ui_board) in ui_query.iter_mut() {
+            if
+            // ui_board.action == UiAction::None &&
+            cursor.within_rect(
+                ui_transform.translation.truncate(),
+                ui_board.size * globals.scale,
+            ) {
+                mouse_event_writer.send(MouseClickEvent::OnUiBoard);
+                ui_board.action = UiAction::MovingUi;
+                return ();
+            }
         }
 
-        // case of clicked on nothing
-        // if events.is_empty() {}
-    }
-}
-
-pub fn check_mouse_on_ui(
-    cursor: ResMut<Cursor>,
-    my_shader_params: ResMut<Assets<MyShader>>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    mut query: Query<(
-        &GlobalTransform,
-        &Handle<MyShader>,
-        &mut ButtonInteraction,
-        &UiButton,
-    )>,
-    mut ui_query: Query<(&Transform, &mut UiBoard)>,
-    globals: ResMut<Globals>,
-) {
-    for (button_transform, shader_handle, mut button_interaction, _ui_button) in query.iter_mut() {
-        let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
-
-        // this looks incorrect, but it is due to buttons being children of the UI board
-        let cam_scale = globals.scale * globals.scale;
-        if cursor.within_rect(
-            button_transform.translation.truncate(),
-            shader_params.size * 0.95 * cam_scale,
+        //
+        // check for mouseclick on anchors (including control points)
+        let mut anchor_event: Option<MouseClickEvent> = None;
+        if let Some((_distance, anchor, handle)) = get_close_anchor(
+            3.0 * globals.scale,
+            cursor.position,
+            &bezier_curves,
+            &bezier_query,
+            globals.scale,
         ) {
-            let bi = button_interaction.deref_mut();
-            *bi = ButtonInteraction::Hovered;
+            anchor_event = Some(MouseClickEvent::OnAnchor((anchor, handle, false)));
+        }
 
-            // TODO: change to a match statement
+        //
+        // check for mouseclick on anchors (excluding control points)
+        let mut anchor_edge_event: Option<MouseClickEvent> = None;
+        if let Some((_dist, anchor_edge, handle)) = get_close_still_anchor(
+            3.0 * globals.scale,
+            cursor.position,
+            &bezier_curves,
+            &bezier_query,
+        ) {
+            anchor_edge_event = Some(MouseClickEvent::OnAnchorEdge((anchor_edge, handle)));
+        }
 
-            // Disallow the UI board to be dragged upon click
-            if mouse_button_input.just_pressed(MouseButton::Left) {
-                *bi = ButtonInteraction::Clicked;
-                for (_t, mut ui_board) in ui_query.iter_mut() {
-                    ui_board.action = UiAction::PressedUiButton;
-                }
+        match (
+            anchor_event,
+            anchor_edge_event,
+            keyboard_input.pressed(KeyCode::LShift),
+            keyboard_input.pressed(KeyCode::LControl),
+            keyboard_input.pressed(KeyCode::Space),
+        ) {
+            // case of spawning a curve close to an anchor
+            (_, Some(MouseClickEvent::OnAnchorEdge(info)), true, false, false) => {
+                mouse_event_writer.send(MouseClickEvent::SpawnOnBezier(info));
             }
 
-            if mouse_button_input.pressed(MouseButton::Left) {
-                *bi = ButtonInteraction::Pressed;
+            // case of spawning a curve close to an anchor (with spawn button)
+            (_, Some(MouseClickEvent::OnAnchorEdge(info)), false, false, false)
+                if spawn_button_on =>
+            {
+                mouse_event_writer.send(MouseClickEvent::SpawnOnBezier(info));
             }
 
-            if mouse_button_input.just_released(MouseButton::Left) {
-                *bi = ButtonInteraction::Released;
-
-                // button_interaction.set_changed(); // probably not necessary
-                for (_t, mut ui_board) in ui_query.iter_mut() {
-                    ui_board.action = UiAction::None;
-                }
+            // case of clicking on a control point (higher priority)
+            (Some(_event), Some(MouseClickEvent::OnAnchorEdge(info)), false, false, false)
+                if !globals.do_hide_anchors && !spawn_button_on && !unlatch_button_on =>
+            {
+                mouse_event_writer.send(MouseClickEvent::OnAnchor((
+                    info.0.to_anchor(),
+                    info.1,
+                    false,
+                )));
             }
-        } else {
-            let bi = button_interaction.deref_mut();
-            *bi = ButtonInteraction::None;
+
+            // case of clicking on an anchor (lower priority)
+            (Some(event), None, false, false, false)
+                if !globals.do_hide_anchors
+                    && !globals.hide_control_points
+                    && !spawn_button_on
+                    && !unlatch_button_on =>
+            {
+                mouse_event_writer.send(event);
+            }
+
+            // case of clicking on an anchor and unlatching
+            (_, Some(MouseClickEvent::OnAnchorEdge(info)), false, false, true)
+                if !globals.do_hide_anchors =>
+            {
+                mouse_event_writer.send(MouseClickEvent::OnAnchor((
+                    info.0.to_anchor(),
+                    info.1,
+                    true,
+                )));
+            }
+
+            // case of clicking on an anchor and unlatching
+            (_, Some(MouseClickEvent::OnAnchorEdge(info)), false, false, false)
+                if !globals.do_hide_anchors && unlatch_button_on =>
+            {
+                mouse_event_writer.send(MouseClickEvent::OnAnchor((
+                    info.0.to_anchor(),
+                    info.1,
+                    true,
+                )));
+            }
+
+            // case of spawning a curve away from any anchor
+            (_, None, true, false, false) => {
+                // mouse_event_writer.send(MouseClickEvent::OnCanvas(None))
+                mouse_event_writer.send(MouseClickEvent::SpawnOnCanvas);
+            }
+
+            // case of spawning a curve away from any anchor, with spawn button on
+            (_, None, false, false, false) if spawn_button_on => {
+                mouse_event_writer.send(MouseClickEvent::SpawnOnCanvas);
+                // mouse_event_writer.send(MouseClickEvent::OnCanvas(None));
+            }
+
+            (None, None, false, true, false) if !spawn_button_on => {
+                action_event_writer.send(Action::SelectionBox);
+            }
+
+            (None, None, false, false, false) if !spawn_button_on => {
+                action_event_writer.send(Action::Unselect);
+            }
+
+            _ => {}
         }
     }
 }
 
-// TODO: refactor
 pub fn pick_color(
-    cursor: ResMut<Cursor>,
     mut my_shader_params: ResMut<Assets<MyShader>>,
-    mouse_button_input: Res<Input<MouseButton>>,
     query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
     mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
     mut globals: ResMut<Globals>,
+    mut mouse_event_reader: EventReader<MouseClickEvent>,
 ) {
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        //
-        let mut pressed_color_button = (false, 0);
-        //
-        for (ui_transform, mut ui_board) in ui_query.iter_mut() {
-            // scale is squared because of Parent/Children shenanegans
-            let cam_scale = globals.scale * globals.scale;
-            for (k, (transform, shader_param_handle, _color_button)) in query.iter().enumerate() {
-                let shader_params = my_shader_params.get(shader_param_handle).unwrap().clone();
+    // if mouse_button_input.just_pressed(MouseButton::Left) {
 
-                if cursor.within_rect(
-                    transform.translation.truncate(),
-                    shader_params.size * 1.15 * cam_scale,
-                ) {
-                    pressed_color_button = (true, k);
+    if let Some(MouseClickEvent::OnColorButton((color, shader_param_handle))) =
+        mouse_event_reader.iter().next()
+    {
+        let (_ui_transform, mut ui_board) = ui_query.single_mut();
+        globals.picked_color = Some(color.clone());
 
-                    globals.picked_color = Some(shader_params.color);
+        ui_board.action = UiAction::PickingColor;
 
-                    ui_board.action = UiAction::PickingColor;
-
-                    break;
-                }
-            }
-
-            // send selected color to shaders so that it shows the selected color with a white contour
-            if pressed_color_button.0 {
-                //
-                for (k, (_transform, shader_param_handle, _color_button)) in
-                    query.iter().enumerate()
-                {
-                    //
-                    let mut shader_params = my_shader_params.get_mut(shader_param_handle).unwrap();
-                    //
-                    if pressed_color_button.1 == k {
-                        shader_params.t = 1.0;
-                    } else {
-                        shader_params.t = 0.0;
-                    }
-                }
-            }
-
-            if ui_board.action == UiAction::None
-                && cursor.within_rect(
-                    ui_transform.translation.truncate(),
-                    ui_board.size * globals.scale,
-                )
-            {
-                ui_board.action = UiAction::MovingUi;
-            }
+        // This loops over all colors to deselect them. A more efficient way of deselecting
+        // would be to store the color and the handle of the selected color as well
+        for (_transform, other_shader_param_handle, _color_button) in query.iter() {
+            //
+            let mut shader_params = my_shader_params.get_mut(other_shader_param_handle).unwrap();
+            shader_params.t = 0.0;
         }
+        // send selected color to shaders so that it shows the selected color with a white contour
+        let mut shader_params = my_shader_params.get_mut(shader_param_handle).unwrap();
+        shader_params.t = 1.0;
+
+        // if ui_board.action == UiAction::None
+        //     && cursor.within_rect(
+        //         ui_transform.translation.truncate(),
+        //         ui_board.size * globals.scale,
+        //     )
+        // {
+        //     ui_board.action = UiAction::MovingUi;
+        // }
     }
 }
 
-// This is an action. It triggers upon left mouseclick
 pub fn spawn_curve_order_on_mouseclick(
-    keyboard_input: Res<Input<KeyCode>>,
-    cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
-    ui_query: Query<&UiBoard>,
-    globals: ResMut<Globals>,
     mut event_writer: EventWriter<Latch>,
-    button_query: Query<(&ButtonState, &UiButton)>,
     mut user_state: ResMut<UserState>,
+    mut mouse_event_reader: EventReader<MouseClickEvent>,
 ) {
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        let mut ui_action = false;
-        for ui_board in ui_query.iter() {
-            if ui_board.action != UiAction::None {
-                ui_action = true;
-                break;
-            }
-        }
+    let click_event = mouse_event_reader.iter().next();
 
-        let mut spawn_button_on = false;
-        for (button_state, ui_button) in button_query.iter() {
-            if ui_button == &UiButton::SpawnCurve {
-                spawn_button_on = button_state == &ButtonState::On;
-            }
-        }
-
-        if !ui_action
-            && ((keyboard_input.pressed(KeyCode::LShift)
-                && !keyboard_input.pressed(KeyCode::LControl)
-                && !keyboard_input.pressed(KeyCode::Space))
-                || spawn_button_on)
-        {
+    match click_event {
+        Some(MouseClickEvent::SpawnOnBezier((anchor_edge, handle))) => {
+            // this is too stateful, be more functional please. events please.
             let us = user_state.as_mut();
             *us = UserState::SpawningCurve;
-
-            // Check for latching on nearby curve endings
-            for bezier_handle in query.iter() {
+            //
+            if let Some(bezier) = bezier_curves.get_mut(handle) {
                 //
-                if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
-                    //
-                    let max_click_distance = 5.0 * globals.scale;
-
-                    let start_close_enough =
-                        (bezier.positions.start - cursor.position).length() < max_click_distance;
-                    let end_close_enough =
-                        (bezier.positions.end - cursor.position).length() < max_click_distance;
-
-                    if start_close_enough && !bezier.quad_is_latched(AnchorEdge::Start) {
-                        // latched
-                        bezier.send_latch_on_spawn(AnchorEdge::Start, &mut event_writer);
-                        break;
-                    } else if end_close_enough && !bezier.quad_is_latched(AnchorEdge::End) {
-                        // latched
-                        bezier.send_latch_on_spawn(AnchorEdge::End, &mut event_writer);
-                        break;
-                    }
-                }
+                bezier.send_latch_on_spawn(*anchor_edge, &mut event_writer);
             }
         }
+        Some(MouseClickEvent::SpawnOnCanvas) => {
+            let us = user_state.as_mut();
+            *us = UserState::SpawningCurve;
+        }
+        _ => {}
     }
 }
 
-// checks if a mouseclick happened on an anchor, if so it sends a UserState::MovingAnchor event
 pub fn check_mouse_on_canvas(
-    keyboard_input: Res<Input<KeyCode>>,
-    cursor: ResMut<Cursor>,
-    bezier_curves: ResMut<Assets<Bezier>>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
-    globals: ResMut<Globals>,
     mut move_event_writer: EventWriter<MoveAnchor>,
-    mut action_event_writer: EventWriter<Action>,
     mut user_state: ResMut<UserState>,
+    mut mouse_event_reader: EventReader<MouseClickEvent>,
 ) {
-    if mouse_button_input.just_pressed(MouseButton::Left)
-        && !keyboard_input.pressed(KeyCode::LShift)
-        && !keyboard_input.pressed(KeyCode::LControl)
-        && !globals.do_hide_anchors
-        && !(user_state.as_ref() == &UserState::SpawningCurve)
-    {
-        let mut clicked_on_anchor_ctrl = false;
+    let click_event = mouse_event_reader.iter().next();
 
-        // case of nothing is hidden
-        if !globals.hide_control_points {
-            if let Some((_distance, anchor, handle)) = get_close_anchor(
-                3.0 * globals.scale,
-                cursor.position,
-                &bezier_curves,
-                &query,
-                globals.scale,
-            ) {
-                clicked_on_anchor_ctrl = true;
+    match click_event {
+        Some(MouseClickEvent::OnAnchor((anchor, handle, unlatch))) => {
+            let moving_anchor = MoveAnchor {
+                handle: handle.clone(),
+                anchor: anchor.clone(),
+                unlatch: *unlatch,
+            };
+            // passing anchor data to a MoveAnchor event
+            move_event_writer.send(moving_anchor.clone());
 
-                let unlatch = !keyboard_input.pressed(KeyCode::LShift)
-                    && !keyboard_input.pressed(KeyCode::LControl)
-                    && keyboard_input.pressed(KeyCode::Space);
-
-                let moving_anchor = MoveAnchor {
-                    handle,
-                    anchor,
-                    unlatch,
-                };
-                move_event_writer.send(moving_anchor.clone());
-
-                let user_state = user_state.as_mut();
-                *user_state = UserState::MovingAnchor;
-            }
+            let user_state = user_state.as_mut();
+            *user_state = UserState::MovingAnchor;
         }
 
-        // if the control points are hidden, user can only click on the anchors
-        if !clicked_on_anchor_ctrl {
-            if let Some((_dist, anchor_edge, handle)) =
-                get_close_still_anchor(3.0 * globals.scale, cursor.position, &bezier_curves, &query)
-            {
-                clicked_on_anchor_ctrl = true;
-
-                let unlatch = !keyboard_input.pressed(KeyCode::LShift)
-                    && !keyboard_input.pressed(KeyCode::LControl)
-                    && keyboard_input.pressed(KeyCode::Space);
-
-                let anchor: Anchor = anchor_edge.to_anchor();
-                let moving_anchor = MoveAnchor {
-                    handle,
-                    anchor,
-                    unlatch,
-                };
-                move_event_writer.send(moving_anchor.clone());
-
-                let user_state = user_state.as_mut();
-                *user_state = UserState::MovingAnchor;
-            }
-        }
-
-        // case of clicked on nothing
-        if !clicked_on_anchor_ctrl {
-            action_event_writer.send(Action::Unselect);
-        }
+        _ => {}
     }
 }
 
@@ -587,15 +516,11 @@ pub fn mouse_release_actions(
     mut ui_query: Query<(&mut Transform, &mut UiBoard), With<GrandParent>>,
     mut user_state: ResMut<UserState>,
     mut cursor: ResMut<Cursor>,
+    mut action_event_writer: EventWriter<Action>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         cursor.latch = Vec::new();
         let user_state = user_state.as_mut();
-        // if let UserState::Selected(_) = user_state {
-        // } else if let UserState::Selecting(_) = user_state {
-        // } else {
-        //     *user_state = UserState::Idle;
-        // }
 
         match user_state {
             UserState::Selected(_) | UserState::Selecting(_) => {}
@@ -618,5 +543,7 @@ pub fn mouse_release_actions(
             ui_board.action = UiAction::None;
             ui_board.previous_position = transform.translation.truncate();
         }
+
+        action_event_writer.send(Action::Selected)
     }
 }

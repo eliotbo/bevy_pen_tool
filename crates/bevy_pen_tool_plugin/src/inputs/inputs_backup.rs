@@ -612,3 +612,171 @@ pub fn mouse_release_actions(
         }
     }
 }
+
+pub enum MouseClickEvent {
+    OnUiBoard,
+    OnColorButton((Color, Handle<MyShader>)),
+    OnUiButton(UiButton),
+    OnBezier((Anchor, Handle<Bezier>)),
+    OnAchorEdge((AnchorEdge, Handle<Bezier>)),
+    OnCanvas,
+}
+
+pub fn check_mouseclick_on_objects(
+    cursor: ResMut<Cursor>,
+    keyboard_input: Res<Input<KeyCode>>,
+    my_shader_params: ResMut<Assets<MyShader>>,
+    globals: ResMut<Globals>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    mut button_query: Query<(&GlobalTransform, &Handle<MyShader>, &UiButton)>,
+    mut color_button_query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
+    mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
+    bezier_query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
+    bezier_curves: ResMut<Assets<Bezier>>,
+    mut mouse_event_writer: EventWriter<MouseClickEvent>,
+    mut action_event_writer: EventWriter<Action>,
+) {
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        let cam_scale = globals.scale * globals.scale;
+
+        // list of priorities from highest to lowest
+        // 1. OnUiButton / OnColorButton
+        // 2. OnUiBoard
+        // 3. OnBezier / OnAnchorEdge
+
+        //
+        // check for mouseclick on UI buttons
+        for (button_transform, shader_handle, ui_button) in button_query.iter_mut() {
+            //
+            let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
+            //
+            if cursor.within_rect(
+                button_transform.translation.truncate(),
+                shader_params.size * 0.95 * cam_scale,
+            ) {
+                mouse_event_writer.send(MouseClickEvent::OnUiButton(ui_button.clone()));
+                return ();
+            }
+        }
+        //
+        // check for mouseclick on color buttons
+        for (transform, shader_param_handle, _color_button) in color_button_query.iter() {
+            let mut shader_params = my_shader_params
+                .get(shader_param_handle.clone())
+                .unwrap()
+                .clone();
+
+            if cursor.within_rect(
+                transform.translation.truncate(),
+                shader_params.size * 1.15 * cam_scale,
+            ) {
+                mouse_event_writer.send(MouseClickEvent::OnColorButton((
+                    shader_params.color.clone(),
+                    shader_param_handle.clone(),
+                )));
+                return ();
+            } else {
+                // could this be moved elsewhere as the router shouldn't have any effects
+                shader_params.t = 0.0;
+            }
+        }
+
+        //
+        // check for mouseclick on UI Board
+        for (ui_transform, ui_board) in ui_query.iter_mut() {
+            if
+            // ui_board.action == UiAction::None &&
+            cursor.within_rect(
+                ui_transform.translation.truncate(),
+                ui_board.size * globals.scale,
+            ) {
+                mouse_event_writer.send(MouseClickEvent::OnUiBoard);
+                return ();
+            }
+        }
+
+        //
+        // check for mouseclick on anchors (including control points)
+        let mut anchor_event: Option<MouseClickEvent> = None;
+        if let Some((_distance, anchor, handle)) = get_close_anchor(
+            3.0 * globals.scale,
+            cursor.position,
+            &bezier_curves,
+            &bezier_query,
+            globals.scale,
+        ) {
+            anchor_event = Some(MouseClickEvent::OnBezier((anchor, handle)));
+        }
+
+        //
+        // check for mouseclick on anchors (excluding control points)
+        let mut anchor_edge_event: Option<MouseClickEvent> = None;
+        if let Some((_dist, anchor_edge, handle)) = get_close_still_anchor(
+            3.0 * globals.scale,
+            cursor.position,
+            &bezier_curves,
+            &bezier_query,
+        ) {
+            anchor_edge_event = Some(MouseClickEvent::OnAchorEdge((anchor_edge, handle)));
+        }
+
+        match (
+            anchor_event,
+            anchor_edge_event,
+            keyboard_input.pressed(KeyCode::LShift),
+            keyboard_input.pressed(KeyCode::LControl),
+            keyboard_input.pressed(KeyCode::Space),
+        ) {
+            (None, None, false, true, false) => {
+                action_event_writer.send(Action::SelectionBox);
+            }
+            _ => {}
+        }
+
+        // case of clicked on nothing
+        // if events.is_empty() {}
+    }
+}
+
+// TODO: refactor
+pub fn pick_color2(
+    cursor: ResMut<Cursor>,
+    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
+    mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
+    mut globals: ResMut<Globals>,
+    mut mouse_event_reader: EventReader<MouseClickEvent>,
+) {
+    // if mouse_button_input.just_pressed(MouseButton::Left) {
+    for event in mouse_event_reader.iter() {
+        if let MouseClickEvent::OnColorButton((color, shader_param_handle)) = event {
+            let (ui_transform, mut ui_board) = ui_query.single_mut();
+            globals.picked_color = Some(color.clone());
+
+            ui_board.action = UiAction::PickingColor;
+
+            // send selected color to shaders so that it shows the selected color with a white contour
+
+            // This loops over all colors to deselect them. A more efficient way of deselecting
+            // would be to store the color and the handle of the selected color as well
+            for (_transform, other_shader_param_handle, _color_button) in query.iter() {
+                //
+                let mut shader_params =
+                    my_shader_params.get_mut(other_shader_param_handle).unwrap();
+                shader_params.t = 0.0;
+            }
+            let mut shader_params = my_shader_params.get_mut(shader_param_handle).unwrap();
+            shader_params.t = 1.0;
+
+            if ui_board.action == UiAction::None
+                && cursor.within_rect(
+                    ui_transform.translation.truncate(),
+                    ui_board.size * globals.scale,
+                )
+            {
+                ui_board.action = UiAction::MovingUi;
+            }
+        }
+    }
+}

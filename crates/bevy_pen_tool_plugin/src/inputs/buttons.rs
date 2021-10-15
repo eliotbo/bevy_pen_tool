@@ -1,6 +1,9 @@
-use crate::util::{Globals, MyShader, OnOffMaterial};
+use crate::inputs::Cursor;
+use crate::util::{Globals, MyShader, OnOffMaterial, UiAction, UiBoard};
 
 use bevy::prelude::*;
+
+use std::ops::DerefMut;
 
 #[derive(Clone, Copy, Debug, Component)]
 pub enum ButtonInteraction {
@@ -38,6 +41,60 @@ pub enum UiButton {
     MakeMesh,
     Helicopter,
     SpawnRoad,
+}
+
+pub fn check_mouse_on_ui(
+    cursor: ResMut<Cursor>,
+    my_shader_params: ResMut<Assets<MyShader>>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    mut query: Query<(
+        &GlobalTransform,
+        &Handle<MyShader>,
+        &mut ButtonInteraction,
+        &UiButton,
+    )>,
+    mut ui_query: Query<(&Transform, &mut UiBoard)>,
+    globals: ResMut<Globals>,
+) {
+    for (button_transform, shader_handle, mut button_interaction, _ui_button) in query.iter_mut() {
+        let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
+
+        // this looks incorrect, but it is due to buttons being children of the UI board
+        let cam_scale = globals.scale * globals.scale;
+        if cursor.within_rect(
+            button_transform.translation.truncate(),
+            shader_params.size * 0.95 * cam_scale,
+        ) {
+            let bi = button_interaction.deref_mut();
+            *bi = ButtonInteraction::Hovered;
+
+            // TODO: change to a match statement
+
+            // Disallow the UI board to be dragged upon click
+            if mouse_button_input.just_pressed(MouseButton::Left) {
+                *bi = ButtonInteraction::Clicked;
+                for (_t, mut ui_board) in ui_query.iter_mut() {
+                    ui_board.action = UiAction::PressedUiButton;
+                }
+            }
+
+            if mouse_button_input.pressed(MouseButton::Left) {
+                *bi = ButtonInteraction::Pressed;
+            }
+
+            if mouse_button_input.just_released(MouseButton::Left) {
+                *bi = ButtonInteraction::Released;
+
+                // button_interaction.set_changed(); // probably not necessary
+                for (_t, mut ui_board) in ui_query.iter_mut() {
+                    ui_board.action = UiAction::None;
+                }
+            }
+        } else {
+            let bi = button_interaction.deref_mut();
+            *bi = ButtonInteraction::None;
+        }
+    }
 }
 
 pub fn button_system(
@@ -97,7 +154,7 @@ pub fn button_system(
             }
         }
 
-        // TODO: send events, replacing the chunky if statements in actions.rs
+        // TODO: receive MouseClickEvent
         if let Some(mut button_state_mut) = button_state_option {
             let button_state = button_state_mut.as_mut();
             match (
