@@ -12,6 +12,7 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 // - change drag a rectangle to drag a selection window
 // - fix bug with selecting window appearing on default position for a frame
 // - the position of a newly-latched anchor is incorrect
+// - bug when loading group: middle quads not despawned
 
 // long-term
 // - ungroup

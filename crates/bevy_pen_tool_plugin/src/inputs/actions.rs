@@ -824,19 +824,27 @@ pub fn load(
     mut loaded_event_writer: EventWriter<Loaded>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Load) {
-        let cur_path = std::env::current_dir().unwrap();
+        // let cur_path = std::env::current_dir().unwrap();
 
-        let res = rfd::FileDialog::new()
-            .add_filter("text", &["txt", "rs"])
-            .add_filter("rust", &["rs", "toml"])
-            .set_directory(&cur_path)
-            .pick_files();
+        // let res = rfd::FileDialog::new()
+        //     .add_filter("text", &["txt", "rs"])
+        //     .add_filter("rust", &["rs", "toml"])
+        //     .set_directory(&cur_path)
+        //     .pick_files();
 
-        // println!("The user choose: {:#?}", res);
+        // let mut path = std::path::PathBuf::new();
+        // if let Some(chosen_path) = res.clone() {
+        //     let path_some = chosen_path.get(0);
+        //     if let Some(path_local) = path_some {
+        //         path = path_local.clone();
+        //     } else {
+        //         return ();
+        //     }
+        // } else {
+        //     return ();
+        // }
 
-        let path1 = res.clone().unwrap();
-
-        let path = path1.get(0).unwrap();
+        let path = "curve_groups.txt";
 
         let clearcolor = clearcolor_struct.0;
 
@@ -848,7 +856,6 @@ pub fn load(
         globals.do_hide_anchors = false;
         globals.do_hide_bounding_boxes = true;
 
-        // let path = "curve_groups.txt";
         let mut file = std::fs::File::open(path).unwrap();
 
         let mut contents = String::new();

@@ -21,6 +21,7 @@ impl Plugin for PenPlugin {
         app.add_asset::<MyShader>()
             .add_asset::<Bezier>()
             .add_asset::<Group>()
+            .add_asset::<MyArrayTexture>()
             .add_event::<MouseClickEvent>()
             .add_event::<Group>()
             .add_event::<OfficialLatch>()
