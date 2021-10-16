@@ -39,74 +39,109 @@ pub fn make_road(
             commands.entity(entity).despawn();
         }
 
-        let num_points = 100;
+        let num_points = 200;
 
+        let crop = 0.000001;
         let t_range: Vec<f32> = (0..num_points)
-            .map(|x| ((x) as f32) / (num_points as f32 - 0.99999))
+            .map(|x| (x as f32) / (num_points as f32 - 0.99999) / (1.0 + 2.0 * crop) + crop)
             .collect();
         let mut mesh_contour1: Vec<Vec3> = Vec::new();
         let mut mesh_contour2: Vec<Vec3> = Vec::new();
+        let mut mesh_contour: Vec<Vec3> = Vec::new();
 
+        let mut k: u32 = 0;
         for t in t_range {
             let position = group.compute_position_with_lut(t);
-            let normal = group.compute_normal_with_bezier(&curves, t as f64);
+            let normal = group
+                .compute_normal_with_bezier(&curves, t as f64)
+                .normalize();
 
             let v1 = Vec3::new(
                 (position.x + normal.x * globals.road_width) as f32,
                 (position.y + normal.y * globals.road_width) as f32,
                 -88.0,
             );
-            mesh_contour1.push(v1);
+            // mesh_contour1.push(v1);
+            //
             let v2 = Vec3::new(
                 (position.x - normal.x * globals.road_width) as f32,
                 (position.y - normal.y * globals.road_width) as f32,
                 -88.0,
             );
-            mesh_contour2.push(v2);
+            // mesh_contour2.push(v2);
+
+            mesh_contour.push(v1);
+            mesh_contour.push(v2);
+
+            k += 1;
+
+            // println!("t: {:?}", &t);
+            // println!("contour1: {:?}", &v1);
+            // println!("contour2: {:?}", &v2);
         }
 
-        mesh_contour2 = mesh_contour2.iter().rev().cloned().collect();
-        mesh_contour1.append(&mut mesh_contour2);
+        // indices
+        let mut new_indices: Vec<u32> = Vec::new();
+        for kk in 0..(num_points) {
+            let k = kk * 2;
+            let mut local_inds = vec![k, (k + 1), (k + 2), (k + 1), (k + 3), (k + 2)];
+            new_indices.append(&mut local_inds);
+        }
+        // println!("indices len: {:?}", &new_indices.len());
 
-        let mut path_builder = Path::builder();
-
-        let first = mesh_contour1[0];
-        path_builder.begin(point(first.x, first.y));
-
-        let resto: Vec<Vec3> = mesh_contour1[1..].to_vec();
-
-        for e in resto.iter() {
-            path_builder.line_to(point(e.x, e.y));
+        // uvs
+        let path_length = group.standalone_lut.path_length;
+        let num_repeats = path_length / 100.0;
+        let mut mesh_attr_uvs: Vec<[f32; 2]> = Vec::new();
+        for k in 0..num_points * 2 {
+            // let (pos_x, pos_y) = (pos[0], pos[1]);
+            let v = k as f32 / (num_points as f32 / num_repeats);
+            mesh_attr_uvs.push([v % 1.0, (k as f32) % 2.0]);
         }
 
-        path_builder.end(true);
-        let path = path_builder.build();
+        // mesh_contour2 = mesh_contour2.iter().rev().cloned().collect();
+        // mesh_contour1.append(&mut mesh_contour2);
 
-        // Create the destination vertex and index buffers.
-        let mut buffers: VertexBuffers<Point, u16> = VertexBuffers::new();
+        // let mut path_builder = Path::builder();
 
-        {
-            let mut vertex_builder = simple_builder(&mut buffers);
+        // let first = mesh_contour[0];
+        // path_builder.begin(point(first.x, first.y));
 
-            // Create the tessellator.
-            let mut tessellator = FillTessellator::new();
+        // // let resto: Vec<Vec3> = mesh_contour1[1..].to_vec();
+        // let resto: Vec<Vec3> = mesh_contour[1..].to_vec();
 
-            // Compute the tessellation.
-            let result =
-                tessellator.tessellate_path(&path, &FillOptions::default(), &mut vertex_builder);
-            assert!(result.is_ok());
-        }
+        // for e in resto.iter() {
+        //     path_builder.line_to(point(e.x, e.y));
+        // }
+
+        // path_builder.end(true);
+        // let path = path_builder.build();
+
+        // // Create the destination vertex and index buffers.
+        // let mut buffers: VertexBuffers<Point, u16> = VertexBuffers::new();
+
+        // {
+        //     let mut vertex_builder = simple_builder(&mut buffers);
+
+        //     // Create the tessellator.
+        //     let mut tessellator = FillTessellator::new();
+
+        //     // Compute the tessellation.
+        //     let result =
+        //         tessellator.tessellate_path(&path, &FillOptions::default(), &mut vertex_builder);
+        //     assert!(result.is_ok());
+        // }
 
         let mut mesh_pos_attributes: Vec<[f32; 3]> = Vec::new();
         let mut mesh_attr_normals: Vec<[f32; 3]> = Vec::new();
-        let mut mesh_attr_uvs: Vec<[f32; 2]> = Vec::new();
 
-        let mut new_indices: Vec<u32> = Vec::new();
+        // let mut new_indices: Vec<u32> = Vec::new();
         // show points from look-up table
         let color = globals.picked_color.unwrap();
         let mut colors = Vec::new();
 
-        for position in buffers.vertices[..].iter() {
+        for position in mesh_contour {
+            // mesh_pos_attributes.push([position.x, position.y, 0.0]);
             mesh_pos_attributes.push([position.x, position.y, 0.0]);
             mesh_attr_normals.push([0.0, 0.0, 1.0]);
 
@@ -132,28 +167,37 @@ pub fn make_road(
             return (*min_v, *max_v);
         }
 
-        let mut bounds_x = bounds(&xs);
-        let size_x = bounds_x.1 - bounds_x.0;
-        let mut bounds_y = bounds(&ys);
-        let size_y = bounds_y.1 - bounds_y.0;
+        // let mut bounds_x = bounds(&xs);
+        // let size_x = bounds_x.1 - bounds_x.0;
+        // let mut bounds_y = bounds(&ys);
+        // let size_y = bounds_y.1 - bounds_y.0;
 
-        for pos in &mesh_pos_attributes {
-            let (pos_x, pos_y) = (pos[0], pos[1]);
+        // let half_len = mesh_pos_attributes.len() / 2;
 
-            mesh_attr_uvs.push([
-                1.0 * (pos_x - bounds_x.0) / size_x,
-                1.0 * (pos_y - bounds_y.0) / size_y,
-            ]);
+        // let first_half: Vec<[f32; 3]> = mesh_pos_attributes[0..(p_len / 2)].to_vec();
+        // let second_half: Vec<[f32; 3]> = mesh_pos_attributes[(p_len / 2)..p_len].to_vec();
 
-            // mesh_attr_uvs.push([
-            //     1.0 * (pos_x - bounds_x.0 * 0.0),
-            //     1.0 * (pos_y - bounds_y.0 * 0.0),
-            // ]);
-        }
+        // let num_repeats = 1.0;
 
-        for ind in buffers.indices[..].iter().rev() {
-            new_indices.push(ind.clone() as u32);
-        }
+        // for k in 0..half_len {
+        //     // let (pos_x, pos_y) = (pos[0], pos[1]);
+        //     let v = k as f32 / (half_len as f32 / num_repeats);
+        //     mesh_attr_uvs.push([v % 1.0, 0.0]);
+        // }
+
+        // for k in (0..half_len).rev() {
+        //     // let (pos_x, pos_y) = (pos[0], pos[1]);
+        //     let v = k as f32 / (half_len as f32 / num_repeats);
+        //     mesh_attr_uvs.push([v % 1.0, 1.0]);
+        // }
+
+        // for ind in buffers.indices[..].iter().rev() {
+        //     new_indices.push(ind.clone() as u32);
+        // }
+
+        // println!("POSITIONS: {:?}", &mesh_pos_attributes);
+        // println!("UVs: {:?}", &mesh_attr_uvs);
+        // println!("indices: {:?}", &new_indices);
 
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
@@ -190,11 +234,22 @@ pub fn make_road(
                 // render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
                 //     pipeline_handle,
                 // )]),
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -12000.0)),
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -120.0)),
                 material: material_handle,
                 ..Default::default()
             })
             .insert(RoadMesh(color));
+
+        // light
+        commands.spawn_bundle(PointLightBundle {
+            transform: Transform::from_translation(Vec3::new(0.0, 50.0, -75.0)),
+            point_light: PointLight {
+                intensity: 50000.,
+                range: 1000.,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
     }
 }
 
@@ -334,8 +389,9 @@ pub fn make_mesh(
         // }));
 
         let material_handle = materials.add(StandardMaterial {
-            base_color_texture: Some(texture_handle),
+            // base_color_texture: Some(texture_handle),
             reflectance: 0.02,
+            base_color: color,
             unlit: false,
             ..Default::default()
         });
@@ -346,7 +402,7 @@ pub fn make_mesh(
                 // render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
                 //     pipeline_handle,
                 // )]),
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -12000.0)),
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -150.0)),
                 material: material_handle,
                 ..Default::default()
             })

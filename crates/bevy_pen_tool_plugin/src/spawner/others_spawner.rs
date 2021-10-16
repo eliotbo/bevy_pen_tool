@@ -1,7 +1,9 @@
 use crate::util::{
-    Bezier, Globals, Group, GroupBoxQuad, GroupMiddleQuad, Maps, MyShader, SelectedBoxQuad,
-    SelectingBoxQuad,
+    Bezier, FollowBezierAnimation, Globals, Group, GroupBoxQuad, GroupMiddleQuad, Maps, MyShader,
+    SelectedBoxQuad, SelectingBoxQuad, TurnRoundAnimation,
 };
+
+use crate::inputs::Action;
 
 use bevy::{
     prelude::*,
@@ -226,6 +228,69 @@ pub fn spawn_group_middle_quads(
                 .id();
 
             commands.entity(*parent).push_children(&[child]);
+        }
+    }
+}
+
+pub fn spawn_heli(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut action_event_reader: EventReader<Action>,
+    groups: Res<Assets<Group>>,
+) {
+    if action_event_reader.iter().any(|x| x == &Action::SpawnHeli) {
+        if let Some(_) = groups.iter().next() {
+            let heli_handle = asset_server.load("textures/heli.png");
+
+            commands
+                .spawn_bundle((
+                    Transform {
+                        translation: Vec3::new(0.0, 0.0, -95.0),
+                        rotation: Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
+                        scale: Vec3::splat(4.0),
+                        ..Default::default()
+                    },
+                    GlobalTransform::identity(),
+                ))
+                .insert(FollowBezierAnimation)
+                .with_children(|cell| {
+                    cell.spawn_scene(asset_server.load("models/car.gltf#Scene0"));
+                })
+                .id();
+
+            let size = Vec2::new(25.0, 25.0);
+            let heli_sprite = commands
+                .spawn_bundle(SpriteBundle {
+                    material: materials.add(heli_handle.into()),
+                    // mesh: mesh_handle_button.clone(),
+                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, -105.0)),
+                    sprite: Sprite::new(size),
+                    visible: Visible {
+                        is_visible: true,
+                        is_transparent: true,
+                    },
+                    ..Default::default()
+                })
+                .insert(FollowBezierAnimation)
+                .id();
+            let copter_handle = asset_server.load("textures/copter.png");
+            let copter_sprite = commands
+                .spawn_bundle(SpriteBundle {
+                    material: materials.add(copter_handle.into()),
+                    // mesh: mesh_handle_button.clone(),
+                    transform: Transform::from_translation(Vec3::new(3.0, 1.0, 5.0)),
+                    sprite: Sprite::new(size),
+                    visible: Visible {
+                        is_visible: true,
+                        is_transparent: true,
+                    },
+                    ..Default::default()
+                })
+                .insert(TurnRoundAnimation)
+                .id();
+
+            commands.entity(heli_sprite).push_children(&[copter_sprite]);
         }
     }
 }

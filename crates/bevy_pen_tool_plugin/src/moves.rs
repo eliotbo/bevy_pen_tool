@@ -278,8 +278,10 @@ pub fn follow_bezier_group(
             let current_looking_dir = transform.rotation.mul_vec3(Vec3::X);
 
             let quat = Quat::from_rotation_arc(current_looking_dir, forward_direction.extend(0.0));
-
-            transform.rotation = transform.rotation.mul_quat(quat);
+            let (axis, mut angle) = quat.to_axis_angle();
+            angle = angle.clamp(0.0, 3.0 * std::f32::consts::PI / 180.0);
+            let clmaped_quat = Quat::from_axis_angle(axis, angle);
+            transform.rotation = transform.rotation.mul_quat(clmaped_quat);
         }
     }
 }

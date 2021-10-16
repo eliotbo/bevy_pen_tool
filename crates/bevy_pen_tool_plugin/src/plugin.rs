@@ -86,7 +86,7 @@ impl Plugin for PenPlugin {
                 SystemSet::on_update("ModelViewController")
                     // TODO:
                     // mouse_release_actions should be in the controller,
-                    // but there is a visual bug with new latches when it's there
+                    // but there is a bug with the position of new latches when it's there
                     .with_system(mouse_release_actions)
                     //
                     .with_system(begin_move_on_mouseclick)

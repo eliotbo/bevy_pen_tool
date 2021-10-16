@@ -13,6 +13,7 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 // - fix bug with selecting window appearing on default position for a frame
 // - the position of a newly-latched anchor is incorrect
 // - bug when loading group: middle quads not despawned
+// - bug: anchors have priority over control points
 
 // long-term
 // - ungroup
