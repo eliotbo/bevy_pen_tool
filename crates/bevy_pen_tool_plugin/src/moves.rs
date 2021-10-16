@@ -165,6 +165,7 @@ pub fn move_end_quads(
         //
         let EndpointQuad(point) = endpoint_quad_id;
         //
+        // checks whether the transforms are equal to the positions in the Bezier data structure
         if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
             if (*point == AnchorEdge::Start
                 && transform.translation.truncate() != bezier.positions.start)

@@ -4,7 +4,6 @@ use crate::util::*;
 use crate::{GroupMiddleQuad, StandaloneLut};
 
 use bevy::prelude::*;
-use bevy::render::wireframe::{Wireframe, WireframeConfig, WireframePlugin};
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -25,7 +24,7 @@ pub fn recompute_lut(
     maps: ResMut<Maps>,
     time: Res<Time>,
 ) {
-    if let Some(Action::ComputeLut) = action_event_reader.iter().next() {
+    if action_event_reader.iter().any(|x| x == &Action::ComputeLut) {
         for bezier_handle in query.iter_mut() {
             let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap();
 
@@ -195,7 +194,10 @@ pub fn selection_box_init(
     mut action_event_reader: EventReader<Action>,
     mut visible_selection_query: Query<&mut Visible, With<SelectingBoxQuad>>,
 ) {
-    if let Some(Action::SelectionBox) = action_event_reader.iter().next() {
+    if action_event_reader
+        .iter()
+        .any(|x| x == &Action::SelectionBox)
+    {
         if let Some((_distance, _anchor, _entity, _selected_handle)) = get_close_anchor_entity(
             2.0 * globals.scale,
             cursor.position,
@@ -231,7 +233,7 @@ pub fn selection_final(
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
 ) {
-    if let Some(Action::Selected) = action_event_reader.iter().next() {
+    if action_event_reader.iter().any(|x| x == &Action::Selected) {
         // let mut changed_user_state = false;
         let mut selected = Group::default();
         if let UserState::Selecting(click_position) = user_state.as_ref() {
@@ -301,7 +303,7 @@ pub fn unselect(
     mut action_event_reader: EventReader<Action>,
     mut user_state: ResMut<UserState>,
 ) {
-    if let Some(Action::Unselect) = action_event_reader.iter().next() {
+    if action_event_reader.iter().any(|x| x == &Action::Unselect) {
         selection.selected.group = HashSet::new();
         selection.selected.handles = HashSet::new();
         selection.selected.ends = None;
@@ -334,7 +336,7 @@ pub fn groupy(
     let mut do_group = false;
     let mut do_compute_lut = false;
     // group selected curves
-    if let Some(Action::Group) = action_event_reader.iter().next() {
+    if action_event_reader.iter().any(|x| x == &Action::Group) {
         do_group = true;
         do_compute_lut = true;
     }
@@ -440,8 +442,7 @@ pub fn delete(
     query2: Query<(Entity, &Handle<Group>), With<GroupBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
 ) {
-    // if keyboard_input.pressed(KeyCode::Delete) {
-    if let Some(Action::Delete) = action_event_reader.iter().next() {
+    if action_event_reader.iter().any(|x| x == &Action::Delete) {
         // list of partners that need to be unlatched
         let mut latched_partners: Vec<Vec<LatchData>> = Vec::new();
         for (entity, bezier_handle) in query.iter() {
@@ -608,7 +609,11 @@ pub fn hide_anchors(
     mut query: Query<&mut Visible, Or<(With<ControlPointQuad>, With<EndpointQuad>)>>,
     mut action_event_reader: EventReader<Action>,
 ) {
-    if let Some(Action::HideAnchors) = action_event_reader.iter().next() {
+    // if let Some(Action::HideAnchors) = action_event_reader.iter().next() {
+    if action_event_reader
+        .iter()
+        .any(|x| x == &Action::HideAnchors)
+    {
         globals.do_hide_anchors = !globals.do_hide_anchors;
         for mut visible in query.iter_mut() {
             visible.is_visible = !globals.do_hide_anchors;
@@ -621,7 +626,10 @@ pub fn hide_control_points(
     mut query_control: Query<&mut Visible, With<ControlPointQuad>>,
     mut action_event_reader: EventReader<Action>,
 ) {
-    if let Some(Action::HideControls) = action_event_reader.iter().next() {
+    if action_event_reader
+        .iter()
+        .any(|x| x == &Action::HideControls)
+    {
         globals.hide_control_points = !globals.hide_control_points;
         for mut visible in query_control.iter_mut() {
             visible.is_visible = !globals.hide_control_points;
@@ -668,7 +676,19 @@ pub fn save(
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
 ) {
-    if let Some(Action::Save) = action_event_reader.iter().next() {
+    if action_event_reader.iter().any(|x| x == &Action::Save) {
+        println!("saving");
+        let mut path = std::env::current_dir().unwrap();
+        path.push("assets");
+        path.push("meshes");
+
+        let res = rfd::FileDialog::new()
+            .set_file_name("foo.txt")
+            .set_directory(&path)
+            .save_file();
+
+        println!("The user choose: {:#?}", res);
+
         let mut vec: Vec<Bezier> = Vec::new();
         for bezier_handle in query.iter() {
             let bezier = bezier_curves.get(bezier_handle).unwrap();
@@ -789,6 +809,7 @@ pub fn save(
 }
 
 // only loads groups
+
 pub fn load(
     query: Query<Entity, Or<(With<BoundingBoxQuad>, With<GroupBoxQuad>)>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
@@ -802,7 +823,21 @@ pub fn load(
     mut action_event_reader: EventReader<Action>,
     mut loaded_event_writer: EventWriter<Loaded>,
 ) {
-    if let Some(Action::Load) = action_event_reader.iter().next() {
+    if action_event_reader.iter().any(|x| x == &Action::Load) {
+        let cur_path = std::env::current_dir().unwrap();
+
+        let res = rfd::FileDialog::new()
+            .add_filter("text", &["txt", "rs"])
+            .add_filter("rust", &["rs", "toml"])
+            .set_directory(&cur_path)
+            .pick_files();
+
+        // println!("The user choose: {:#?}", res);
+
+        let path1 = res.clone().unwrap();
+
+        let path = path1.get(0).unwrap();
+
         let clearcolor = clearcolor_struct.0;
 
         // delete all current groups and curves before spawning the saved ones
@@ -813,7 +848,7 @@ pub fn load(
         globals.do_hide_anchors = false;
         globals.do_hide_bounding_boxes = true;
 
-        let path = "curve_groups.txt";
+        // let path = "curve_groups.txt";
         let mut file = std::fs::File::open(path).unwrap();
 
         let mut contents = String::new();
@@ -868,10 +903,9 @@ pub fn latch2(
         QueryState<(&Handle<Bezier>, &BoundingBoxQuad)>,
     )>,
     globals: ResMut<Globals>,
-    mut event_writer: EventWriter<OfficialLatch>,
     mut action_event_reader: EventReader<Action>,
 ) {
-    if let Some(Action::Latch) = action_event_reader.iter().next() {
+    if action_event_reader.iter().any(|x| x == &Action::Latch) {
         let latching_distance = 5.0;
 
         let mut potential_mover: Option<(Vec2, u128, AnchorEdge, Handle<Bezier>)> = None;
@@ -884,13 +918,16 @@ pub fn latch2(
         )> = None;
 
         // find moving quad and store its parameters
+
+        // TODO: insert a Moving component to a moving anchor
         for (bezier_handle, _bb) in query.q0().iter() {
-            let bezier = bezier_curves.get(bezier_handle).unwrap().clone();
+            let mut bezier = bezier_curves.get(bezier_handle).unwrap().clone();
+            bezier.potential_latch = None;
             if bezier.edge_is_moving() {
                 // a latched point does not latch to an additional point
                 let moving_anchor = bezier.get_mover_edge();
                 if bezier.quad_is_latched(moving_anchor) {
-                    return;
+                    return ();
                 }
 
                 let mover_pos = cursor.position;
@@ -935,7 +972,9 @@ pub fn latch2(
                     partners_edge: mover_edge,
                 };
 
-                event_writer.send(OfficialLatch(partner_latch_data, partner_handle.clone()));
+                partner_bezier.potential_latch = Some(partner_latch_data);
+
+                // event_writer.send(OfficialLatch(partner_latch_data, partner_handle.clone()));
             }
         }
 
@@ -946,44 +985,44 @@ pub fn latch2(
             let partner_bezier = bezier_curves.get(partner_handle).unwrap().clone();
             let bezier = bezier_curves.get_mut(mover_handle.clone()).unwrap();
 
+            let latch_anchor_position = partner_bezier.get_position(pa_edge.to_anchor());
+            let latch_control_position = partner_bezier.get_opposite_control(pa_edge);
+
             let mover_latch_data = LatchData {
                 latched_to_id: partner_id,
                 self_edge: mover_anchor,
                 partners_edge: pa_edge,
             };
 
+            bezier.potential_latch = Some(mover_latch_data.clone());
+
             // set the position of the latched moving quad and its control point
             if mover_anchor == AnchorEdge::Start {
-                bezier.positions.start = partner_bezier.get_position(pa_edge.to_anchor());
-                bezier.positions.control_start = partner_bezier.get_opposite_control(pa_edge)
+                bezier.positions.start = latch_anchor_position;
+                bezier.positions.control_start = latch_control_position;
             } else if mover_anchor == AnchorEdge::End {
-                bezier.positions.end = partner_bezier.get_position(pa_edge.to_anchor());
-                bezier.positions.control_end = partner_bezier.get_opposite_control(pa_edge)
+                bezier.positions.end = latch_anchor_position;
+                bezier.positions.control_end = latch_control_position;
             }
-
-            event_writer.send(OfficialLatch(mover_latch_data, mover_handle.clone()));
         }
     }
 }
 
 pub fn officiate_latch_partnership(
-    mouse_button_input: Res<Input<MouseButton>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut latch_event_reader: EventReader<OfficialLatch>,
     globals: ResMut<Globals>,
     audio: Res<Audio>,
     maps: ResMut<Maps>,
 ) {
-    if mouse_button_input.just_released(MouseButton::Left) {
-        for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
-            let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
-            bezier.set_latch(latch.clone());
-            // println!("latched, {:?}", bezier.latches);
+    for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
+        let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
+        bezier.set_latch(latch.clone());
+        // bezier.has_just_latched = true;
 
-            if globals.sound_on {
-                if let Some(sound) = maps.sounds.get("latch") {
-                    audio.play(sound.clone());
-                }
+        if globals.sound_on {
+            if let Some(sound) = maps.sounds.get("latch") {
+                audio.play(sound.clone());
             }
         }
     }
@@ -1035,7 +1074,7 @@ pub fn spawn_heli(
     mut action_event_reader: EventReader<Action>,
     groups: Res<Assets<Group>>,
 ) {
-    if let Some(Action::SpawnHeli) = action_event_reader.iter().next() {
+    if action_event_reader.iter().any(|x| x == &Action::SpawnHeli) {
         if let Some(_) = groups.iter().next() {
             let heli_handle = asset_server.load("textures/heli.png");
             let size = Vec2::new(25.0, 25.0);

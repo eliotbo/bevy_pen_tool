@@ -609,6 +609,7 @@ pub struct LatchData {
     pub latched_to_id: u128,
     pub self_edge: AnchorEdge,
     pub partners_edge: AnchorEdge,
+    // pub latch_position: Vec2,
 }
 
 pub struct BezierCoord2 {
@@ -656,6 +657,7 @@ pub struct Bezier {
     pub lut: LutDistance,
     pub id: u128,
     pub latches: HashMap<AnchorEdge, Vec<LatchData>>,
+    pub potential_latch: Option<LatchData>,
     pub grouped: bool,
 }
 
@@ -676,6 +678,7 @@ impl Default for Bezier {
             id: rng.gen(),
             latches,
             grouped: false,
+            potential_latch: None,
         }
     }
 }
@@ -769,6 +772,8 @@ impl Bezier {
         !self.latches[&anchor_edge].is_empty()
     }
 
+    // computes the desired anchor quad positions
+    // they should be slighty off the anchor positions, towards the curve center
     pub fn ends_displacement(&self, scale: f32) -> ((Vec2, Vec2), (Quat, Quat)) {
         let quad_width = 1.0 * scale;
         let mut angles_vec = Vec::new();
@@ -809,18 +814,6 @@ impl Bezier {
             (start_rotation, end_rotation),
         );
     }
-
-    // pub fn get_mover_position_and_latch(&self) -> Option<(Vec2, Vec<LatchData>)> {
-    //     let info = match self.move_quad {
-    //         Anchor::Start => Some((
-    //             self.positions.start,
-    //             self.latches[&AnchorEdge::Start].clone(),
-    //         )),
-    //         Anchor::End => Some((self.positions.end, self.latches[&AnchorEdge::End].clone())),
-    //         _ => None,
-    //     };
-    //     return info;
-    // }
 
     pub fn update_positions_cursor(&mut self, cursor: &Res<Cursor>) {
         match self.move_quad {
@@ -1158,7 +1151,6 @@ pub fn adjust_selection_attributes(
     mut meshes: ResMut<Assets<Mesh>>,
     globals: ResMut<Globals>,
     selection: ResMut<Selection>,
-    mut action_event_reader: EventReader<Action>,
     user_state: Res<UserState>,
 ) {
     let mut do_adjust = false;
@@ -1463,6 +1455,7 @@ pub fn compute_lut_long(
 pub fn change_ends_and_controls_params(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+    mut latch_event_reader: EventReader<OfficialLatch>,
     cursor: Res<Cursor>,
     maps: ResMut<Maps>,
 ) {
@@ -1472,8 +1465,9 @@ pub fn change_ends_and_controls_params(
         // TODO: use an event here instead of scanning for a moving quad
         for bezier_handle in query.iter_mut() {
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
-                bezier.update_positions_cursor(&cursor);
                 latch_info = bezier.get_mover_latch_info();
+                bezier.update_positions_cursor(&cursor);
+
                 if let Some(_) = latch_info {
                     break;
                 }

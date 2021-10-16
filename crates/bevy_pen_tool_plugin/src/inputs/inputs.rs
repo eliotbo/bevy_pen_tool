@@ -2,7 +2,7 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
     get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad,
-    ColorButton, Globals, GrandParent, MyShader, UiAction, UiBoard, UserState,
+    ColorButton, Globals, GrandParent, MyShader, OfficialLatch, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -90,23 +90,16 @@ pub fn send_action(
     keyboard_input: Res<Input<KeyCode>>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut mouse_wheel_events: EventReader<MouseWheel>,
+    mut button_query: Query<(&ButtonState, &UiButton)>,
 ) {
     // send Action event upon UI button press
     for ui_button in ui_event_reader.iter() {
         match ui_button {
-            UiButton::Latch => action_event_writer.send(Action::Latch),
             UiButton::Redo => action_event_writer.send(Action::Redo),
             UiButton::Undo => action_event_writer.send(Action::Undo),
             UiButton::Load => action_event_writer.send(Action::Load),
             UiButton::Save => action_event_writer.send(Action::Save),
             UiButton::Group => action_event_writer.send(Action::Group),
-            // // is this correct?
-            // UiButton::Selection => {
-            //     action_event_writer.send(Action::Select);
-            //     // action_event_writer.send(Action::SelectionBox);
-            // }
-            // UiButton::Detach => action_event_writer.send(Action::Detach),
-            // UiButton::SpawnCurve => action_event_writer.send(Action::SpawnCurve),
             UiButton::Hide => action_event_writer.send(Action::HideAnchors),
             UiButton::Sound => action_event_writer.send(Action::ToggleSound),
             UiButton::ScaleUp => action_event_writer.send(Action::ScaleUp),
@@ -117,6 +110,13 @@ pub fn send_action(
             UiButton::MakeMesh => action_event_writer.send(Action::MakeMesh),
             UiButton::SpawnRoad => action_event_writer.send(Action::SpawnRoad),
             _ => {}
+        }
+    }
+
+    // continuously send Latch events when latch button is On
+    for (button_state, ui_button) in button_query.iter_mut() {
+        if ui_button == &UiButton::Latch && button_state == &ButtonState::On {
+            action_event_writer.send(Action::Latch)
         }
     }
 
@@ -228,8 +228,13 @@ pub fn check_mouseclick_on_objects(
     my_shader_params: ResMut<Assets<MyShader>>,
     globals: ResMut<Globals>,
     mouse_button_input: Res<Input<MouseButton>>,
-    mut button_query: Query<(&ButtonState, &GlobalTransform, &Handle<MyShader>, &UiButton)>,
-
+    mut button_query: Query<(
+        &ButtonState,
+        &GlobalTransform,
+        &Handle<MyShader>,
+        &mut ButtonInteraction,
+        &UiButton,
+    )>,
     mut color_button_query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
     mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
     bezier_query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
@@ -243,7 +248,9 @@ pub fn check_mouseclick_on_objects(
         // TODO: too much boilerplate to check if a button is on...
         let mut spawn_button_on = false;
         let mut unlatch_button_on = false;
-        for (button_state, _button_trans, _shader_handle, ui_button) in button_query.iter_mut() {
+        for (button_state, _button_trans, _shader_handle, _interaction, ui_button) in
+            button_query.iter_mut()
+        {
             if ui_button == &UiButton::SpawnCurve {
                 spawn_button_on = button_state == &ButtonState::On;
             } else if ui_button == &UiButton::Detach {
@@ -258,7 +265,11 @@ pub fn check_mouseclick_on_objects(
 
         //
         // check for mouseclick on UI buttons
-        for (_state, button_transform, shader_handle, ui_button) in button_query.iter_mut() {
+        //
+        // This block is useless other than to return () upon button press (no effects)
+        for (_state, button_transform, shader_handle, mut _button_interaction, ui_button) in
+            button_query.iter_mut()
+        {
             //
             let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
             //
@@ -266,11 +277,13 @@ pub fn check_mouseclick_on_objects(
                 button_transform.translation.truncate(),
                 shader_params.size * 0.95 * cam_scale,
             ) {
+                // this sends into nothingness
                 mouse_event_writer.send(MouseClickEvent::OnUiButton(ui_button.clone()));
 
                 return ();
             }
         }
+
         //
         // check for mouseclick on color buttons
         for (transform, shader_param_handle, _color_button) in color_button_query.iter() {
@@ -382,7 +395,7 @@ pub fn check_mouseclick_on_objects(
                 )));
             }
 
-            // case of clicking on an anchor and unlatching
+            // case of clicking on an anchor and unlatching with unlatch button
             (_, Some(MouseClickEvent::OnAnchorEdge(info)), false, false, false)
                 if !globals.do_hide_anchors && unlatch_button_on =>
             {
@@ -517,6 +530,7 @@ pub fn mouse_release_actions(
     mut user_state: ResMut<UserState>,
     mut cursor: ResMut<Cursor>,
     mut action_event_writer: EventWriter<Action>,
+    mut latch_event_writer: EventWriter<OfficialLatch>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         cursor.latch = Vec::new();
@@ -532,8 +546,12 @@ pub fn mouse_release_actions(
         // let go of all any moving quad upon mouse button release
         for (bezier_handle, _unused) in query.iter() {
             //
-            if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
+            if let Some(mut bezier) = bezier_curves.get_mut(bezier_handle) {
                 //
+                if let Some(potential_latch) = bezier.potential_latch.clone() {
+                    latch_event_writer.send(OfficialLatch(potential_latch, bezier_handle.clone()));
+                }
+                bezier.potential_latch = None;
                 bezier.move_quad = Anchor::None;
             }
         }

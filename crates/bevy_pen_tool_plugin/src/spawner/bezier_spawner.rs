@@ -39,7 +39,7 @@ pub fn spawn_bezier_system(
         let mut start = cursor.position;
 
         // the control points cannot be exactly in the same positions as the anchors
-        // because the algorithm for finding position along the curves fail
+        // because the algorithm for finding position along the curves fail in that case
         let epsilon = 5.01;
         let mut control_start: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
         let control_end: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
@@ -74,12 +74,9 @@ pub fn spawn_bezier_system(
             },
             previous_positions: BezierPositions::default(),
             move_quad: Anchor::End,
-            color: None,
-            do_compute_lut: true,
-            lut: Vec::new(),
             id: spawner_id,
             latches,
-            grouped: false,
+            ..Default::default()
         };
         bezier.update_previous_pos();
 
