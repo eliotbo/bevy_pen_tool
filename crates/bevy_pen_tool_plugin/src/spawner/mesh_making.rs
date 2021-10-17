@@ -1,5 +1,6 @@
-use super::inputs::Action;
+use crate::inputs::Action;
 use crate::util::*;
+
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{
@@ -22,8 +23,6 @@ pub fn make_road(
     globals: Res<Globals>,
     groups: Res<Assets<Group>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut pipelines: ResMut<Assets<PipelineDescriptor>>,
-    mut shaders: ResMut<Assets<Shader>>,
     query: Query<Entity, With<RoadMesh>>,
 
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -39,17 +38,15 @@ pub fn make_road(
             commands.entity(entity).despawn();
         }
 
-        let num_points = 200;
+        let num_points = 204;
 
         let crop = 0.000001;
         let t_range: Vec<f32> = (0..num_points)
             .map(|x| (x as f32) / (num_points as f32 - 0.99999) / (1.0 + 2.0 * crop) + crop)
             .collect();
-        let mut mesh_contour1: Vec<Vec3> = Vec::new();
-        let mut mesh_contour2: Vec<Vec3> = Vec::new();
+
         let mut mesh_contour: Vec<Vec3> = Vec::new();
 
-        let mut k: u32 = 0;
         for t in t_range {
             let position = group.compute_position_with_lut(t);
             let normal = group
@@ -61,32 +58,26 @@ pub fn make_road(
                 (position.y + normal.y * globals.road_width) as f32,
                 -88.0,
             );
-            // mesh_contour1.push(v1);
-            //
+
             let v2 = Vec3::new(
                 (position.x - normal.x * globals.road_width) as f32,
                 (position.y - normal.y * globals.road_width) as f32,
                 -88.0,
             );
-            // mesh_contour2.push(v2);
 
             mesh_contour.push(v1);
             mesh_contour.push(v2);
-
-            k += 1;
-
-            // println!("t: {:?}", &t);
-            // println!("contour1: {:?}", &v1);
-            // println!("contour2: {:?}", &v2);
         }
 
         // indices
         let mut new_indices: Vec<u32> = Vec::new();
-        for kk in 0..(num_points) {
+        for kk in 0..(num_points - 1) {
             let k = kk * 2;
             let mut local_inds = vec![k, (k + 1), (k + 2), (k + 1), (k + 3), (k + 2)];
             new_indices.append(&mut local_inds);
         }
+        println!("{:?}", mesh_contour.len());
+        println!("{:?}", new_indices.iter().max());
         // println!("indices len: {:?}", &new_indices.len());
 
         // uvs
@@ -99,43 +90,9 @@ pub fn make_road(
             mesh_attr_uvs.push([v % 1.0, (k as f32) % 2.0]);
         }
 
-        // mesh_contour2 = mesh_contour2.iter().rev().cloned().collect();
-        // mesh_contour1.append(&mut mesh_contour2);
-
-        // let mut path_builder = Path::builder();
-
-        // let first = mesh_contour[0];
-        // path_builder.begin(point(first.x, first.y));
-
-        // // let resto: Vec<Vec3> = mesh_contour1[1..].to_vec();
-        // let resto: Vec<Vec3> = mesh_contour[1..].to_vec();
-
-        // for e in resto.iter() {
-        //     path_builder.line_to(point(e.x, e.y));
-        // }
-
-        // path_builder.end(true);
-        // let path = path_builder.build();
-
-        // // Create the destination vertex and index buffers.
-        // let mut buffers: VertexBuffers<Point, u16> = VertexBuffers::new();
-
-        // {
-        //     let mut vertex_builder = simple_builder(&mut buffers);
-
-        //     // Create the tessellator.
-        //     let mut tessellator = FillTessellator::new();
-
-        //     // Compute the tessellation.
-        //     let result =
-        //         tessellator.tessellate_path(&path, &FillOptions::default(), &mut vertex_builder);
-        //     assert!(result.is_ok());
-        // }
-
         let mut mesh_pos_attributes: Vec<[f32; 3]> = Vec::new();
         let mut mesh_attr_normals: Vec<[f32; 3]> = Vec::new();
 
-        // let mut new_indices: Vec<u32> = Vec::new();
         // show points from look-up table
         let color = globals.picked_color.unwrap();
         let mut colors = Vec::new();
@@ -167,38 +124,6 @@ pub fn make_road(
             return (*min_v, *max_v);
         }
 
-        // let mut bounds_x = bounds(&xs);
-        // let size_x = bounds_x.1 - bounds_x.0;
-        // let mut bounds_y = bounds(&ys);
-        // let size_y = bounds_y.1 - bounds_y.0;
-
-        // let half_len = mesh_pos_attributes.len() / 2;
-
-        // let first_half: Vec<[f32; 3]> = mesh_pos_attributes[0..(p_len / 2)].to_vec();
-        // let second_half: Vec<[f32; 3]> = mesh_pos_attributes[(p_len / 2)..p_len].to_vec();
-
-        // let num_repeats = 1.0;
-
-        // for k in 0..half_len {
-        //     // let (pos_x, pos_y) = (pos[0], pos[1]);
-        //     let v = k as f32 / (half_len as f32 / num_repeats);
-        //     mesh_attr_uvs.push([v % 1.0, 0.0]);
-        // }
-
-        // for k in (0..half_len).rev() {
-        //     // let (pos_x, pos_y) = (pos[0], pos[1]);
-        //     let v = k as f32 / (half_len as f32 / num_repeats);
-        //     mesh_attr_uvs.push([v % 1.0, 1.0]);
-        // }
-
-        // for ind in buffers.indices[..].iter().rev() {
-        //     new_indices.push(ind.clone() as u32);
-        // }
-
-        // println!("POSITIONS: {:?}", &mesh_pos_attributes);
-        // println!("UVs: {:?}", &mesh_attr_uvs);
-        // println!("indices: {:?}", &new_indices);
-
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
 
@@ -209,17 +134,12 @@ pub fn make_road(
         mesh.set_indices(Some(Indices::U32(new_indices)));
 
         let mesh_handle = meshes.add(mesh);
-        // maps.group_meshes.insert("group_mesh", mesh_handle.clone());
 
         use std::{thread, time};
-        let texture_handle: Handle<Texture> = asset_server.load("textures/road_texture.png");
+        // let texture_handle: Handle<Texture> = asset_server.load("textures/road_texture.png");
+        let texture_handle: Handle<Texture> = asset_server.load("textures/single_lane_road.png");
         let hundred_millis = time::Duration::from_millis(100);
         thread::sleep(hundred_millis);
-
-        // let pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
-        //     vertex: shaders.add(Shader::from_glsl(ShaderStage::Vertex, VERTEX_SHADER)),
-        //     fragment: Some(shaders.add(Shader::from_glsl(ShaderStage::Fragment, FRAGMENT_SHADER))),
-        // }));
 
         let material_handle = materials.add(StandardMaterial {
             base_color_texture: Some(texture_handle),
@@ -231,10 +151,7 @@ pub fn make_road(
         commands
             .spawn_bundle(PbrBundle {
                 mesh: mesh_handle,
-                // render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                //     pipeline_handle,
-                // )]),
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -120.0)),
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -725.0)),
                 material: material_handle,
                 ..Default::default()
             })
@@ -242,7 +159,7 @@ pub fn make_road(
 
         // light
         commands.spawn_bundle(PointLightBundle {
-            transform: Transform::from_translation(Vec3::new(0.0, 50.0, -75.0)),
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, -700.0)),
             point_light: PointLight {
                 intensity: 50000.,
                 range: 1000.,
@@ -260,8 +177,8 @@ pub fn make_mesh(
     globals: Res<Globals>,
     groups: Res<Assets<Group>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut pipelines: ResMut<Assets<PipelineDescriptor>>,
-    mut shaders: ResMut<Assets<Shader>>,
+    pipelines: ResMut<Assets<PipelineDescriptor>>,
+    shaders: ResMut<Assets<Shader>>,
     query: Query<Entity, With<GroupMesh>>,
 
     asset_server: Res<AssetServer>,
@@ -355,11 +272,6 @@ pub fn make_mesh(
                 1.0 * (pos_x - bounds_x.0) / size_x,
                 1.0 * (pos_y - bounds_y.0) / size_y,
             ]);
-
-            // mesh_attr_uvs.push([
-            //     1.0 * (pos_x - bounds_x.0 * 0.0),
-            //     1.0 * (pos_y - bounds_y.0 * 0.0),
-            // ]);
         }
 
         for ind in buffers.indices[..].iter().rev() {
@@ -402,7 +314,7 @@ pub fn make_mesh(
                 // render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
                 //     pipeline_handle,
                 // )]),
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -150.0)),
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -730.0)),
                 material: material_handle,
                 ..Default::default()
             })

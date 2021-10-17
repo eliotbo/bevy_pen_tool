@@ -21,7 +21,6 @@ impl Plugin for PenPlugin {
         app.add_asset::<MyShader>()
             .add_asset::<Bezier>()
             .add_asset::<Group>()
-            .add_asset::<MyArrayTexture>()
             .add_event::<MouseClickEvent>()
             .add_event::<Group>()
             .add_event::<OfficialLatch>()
@@ -62,12 +61,12 @@ impl Plugin for PenPlugin {
             // Update model
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
-                    .with_system(groupy)
+                    .with_system(groupy.label("group"))
                     .with_system(change_ends_and_controls_params.exclusive_system().at_end())
                     .with_system(latch2)
                     .with_system(officiate_latch_partnership)
                     .with_system(recompute_lut)
-                    .with_system(load)
+                    .with_system(load.after("group"))
                     .with_system(save)
                     .with_system(selection_box_init)
                     .with_system(selection_final)
@@ -77,6 +76,7 @@ impl Plugin for PenPlugin {
                     .with_system(spawn_heli)
                     .with_system(make_mesh)
                     .with_system(make_road)
+                    .with_system(unselect)
                     .label("model")
                     .after("controller"),
             )

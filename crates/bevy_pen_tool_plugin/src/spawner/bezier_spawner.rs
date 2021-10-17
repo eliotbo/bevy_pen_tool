@@ -180,8 +180,8 @@ pub fn spawn_bezier(
 
     // TODO: make the depth deterministic
     let mut rng = thread_rng();
-    let pos_z = -rng.gen::<f32>() * 5000.0;
-    let mut init_pos = Transform::from_translation(bb_pos.extend(pos_z + 30.0));
+    let pos_z = -rng.gen::<f32>() * 5000.0 - 1110.0;
+    let mut init_pos = Transform::from_translation(bb_pos.extend(-20.0));
     init_pos.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
     let parent = commands
@@ -325,7 +325,7 @@ pub fn spawn_bezier(
                 mesh: middle_mesh_handle.clone(),
                 visible: visible.clone(),
                 render_pipelines: render_piplines.clone(),
-                transform: Transform::from_xyz(0.0, 0.0, pos_z + 50.0 + z),
+                transform: Transform::from_xyz(0.0, 0.0, pos_z + 100.0 + z),
                 ..Default::default()
             })
             .insert(MiddlePointQuad)

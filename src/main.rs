@@ -7,13 +7,9 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 
 // TODO:
 // - make whole group move when selected
-// - make delete button
 // - add Delete to readme
-// - change drag a rectangle to drag a selection window
-// - fix bug with selecting window appearing on default position for a frame
-// - the position of a newly-latched anchor is incorrect
-// - bug when loading group: middle quads not despawned
-// - bug: anchors have priority over control points
+// - change readme: drag a rectangle to drag a selection window
+// - generate a normal lut (perpendicular direction)
 
 // long-term
 // - ungroup
@@ -50,6 +46,7 @@ fn camera_setup(mut commands: Commands, mut globals: ResMut<Globals>) {
     // sets the number of rows in the animation position look-up table. More points will
     // make an animation smoother, but will take more space in memory
     globals.group_lut_num_points = 100;
+    globals.road_width = 8.0;
 }
 
 fn test(keyboard_input: Res<Input<KeyCode>>, mut bezier_curves: ResMut<Assets<Bezier>>) {

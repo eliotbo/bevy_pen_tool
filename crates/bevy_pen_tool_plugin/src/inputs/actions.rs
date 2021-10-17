@@ -299,7 +299,10 @@ pub fn selection_final(
 
 pub fn unselect(
     mut selection: ResMut<Selection>,
-    mut visible_selection_query: Query<&mut Visible, With<SelectedBoxQuad>>,
+    mut visible_selection_query: Query<
+        &mut Visible,
+        Or<(With<SelectedBoxQuad>, With<GroupBoxQuad>)>,
+    >,
     mut action_event_reader: EventReader<Action>,
     mut user_state: ResMut<UserState>,
 ) {

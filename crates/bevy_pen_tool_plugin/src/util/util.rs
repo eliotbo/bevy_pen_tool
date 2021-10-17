@@ -113,7 +113,10 @@ pub struct OfficialLatch(pub LatchData, pub Handle<Bezier>);
 pub struct TurnRoundAnimation;
 
 #[derive(Component)]
-pub struct FollowBezierAnimation;
+pub struct FollowBezierAnimation {
+    pub animation_offset: f64,
+    pub initial_direction: Vec3,
+}
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Copy)]
 pub enum Anchor {

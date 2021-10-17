@@ -10,6 +10,37 @@ use bevy::{
     render::pipeline::{RenderPipeline, RenderPipelines},
 };
 
+///////////////////////////////////////////// z positions
+// spawn_group_middle_quads:        -1000.0
+// car:  -720.0
+// helicopter: -715.0
+// heli rotor blades: -710.0
+// spawn_group_bounding_box:        0.0
+// spawn_selecting_bounding_box:    5.0
+// spawn_selection_bounding_box:    -10.0
+
+// button_ui: -550.0
+// color_ui:  -500.0
+// buttons:   -400.0
+// icon:        10.1
+// icon2:       20.1
+
+// pos_z in bezier_spawner: -5110.0 to -1110.0
+// bezier_bounding_box: -20.0
+// start anchor: 30.0 + pos_z
+// end anchor: 40.0 + pos_z
+// ctrl start: 50 + pos_z
+// ctrl end: 60 + pos_z
+// middle quads: 110 + pos_z + 10 per quad
+
+// road: -725.0
+// light: -700.0
+// mesh: -730.0
+// helicopter: -715.0
+// heli rotor blades: -710.0
+// car:  -720.0
+///////////////////////////////////////////// z positions
+
 pub fn spawn_selection_bounding_box(
     mut commands: Commands,
     // asset_server: Res<AssetServer>,
@@ -39,7 +70,7 @@ pub fn spawn_selection_bounding_box(
         size: bb_group_size,
         flip: false,
     }));
-    let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, -455.0));
+    let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, -10.0));
     let bb_group_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
 
     commands
@@ -85,7 +116,7 @@ pub fn spawn_selecting_bounding_box(
         size: bb_group_size,
         flip: false,
     }));
-    let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, -650.0));
+    let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, 5.0));
     let bb_group_pipeline_handle = maps.pipeline_handles["selecting"].clone();
 
     commands
@@ -135,7 +166,7 @@ pub fn spawn_group_bounding_box(
             size: bb_group_size,
             flip: false,
         }));
-        let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, -455.0));
+        let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, 0.0));
         let bb_group_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
 
         commands
@@ -173,7 +204,7 @@ pub fn spawn_group_middle_quads(
         };
         let middle_mesh_handle = maps.mesh_handles["middles"].clone();
 
-        let pos_z = -1111.11;
+        let pos_z = -1000.0;
 
         let num_mid_quads = 50;
 
@@ -212,14 +243,14 @@ pub fn spawn_group_middle_quads(
             });
 
             x = x + 2.0;
-            z = z + 10.0;
+            z = z + 5.0;
             let child = commands
                 // // left
                 .spawn_bundle(MeshBundle {
                     mesh: middle_mesh_handle.clone(),
                     visible: visible.clone(),
                     render_pipelines: render_piplines.clone(),
-                    transform: Transform::from_xyz(pos.x, pos.y, pos_z + 50.0 + z),
+                    transform: Transform::from_xyz(pos.x, pos.y, pos_z),
                     ..Default::default()
                 })
                 .insert(GroupMiddleQuad(num_mid_quads))
@@ -240,57 +271,84 @@ pub fn spawn_heli(
     groups: Res<Assets<Group>>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::SpawnHeli) {
-        if let Some(_) = groups.iter().next() {
-            let heli_handle = asset_server.load("textures/heli.png");
+        // if let Some(_) = groups.iter().next() {
 
-            commands
-                .spawn_bundle((
-                    Transform {
-                        translation: Vec3::new(0.0, 0.0, -95.0),
-                        rotation: Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
-                        scale: Vec3::splat(4.0),
-                        ..Default::default()
-                    },
-                    GlobalTransform::identity(),
-                ))
-                .insert(FollowBezierAnimation)
-                .with_children(|cell| {
-                    cell.spawn_scene(asset_server.load("models/car.gltf#Scene0"));
-                })
-                .id();
+        // let rotation = Quat::IDENTITY;
+        let rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
+            .mul_quat(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2));
 
-            let size = Vec2::new(25.0, 25.0);
-            let heli_sprite = commands
-                .spawn_bundle(SpriteBundle {
-                    material: materials.add(heli_handle.into()),
-                    // mesh: mesh_handle_button.clone(),
-                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, -105.0)),
-                    sprite: Sprite::new(size),
-                    visible: Visible {
-                        is_visible: true,
-                        is_transparent: true,
-                    },
+        commands
+            .spawn_bundle((
+                Transform {
+                    translation: Vec3::new(0.0, 0.0, -720.0),
+                    rotation,
+                    scale: Vec3::splat(3.0),
                     ..Default::default()
-                })
-                .insert(FollowBezierAnimation)
-                .id();
-            let copter_handle = asset_server.load("textures/copter.png");
-            let copter_sprite = commands
-                .spawn_bundle(SpriteBundle {
-                    material: materials.add(copter_handle.into()),
-                    // mesh: mesh_handle_button.clone(),
-                    transform: Transform::from_translation(Vec3::new(3.0, 1.0, 5.0)),
-                    sprite: Sprite::new(size),
-                    visible: Visible {
-                        is_visible: true,
-                        is_transparent: true,
-                    },
-                    ..Default::default()
-                })
-                .insert(TurnRoundAnimation)
-                .id();
+                },
+                GlobalTransform::identity(),
+            ))
+            .insert(FollowBezierAnimation {
+                animation_offset: 0.0,
+                initial_direction: Vec3::Z,
+            })
+            // .insert(TurnRoundAnimation)
+            .with_children(|cell| {
+                cell.spawn_scene(asset_server.load("models/car.gltf#Scene0"));
+            })
+            .id();
 
-            commands.entity(heli_sprite).push_children(&[copter_sprite]);
-        }
+        let heli_handle = asset_server.load("textures/heli.png");
+        let size = Vec2::new(25.0, 25.0);
+        let heli_sprite = commands
+            .spawn_bundle(SpriteBundle {
+                material: materials.add(heli_handle.into()),
+                // mesh: mesh_handle_button.clone(),
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -710.0)),
+                sprite: Sprite::new(size),
+                visible: Visible {
+                    is_visible: true,
+                    is_transparent: true,
+                },
+                ..Default::default()
+            })
+            .insert(FollowBezierAnimation {
+                animation_offset: -0.1,
+                initial_direction: Vec3::X,
+            })
+            .id();
+        let copter_handle = asset_server.load("textures/copter.png");
+        let copter_sprite = commands
+            .spawn_bundle(SpriteBundle {
+                material: materials.add(copter_handle.into()),
+                // mesh: mesh_handle_button.clone(),
+                transform: Transform::from_translation(Vec3::new(3.0, 1.0, 5.0)),
+                sprite: Sprite::new(size),
+                visible: Visible {
+                    is_visible: true,
+                    is_transparent: true,
+                },
+                ..Default::default()
+            })
+            .insert(TurnRoundAnimation)
+            .id();
+
+        commands.entity(heli_sprite).push_children(&[copter_sprite]);
+
+        // light
+        commands
+            .spawn_bundle(PointLightBundle {
+                transform: Transform::from_translation(Vec3::new(0.0, 25.0, -700.0)),
+                point_light: PointLight {
+                    intensity: 50000.,
+                    range: 1000.,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(FollowBezierAnimation {
+                animation_offset: 0.0,
+                initial_direction: Vec3::X,
+            });
     }
+    // }
 }

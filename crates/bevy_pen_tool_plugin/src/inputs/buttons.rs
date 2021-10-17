@@ -41,6 +41,7 @@ pub enum UiButton {
     MakeMesh,
     Helicopter,
     SpawnRoad,
+    Delete,
 }
 
 pub fn check_mouse_on_ui(

@@ -109,6 +109,8 @@ pub fn send_action(
             UiButton::Helicopter => action_event_writer.send(Action::SpawnHeli),
             UiButton::MakeMesh => action_event_writer.send(Action::MakeMesh),
             UiButton::SpawnRoad => action_event_writer.send(Action::SpawnRoad),
+            UiButton::Delete => action_event_writer.send(Action::Delete),
+
             _ => {}
         }
     }
@@ -248,6 +250,7 @@ pub fn check_mouseclick_on_objects(
         // TODO: too much boilerplate to check if a button is on...
         let mut spawn_button_on = false;
         let mut unlatch_button_on = false;
+        let mut selection_button_on = false;
         for (button_state, _button_trans, _shader_handle, _interaction, ui_button) in
             button_query.iter_mut()
         {
@@ -255,6 +258,8 @@ pub fn check_mouseclick_on_objects(
                 spawn_button_on = button_state == &ButtonState::On;
             } else if ui_button == &UiButton::Detach {
                 unlatch_button_on = button_state == &ButtonState::On;
+            } else if ui_button == &UiButton::Selection {
+                selection_button_on = button_state == &ButtonState::On;
             }
         }
 
@@ -363,7 +368,17 @@ pub fn check_mouseclick_on_objects(
                 mouse_event_writer.send(MouseClickEvent::SpawnOnBezier(info));
             }
 
-            // case of clicking on a control point (higher priority)
+            // case of clicking on an anchor (higher priority)
+            (Some(event), _, false, false, false)
+                if !globals.do_hide_anchors
+                    && !globals.hide_control_points
+                    && !spawn_button_on
+                    && !unlatch_button_on =>
+            {
+                mouse_event_writer.send(event);
+            }
+
+            // case of clicking on a control point (lower priority)
             (Some(_event), Some(MouseClickEvent::OnAnchorEdge(info)), false, false, false)
                 if !globals.do_hide_anchors && !spawn_button_on && !unlatch_button_on =>
             {
@@ -372,16 +387,6 @@ pub fn check_mouseclick_on_objects(
                     info.1,
                     false,
                 )));
-            }
-
-            // case of clicking on an anchor (lower priority)
-            (Some(event), None, false, false, false)
-                if !globals.do_hide_anchors
-                    && !globals.hide_control_points
-                    && !spawn_button_on
-                    && !unlatch_button_on =>
-            {
-                mouse_event_writer.send(event);
             }
 
             // case of clicking on an anchor and unlatching
@@ -422,7 +427,12 @@ pub fn check_mouseclick_on_objects(
                 action_event_writer.send(Action::SelectionBox);
             }
 
+            (None, None, false, false, false) if !spawn_button_on && selection_button_on => {
+                action_event_writer.send(Action::SelectionBox);
+            }
+
             (None, None, false, false, false) if !spawn_button_on => {
+                // println!("Debug");
                 action_event_writer.send(Action::Unselect);
             }
 

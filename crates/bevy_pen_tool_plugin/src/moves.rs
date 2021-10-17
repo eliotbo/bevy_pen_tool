@@ -251,6 +251,7 @@ pub fn follow_bezier_group(
         Or<(With<FollowBezierAnimation>, With<TurnRoundAnimation>)>,
     >,
     groups: Res<Assets<Group>>,
+    curves: ResMut<Assets<Bezier>>,
     time: Res<Time>,
 ) {
     if let Some(group) = groups.iter().next() {
@@ -258,30 +259,58 @@ pub fn follow_bezier_group(
             visible.is_visible = true;
         }
 
-        let path_length = group.1.standalone_lut.path_length as f64;
+        for (mut transform, bezier_animation) in query.iter_mut() {
+            let path_length = group.1.standalone_lut.path_length as f64;
 
-        let multiplier: f64 = 500.0 / path_length;
-        let t_time = (time.seconds_since_startup() * (0.1 * multiplier)) % 1.0;
-        let pos = group.1.compute_position_with_lut(t_time as f32);
+            let multiplier: f64 = 500.0 / path_length;
+            let t_time = (bezier_animation.animation_offset
+                + time.seconds_since_startup() * (0.1 * multiplier))
+                % 1.0;
+            let mut pos = group.1.compute_position_with_lut(t_time as f32);
 
-        // the heli looks ahead (5% of the curve length) to orient itself
-        let further_pos = group
-            .1
-            .compute_position_with_lut(((t_time + 0.05 * multiplier) % 1.0) as f32);
+            let road_line_offset = 4.0;
+            let normal = group
+                .1
+                .compute_normal_with_bezier(&curves, t_time as f64)
+                .normalize();
+            pos += normal * road_line_offset;
 
-        let forward_direction = (further_pos - pos).normalize();
-
-        for (mut transform, _bezier_animation) in query.iter_mut() {
             transform.translation.x = pos.x;
             transform.translation.y = pos.y;
 
-            let current_looking_dir = transform.rotation.mul_vec3(Vec3::X);
+            // the car looks ahead (5% of the curve length) to orient itself
+            let further_pos = group
+                .1
+                .compute_position_with_lut(((t_time + 0.05 * multiplier) % 1.0) as f32);
+            let further_normal = group
+                .1
+                .compute_normal_with_bezier(&curves, ((t_time + 0.05 * multiplier) % 1.0) as f64)
+                .normalize();
+
+            let forward_direction =
+                (further_pos + further_normal * road_line_offset - pos).normalize();
+
+            // let initial_rot = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
+            // let forward_direction = initial_rot.mul_vec3(forward_direction0.extend(0.0));
+
+            let mut current_looking_dir = transform
+                .rotation
+                .mul_vec3(bezier_animation.initial_direction);
+            current_looking_dir.z = 0.0;
 
             let quat = Quat::from_rotation_arc(current_looking_dir, forward_direction.extend(0.0));
+
             let (axis, mut angle) = quat.to_axis_angle();
+            // println!(
+            //     "current_looking_dir: {:?}, forward_direction: {:?}",
+            //     current_looking_dir, forward_direction
+            // );
+
+            // maximum rotating speed
             angle = angle.clamp(0.0, 3.0 * std::f32::consts::PI / 180.0);
-            let clmaped_quat = Quat::from_axis_angle(axis, angle);
-            transform.rotation = transform.rotation.mul_quat(clmaped_quat);
+            let clamped_quat = Quat::from_axis_angle(axis, angle);
+
+            transform.rotation = clamped_quat.mul_quat(transform.rotation);
         }
     }
 }
