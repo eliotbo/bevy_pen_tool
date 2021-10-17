@@ -22,7 +22,7 @@ struct Lut {
 impl Lut {
     // loads a look-up table that was saved in assets/lut using bevy_pen_tool
     fn load() -> Lut {
-        let lut_path = "assets/lut/my_group_lut.txt";
+        let lut_path = "saved/look_up_tables/my_group0.lut";
         let mut file = std::fs::File::open(lut_path).unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();

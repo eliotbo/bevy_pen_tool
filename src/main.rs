@@ -9,12 +9,13 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 // - make whole group move when selected
 // - add Delete to readme
 // - change readme: drag a rectangle to drag a selection window
-// - generate a normal lut (perpendicular direction)
+// - add enabled/disabled to buttons
 
 // long-term
 // - ungroup
-// - make undo/redo
-// - Attach UI to a UI camera
+// - compatibility with multiple groups
+// - undo/redo
+// - Attach UI to a UI camera -- waiting for UI to be compatible with shaders
 
 fn main() {
     App::new()
@@ -45,7 +46,7 @@ fn camera_setup(mut commands: Commands, mut globals: ResMut<Globals>) {
 
     // sets the number of rows in the animation position look-up table. More points will
     // make an animation smoother, but will take more space in memory
-    globals.group_lut_num_points = 100;
+    globals.group_lut_num_points = 10;
     globals.road_width = 8.0;
 }
 

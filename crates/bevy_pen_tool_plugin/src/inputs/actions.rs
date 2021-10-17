@@ -13,12 +13,10 @@ use std::io::Read;
 use std::io::Write;
 
 pub fn recompute_lut(
-    // keyboard_input: Res<Input<KeyCode>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     query_group: Query<&Handle<Group>>,
     mut groups: ResMut<Assets<Group>>,
-    // mut ui_event_reader: EventReader<UiButton>,
     mut action_event_reader: EventReader<Action>,
     globals: ResMut<Globals>,
     maps: ResMut<Maps>,
@@ -223,8 +221,6 @@ pub fn selection_final(
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
-    // mut visible_selecting_query: Query<&mut Visible, With<SelectingBoxQuad>>,
-    // mut visible_selected_query: Query<&mut Visible, With<SelectedBoxQuad>>,
     mut query_set: QuerySet<(
         QueryState<&mut Visible, With<SelectingBoxQuad>>,
         QueryState<&mut Visible, With<SelectedBoxQuad>>,
@@ -666,148 +662,181 @@ pub fn hide_control_points(
 //     }
 // }
 
+use std::path::PathBuf;
+fn open_file_dialog(save_name: &str, folder: &str, extension: &str) -> Option<PathBuf> {
+    let mut k = 0;
+
+    let mut default_path = std::env::current_dir().unwrap();
+    default_path.push("saved");
+    default_path.push(folder.to_string());
+    let mut default_name: String;
+
+    loop {
+        default_name = save_name.to_string();
+        default_name.push_str(&(k.to_string()));
+        default_name.push_str(extension);
+
+        default_path.push(&default_name);
+
+        if !default_path.exists() {
+            break;
+        }
+        default_path.pop();
+
+        k += 1;
+    }
+
+    let res = rfd::FileDialog::new()
+        .set_file_name(&default_name)
+        .set_directory(&default_path)
+        .save_file();
+    println!("The user choose: {:#?}", &res);
+
+    return res;
+}
+
 pub fn save(
-    // keyboard_input: Res<Input<KeyCode>>,
     query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     group_query: Query<&Handle<Group>, With<GroupBoxQuad>>,
     mesh_query: Query<(&Handle<Mesh>, &GroupMesh)>,
     mut groups: ResMut<Assets<Group>>,
-    // mut event_reader: EventReader<UiButton>,
     meshes: Res<Assets<Mesh>>,
 
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Save) {
-        println!("saving");
-        let mut path = std::env::current_dir().unwrap();
-        path.push("assets");
-        path.push("meshes");
+        //
 
-        let res = rfd::FileDialog::new()
-            .set_file_name("foo.txt")
-            .set_directory(&path)
-            .save_file();
+        //
+        // ////////////// start.  Save individual Bezier curves
+        // let mut vec: Vec<Bezier> = Vec::new();
+        // for bezier_handle in query.iter() {
+        //     let bezier = bezier_curves.get(bezier_handle).unwrap();
+        //     let mut bezier_clone = bezier.clone();
+        //     bezier_clone.lut = Vec::new();
+        //     vec.push(bezier_clone);
+        // }
 
-        println!("The user choose: {:#?}", res);
+        // let serialized = serde_json::to_string_pretty(&vec).unwrap();
 
-        let mut vec: Vec<Bezier> = Vec::new();
-        for bezier_handle in query.iter() {
-            let bezier = bezier_curves.get(bezier_handle).unwrap();
-            let mut bezier_clone = bezier.clone();
-            bezier_clone.lut = Vec::new();
-            vec.push(bezier_clone);
-        }
+        // let path = "curves.txt";
+        // let mut output = File::create(path).unwrap();
+        // let _result = output.write(serialized.as_bytes());
+        // ////////////// end.  Save individual Bezier curves
+        //
 
-        let serialized = serde_json::to_string_pretty(&vec).unwrap();
-
-        let path = "curves.txt";
-        let mut output = File::create(path).unwrap();
-        let _result = output.write(serialized.as_bytes());
-
-        let mut group_vec = Vec::new();
-        for group_handle in group_query.iter() {
+        ////////////// start. Save Group and save Group look-up table
+        if let Some(group_handle) = group_query.iter().next() {
+            let mut group_vec = Vec::new();
+            // for group_handle in group_query.iter() {
             let group = groups.get_mut(group_handle).unwrap();
+            //
+            ////////////// start. Save Group look-up table
+            let lut_dialog_result = open_file_dialog("my_group", "look_up_tables", ".lut");
+            if let Some(lut_path) = lut_dialog_result {
+                group.compute_standalone_lut(&mut bezier_curves, globals.group_lut_num_points);
+                let lut_serialized = serde_json::to_string_pretty(&group.standalone_lut).unwrap();
+                // let lut_path = "assets/lut/my_group_lut.txt";
+                let mut lut_output = File::create(&lut_path).unwrap();
+                let _lut_write_result = lut_output.write(lut_serialized.as_bytes());
+            }
 
-            group.compute_standalone_lut(&mut bezier_curves, globals.group_lut_num_points);
-            let lut_serialized = serde_json::to_string_pretty(&group.standalone_lut).unwrap();
-            let lut_path = "assets/lut/my_group_lut.txt";
-            let mut lut_output = File::create(lut_path).unwrap();
-            let _lut_result = lut_output.write(lut_serialized.as_bytes());
+            ////////////// start. Save Group
+            let group_dialog_result = open_file_dialog("my_group", "groups", ".group");
+            if let Some(group_path) = group_dialog_result {
+                group_vec.push(group.into_group_save(&mut bezier_curves).clone());
+                // }
 
-            group_vec.push(group.into_group_save(&mut bezier_curves).clone());
-        }
+                let serialized = serde_json::to_string_pretty(&group_vec).unwrap();
 
-        let serialized = serde_json::to_string_pretty(&group_vec).unwrap();
-
-        let path = "curve_groups.txt";
-        let mut output = File::create(path).unwrap();
-        let _result = output.write(serialized.as_bytes());
-
-        //////// save mesh in obj format ///////////////////
-        if let Some((mesh_handle, GroupMesh(color))) = mesh_query.iter().next() {
-            let mesh = meshes.get(mesh_handle).unwrap();
-            let vertex_attributes = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
-            let indices_u32 = mesh.indices().unwrap();
-
-            match (vertex_attributes, indices_u32) {
-                (
-                    bevy::render::mesh::VertexAttributeValues::Float32x3(vertices),
-                    bevy::render::mesh::Indices::U32(indices),
-                ) => {
-                    let obj_vertices = vertices
-                        .clone()
-                        .iter()
-                        .map(|arr| obj_exporter::Vertex {
-                            x: arr[0] as f64,
-                            y: arr[1] as f64,
-                            z: arr[2] as f64,
-                        })
-                        .collect::<Vec<obj_exporter::Vertex>>();
-
-                    // let mut obj_inds_vecs: Vec<Vec<u32>> =
-                    // indices.chunks(3).map(|x| x.to_vec()).collect();
-                    let obj_inds_vecs: Vec<(usize, usize, usize)> = indices
-                        .chunks_exact(3)
-                        .map(|z| {
-                            let mut x = z.iter();
-                            return (
-                                *x.next().unwrap() as usize,
-                                *x.next().unwrap() as usize,
-                                *x.next().unwrap() as usize,
-                            );
-                        })
-                        .collect();
-
-                    let normals = vec![obj_exporter::Vertex {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 1.0,
-                    }];
-
-                    let set = obj_exporter::ObjSet {
-                        material_library: None,
-                        objects: vec![obj_exporter::Object {
-                            name: "My_mesh".to_owned(),
-                            vertices: obj_vertices,
-                            tex_vertices: vec![],
-                            normals,
-                            geometry: vec![obj_exporter::Geometry {
-                                material_name: None,
-                                shapes: obj_inds_vecs
-                                    .into_iter()
-                                    .map(|(x, y, z)| obj_exporter::Shape {
-                                        primitive: obj_exporter::Primitive::Triangle(
-                                            (x, Some(x), Some(0)),
-                                            (y, Some(y), Some(0)),
-                                            (z, Some(z), Some(0)),
-                                        ),
-                                        groups: vec![],
-                                        smoothing_groups: vec![],
-                                    })
-                                    .collect(),
-                            }],
-                        }],
-                    };
-
-                    obj_exporter::export_to_file(&set, "assets/meshes/my_mesh.obj").unwrap();
-
-                    // // saving format 3-tuple with:
-                    // // Vec<[f32;3]> for vertex attributes
-                    // // Vec<u32> for indices
-                    // // Color for the mesh color
-                    // let mesh_info = (vertices, indices, color);
-                    // let mesh_serialized = serde_json::to_string_pretty(&mesh_info).unwrap();
-                    // let mesh_path = "assets/meshes/my_mesh.txt";
-                    // let mut mesh_output = File::create(mesh_path).unwrap();
-                    // let _mesh_result = mesh_output.write(mesh_serialized.as_bytes());
-                }
-                _ => {}
+                // let path = "curve_groups.txt";
+                let mut output = File::create(group_path).unwrap();
+                let _group_write_result = output.write(serialized.as_bytes());
             }
         }
+        ////////////// end. Save group and look-up table
+        //
 
-        println!("{:?}", "saved");
+        ////////////// start. Save mesh in obj format
+        if let Some((mesh_handle, GroupMesh(color))) = mesh_query.iter().next() {
+            let group_dialog_result = open_file_dialog("my_mesh", "meshes", ".obj");
+            if let Some(group_path) = group_dialog_result {
+                let mesh = meshes.get(mesh_handle).unwrap();
+                let vertex_attributes = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
+                let indices_u32 = mesh.indices().unwrap();
+
+                match (vertex_attributes, indices_u32) {
+                    (
+                        bevy::render::mesh::VertexAttributeValues::Float32x3(vertices),
+                        bevy::render::mesh::Indices::U32(indices),
+                    ) => {
+                        let obj_vertices = vertices
+                            .clone()
+                            .iter()
+                            .map(|arr| obj_exporter::Vertex {
+                                x: arr[0] as f64,
+                                y: arr[1] as f64,
+                                z: arr[2] as f64,
+                            })
+                            .collect::<Vec<obj_exporter::Vertex>>();
+
+                        // let mut obj_inds_vecs: Vec<Vec<u32>> =
+                        // indices.chunks(3).map(|x| x.to_vec()).collect();
+                        let obj_inds_vecs: Vec<(usize, usize, usize)> = indices
+                            .chunks_exact(3)
+                            .map(|z| {
+                                let mut x = z.iter();
+                                return (
+                                    *x.next().unwrap() as usize,
+                                    *x.next().unwrap() as usize,
+                                    *x.next().unwrap() as usize,
+                                );
+                            })
+                            .collect();
+
+                        let normals = vec![obj_exporter::Vertex {
+                            x: 0.0,
+                            y: 0.0,
+                            z: 1.0,
+                        }];
+
+                        let set = obj_exporter::ObjSet {
+                            material_library: None,
+                            objects: vec![obj_exporter::Object {
+                                name: "My_mesh".to_owned(),
+                                vertices: obj_vertices,
+                                tex_vertices: vec![],
+                                normals,
+                                geometry: vec![obj_exporter::Geometry {
+                                    material_name: None,
+                                    shapes: obj_inds_vecs
+                                        .into_iter()
+                                        .map(|(x, y, z)| obj_exporter::Shape {
+                                            primitive: obj_exporter::Primitive::Triangle(
+                                                (x, Some(x), Some(0)),
+                                                (y, Some(y), Some(0)),
+                                                (z, Some(z), Some(0)),
+                                            ),
+                                            groups: vec![],
+                                            smoothing_groups: vec![],
+                                        })
+                                        .collect(),
+                                }],
+                            }],
+                        };
+
+                        obj_exporter::export_to_file(&set, group_path).unwrap();
+                    }
+                    _ => {}
+                }
+            }
+
+            ////////////// end. Save mesh in obj format
+
+            println!("{:?}", "saved");
+        }
     }
 }
 
@@ -827,27 +856,28 @@ pub fn load(
     mut loaded_event_writer: EventWriter<Loaded>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Load) {
-        // let cur_path = std::env::current_dir().unwrap();
+        let mut default_path = std::env::current_dir().unwrap();
+        default_path.push("saved");
+        default_path.push("groups");
 
-        // let res = rfd::FileDialog::new()
-        //     .add_filter("text", &["txt", "rs"])
-        //     .add_filter("rust", &["rs", "toml"])
-        //     .set_directory(&cur_path)
-        //     .pick_files();
+        let res = rfd::FileDialog::new()
+            .add_filter("text", &["group"])
+            .set_directory(&default_path)
+            .pick_files();
 
-        // let mut path = std::path::PathBuf::new();
-        // if let Some(chosen_path) = res.clone() {
-        //     let path_some = chosen_path.get(0);
-        //     if let Some(path_local) = path_some {
-        //         path = path_local.clone();
-        //     } else {
-        //         return ();
-        //     }
-        // } else {
-        //     return ();
-        // }
+        let mut path = std::path::PathBuf::new();
+        if let Some(chosen_path) = res.clone() {
+            let path_some = chosen_path.get(0);
+            if let Some(path_local) = path_some {
+                path = path_local.clone();
+            } else {
+                return ();
+            }
+        } else {
+            return ();
+        }
 
-        let path = "curve_groups.txt";
+        // let path = "curve_groups.txt";
 
         let clearcolor = clearcolor_struct.0;
 
@@ -863,6 +893,7 @@ pub fn load(
 
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
+
         let loaded_groups_vec: Vec<GroupSaveLoad> = serde_json::from_str(&contents).unwrap();
 
         let mut group = Group {

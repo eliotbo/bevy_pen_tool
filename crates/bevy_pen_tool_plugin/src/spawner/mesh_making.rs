@@ -76,9 +76,6 @@ pub fn make_road(
             let mut local_inds = vec![k, (k + 1), (k + 2), (k + 1), (k + 3), (k + 2)];
             new_indices.append(&mut local_inds);
         }
-        println!("{:?}", mesh_contour.len());
-        println!("{:?}", new_indices.iter().max());
-        // println!("indices len: {:?}", &new_indices.len());
 
         // uvs
         let path_length = group.standalone_lut.path_length;
@@ -159,7 +156,7 @@ pub fn make_road(
 
         // light
         commands.spawn_bundle(PointLightBundle {
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, -700.0)),
+            transform: Transform::from_translation(Vec3::new(25.0, 15.0, -700.0)),
             point_light: PointLight {
                 intensity: 50000.,
                 range: 1000.,

@@ -49,18 +49,18 @@
     "lut": [],
     "id": 334012659822204033876871255251659834413,
     "latches": {
-      "End": [
-        {
-          "latched_to_id": 90487113981202817746748784880247320581,
-          "self_edge": "End",
-          "partners_edge": "Start"
-        }
-      ],
       "Start": [
         {
           "latched_to_id": 234125285601886956283132274783014513404,
           "self_edge": "Start",
           "partners_edge": "End"
+        }
+      ],
+      "End": [
+        {
+          "latched_to_id": 90487113981202817746748784880247320581,
+          "self_edge": "End",
+          "partners_edge": "Start"
         }
       ]
     },
@@ -117,18 +117,18 @@
     "lut": [],
     "id": 90487113981202817746748784880247320581,
     "latches": {
-      "End": [
-        {
-          "latched_to_id": 250347434660331547503107667937381804045,
-          "self_edge": "End",
-          "partners_edge": "Start"
-        }
-      ],
       "Start": [
         {
           "latched_to_id": 334012659822204033876871255251659834413,
           "self_edge": "Start",
           "partners_edge": "End"
+        }
+      ],
+      "End": [
+        {
+          "latched_to_id": 250347434660331547503107667937381804045,
+          "self_edge": "End",
+          "partners_edge": "Start"
         }
       ]
     },
@@ -185,18 +185,18 @@
     "lut": [],
     "id": 250347434660331547503107667937381804045,
     "latches": {
-      "Start": [
-        {
-          "latched_to_id": 90487113981202817746748784880247320581,
-          "self_edge": "Start",
-          "partners_edge": "End"
-        }
-      ],
       "End": [
         {
           "latched_to_id": 197191339486488538890643482347243526211,
           "self_edge": "End",
           "partners_edge": "Start"
+        }
+      ],
+      "Start": [
+        {
+          "latched_to_id": 90487113981202817746748784880247320581,
+          "self_edge": "Start",
+          "partners_edge": "End"
         }
       ]
     },
@@ -253,18 +253,18 @@
     "lut": [],
     "id": 197191339486488538890643482347243526211,
     "latches": {
-      "Start": [
-        {
-          "latched_to_id": 250347434660331547503107667937381804045,
-          "self_edge": "Start",
-          "partners_edge": "End"
-        }
-      ],
       "End": [
         {
           "latched_to_id": 281562583228304480199668689218778872413,
           "self_edge": "End",
           "partners_edge": "Start"
+        }
+      ],
+      "Start": [
+        {
+          "latched_to_id": 250347434660331547503107667937381804045,
+          "self_edge": "Start",
+          "partners_edge": "End"
         }
       ]
     },
@@ -389,18 +389,18 @@
     "lut": [],
     "id": 285000267357559555577385926205730556962,
     "latches": {
-      "End": [
-        {
-          "latched_to_id": 234125285601886956283132274783014513404,
-          "self_edge": "End",
-          "partners_edge": "Start"
-        }
-      ],
       "Start": [
         {
           "latched_to_id": 281562583228304480199668689218778872413,
           "self_edge": "Start",
           "partners_edge": "End"
+        }
+      ],
+      "End": [
+        {
+          "latched_to_id": 234125285601886956283132274783014513404,
+          "self_edge": "End",
+          "partners_edge": "Start"
         }
       ]
     },

@@ -713,6 +713,8 @@ pub fn spawn_ui(
         size: button_size,
         ..Default::default()
     });
+    let on_material_show = asset_server.load("textures/show_anchors.png");
+    let off_material_hide = asset_server.load("textures/hide.png");
     let hide_button = commands
         .spawn_bundle(MeshBundle {
             mesh: mesh_handle_button.clone(),
@@ -734,15 +736,19 @@ pub fn spawn_ui(
 
     commands.entity(main_ui).push_children(&[hide_button]);
 
-    let texture_handle = asset_server.load("textures/hide.png");
+    // let texture_handle = asset_server.load("textures/hide.png");
     let hide_sprite = commands
         .spawn_bundle(SpriteBundle {
-            material: materials.add(texture_handle.into()),
+            material: materials.add(on_material_show.into()),
             // mesh: mesh_handle_button.clone(),
             transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
             sprite: Sprite::new(button_size / 1.3),
             ..Default::default()
         })
+        .insert(OnOffMaterial {
+            material: materials.add(off_material_hide.into()),
+        })
+        .insert(UiButton::Hide)
         .id();
 
     commands.entity(hide_button).push_children(&[hide_sprite]);

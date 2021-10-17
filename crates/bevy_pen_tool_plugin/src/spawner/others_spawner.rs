@@ -10,6 +10,12 @@ use bevy::{
     render::pipeline::{RenderPipeline, RenderPipelines},
 };
 
+// There is culling between two transparent quads at the same distance from the camera.
+// Is this normal behavior?
+// To avoid culling, the quads that can intercept each other in the xy plane need
+// to have different z-values
+//
+//
 ///////////////////////////////////////////// z positions
 // spawn_group_middle_quads:        -1000.0
 // car:  -720.0
@@ -271,84 +277,83 @@ pub fn spawn_heli(
     groups: Res<Assets<Group>>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::SpawnHeli) {
-        // if let Some(_) = groups.iter().next() {
+        if let Some(_) = groups.iter().next() {
+            // let rotation = Quat::IDENTITY;
+            let rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
+                .mul_quat(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2));
 
-        // let rotation = Quat::IDENTITY;
-        let rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
-            .mul_quat(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2));
+            commands
+                .spawn_bundle((
+                    Transform {
+                        translation: Vec3::new(0.0, 0.0, -720.0),
+                        rotation,
+                        scale: Vec3::splat(3.0),
+                        ..Default::default()
+                    },
+                    GlobalTransform::identity(),
+                ))
+                .insert(FollowBezierAnimation {
+                    animation_offset: 0.0,
+                    initial_direction: Vec3::Z,
+                })
+                // .insert(TurnRoundAnimation)
+                .with_children(|cell| {
+                    cell.spawn_scene(asset_server.load("models/car.gltf#Scene0"));
+                })
+                .id();
 
-        commands
-            .spawn_bundle((
-                Transform {
-                    translation: Vec3::new(0.0, 0.0, -720.0),
-                    rotation,
-                    scale: Vec3::splat(3.0),
+            let heli_handle = asset_server.load("textures/heli.png");
+            let size = Vec2::new(25.0, 25.0);
+            let heli_sprite = commands
+                .spawn_bundle(SpriteBundle {
+                    material: materials.add(heli_handle.into()),
+                    // mesh: mesh_handle_button.clone(),
+                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, -710.0)),
+                    sprite: Sprite::new(size),
+                    visible: Visible {
+                        is_visible: true,
+                        is_transparent: true,
+                    },
                     ..Default::default()
-                },
-                GlobalTransform::identity(),
-            ))
-            .insert(FollowBezierAnimation {
-                animation_offset: 0.0,
-                initial_direction: Vec3::Z,
-            })
-            // .insert(TurnRoundAnimation)
-            .with_children(|cell| {
-                cell.spawn_scene(asset_server.load("models/car.gltf#Scene0"));
-            })
-            .id();
-
-        let heli_handle = asset_server.load("textures/heli.png");
-        let size = Vec2::new(25.0, 25.0);
-        let heli_sprite = commands
-            .spawn_bundle(SpriteBundle {
-                material: materials.add(heli_handle.into()),
-                // mesh: mesh_handle_button.clone(),
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, -710.0)),
-                sprite: Sprite::new(size),
-                visible: Visible {
-                    is_visible: true,
-                    is_transparent: true,
-                },
-                ..Default::default()
-            })
-            .insert(FollowBezierAnimation {
-                animation_offset: -0.1,
-                initial_direction: Vec3::X,
-            })
-            .id();
-        let copter_handle = asset_server.load("textures/copter.png");
-        let copter_sprite = commands
-            .spawn_bundle(SpriteBundle {
-                material: materials.add(copter_handle.into()),
-                // mesh: mesh_handle_button.clone(),
-                transform: Transform::from_translation(Vec3::new(3.0, 1.0, 5.0)),
-                sprite: Sprite::new(size),
-                visible: Visible {
-                    is_visible: true,
-                    is_transparent: true,
-                },
-                ..Default::default()
-            })
-            .insert(TurnRoundAnimation)
-            .id();
-
-        commands.entity(heli_sprite).push_children(&[copter_sprite]);
-
-        // light
-        commands
-            .spawn_bundle(PointLightBundle {
-                transform: Transform::from_translation(Vec3::new(0.0, 25.0, -700.0)),
-                point_light: PointLight {
-                    intensity: 50000.,
-                    range: 1000.,
+                })
+                .insert(FollowBezierAnimation {
+                    animation_offset: -0.1,
+                    initial_direction: Vec3::X,
+                })
+                .id();
+            let copter_handle = asset_server.load("textures/copter.png");
+            let copter_sprite = commands
+                .spawn_bundle(SpriteBundle {
+                    material: materials.add(copter_handle.into()),
+                    // mesh: mesh_handle_button.clone(),
+                    transform: Transform::from_translation(Vec3::new(3.0, 1.0, 5.0)),
+                    sprite: Sprite::new(size),
+                    visible: Visible {
+                        is_visible: true,
+                        is_transparent: true,
+                    },
                     ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(FollowBezierAnimation {
-                animation_offset: 0.0,
-                initial_direction: Vec3::X,
-            });
+                })
+                .insert(TurnRoundAnimation)
+                .id();
+
+            commands.entity(heli_sprite).push_children(&[copter_sprite]);
+
+            // light
+            commands
+                .spawn_bundle(PointLightBundle {
+                    transform: Transform::from_translation(Vec3::new(0.0, 25.0, -700.0)),
+                    point_light: PointLight {
+                        intensity: 50000.,
+                        range: 1000.,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(FollowBezierAnimation {
+                    animation_offset: 0.0,
+                    initial_direction: Vec3::X,
+                });
+        }
     }
-    // }
 }
