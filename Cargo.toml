@@ -9,19 +9,13 @@ categories = ["animation", "ui", "game-development", "mesh", "bezier-curves"]
 members = ["crates/*"]
 
 [dependencies]
-
-# bevy = { version = "0.5", git = "https://github.com/bevyengine/bevy", rev="615d43b", default-features = true }
-bevy = { version = "0.5", git = "https://github.com/bevyengine/bevy", rev="0887f41", default-features = true }
-# bevy = { version = "0.5", default-features = false, features = ["render"] }
-
-bevy_pen_tool_plugin = { path = "crates/bevy_pen_tool_plugin", version = "0.1.0" }
-# bevy_prototype_debug_lines = { path  = "crates/bevy_debug_lines"}
+bevy = { version = "0.5", git = "https://github.com/bevyengine/bevy", rev="099386f184901b4fe1183f619f301a668abe5672", default-features = true }
+bevy_pen_tool_plugin = { path = "crates/bevy_pen_tool_plugin", version = "0.2.0" }
 
 serde_json = "1.0.59"
 serde = { version = "1", features = ["derive"] }
 lyon = "0.17.5"
 rfd = "0.5.1"
-
 
 
 [[example]]
