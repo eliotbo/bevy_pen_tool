@@ -32,9 +32,9 @@ A Bevy Engine plugin for making 2D paths, smooth animations, meshes and roads wi
 | ![lut](https://user-images.githubusercontent.com/6177048/137652254-f62c0d1b-d323-4ec6-b51f-c86b3f21f390.png) | Left Shift + T | Compute look-up table (linearizes animations) |
 | ![sound](https://user-images.githubusercontent.com/6177048/137652277-c43ace61-723b-409b-b48b-5521238c5e4d.png) | None | Toggle sound |
 | ![bin](https://user-images.githubusercontent.com/6177048/137652281-a461da81-bbd0-4728-a80f-7bb19849a149.png) | Select curves or group + Delete | Delete curves or group |
-| ![road](https://user-images.githubusercontent.com/6177048/137652369-0bd832a9-9c03-42a3-9dc6-b840f45c86dd.png) | None | Spawn road |
-| ![mesh](https://user-images.githubusercontent.com/6177048/137652366-ffc53243-0df9-4e84-a0ab-3985c3c59302.png) | None | Spawn interior mesh |
-| ![heli](https://user-images.githubusercontent.com/6177048/137652364-67eedf2b-8283-43b0-a2e6-e80e97f5cb89.png) | None | Spawn animated car |
+| ![road](https://user-images.githubusercontent.com/6177048/137652369-0bd832a9-9c03-42a3-9dc6-b840f45c86dd.png) | None | Spawn road on curve group |
+| ![mesh](https://user-images.githubusercontent.com/6177048/137652366-ffc53243-0df9-4e84-a0ab-3985c3c59302.png) | None | Spawn mesh inside curve group |
+| ![heli](https://user-images.githubusercontent.com/6177048/137652364-67eedf2b-8283-43b0-a2e6-e80e97f5cb89.png) | None | Spawn animated car on curve group |
 
 
 
@@ -47,7 +47,7 @@ A Bevy Engine plugin for making 2D paths, smooth animations, meshes and roads wi
 Clone the repo, copy and paste the crate called "bevy_pen_tool_plugin" from the "crates" folder in the repo to the directory for your project, and add "bevy_pen_tool_plugin" as a local dependency in Cargo.toml. Refer to main.rs and Cargo.toml for futher details.
 
 ## How to
-A typical sequence of actions using the plugin is as follows:
+A typical sequence of actions using the plugin would be as follows:
 1. Spawn curves
 2. Latch them together
 3. Group the latched curves (cannot be ungrouped)
@@ -76,6 +76,7 @@ bevy_pen_tool, in its current form,
 ## TODO
 - saving multiple groups
 - ability to move whole group
+- ruler tool
 - no guarantees, but maybe a 3D version
 
 
