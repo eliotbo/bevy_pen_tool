@@ -61,8 +61,8 @@ A user can save and load the data structure for a group of Bezier curves -- call
 
 There are two important parameters to tweak and they are both located in a Resource called "Globals"
 1. group_lut_num_points: the number of elements in the generated look-up table (more yields smoother animations/meshes)
-2. road_width: the width of the road meshes
-See main.rs to see how to modify these parameters.
+2. road_width: the width of the road meshes.
+Refer to main.rs to see how to modify these parameters.
 
 
 
