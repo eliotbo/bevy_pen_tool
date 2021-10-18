@@ -76,8 +76,9 @@ bevy_pen_tool, in its current form,
 
 
 ## TODO
-- saving multiple groups
 - ability to move whole group
+- select and delete mesh
+- saving multiple groups
 - ruler tool
 - no guarantees, but maybe a 3D version
 
