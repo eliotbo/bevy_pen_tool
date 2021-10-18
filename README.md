@@ -34,7 +34,7 @@ A Bevy Engine plugin for making 2D paths, smooth animations, meshes and roads wi
 | ![bin](https://user-images.githubusercontent.com/6177048/137652281-a461da81-bbd0-4728-a80f-7bb19849a149.png) | Select curves or group + Delete | Delete curves or group |
 | ![road](https://user-images.githubusercontent.com/6177048/137652369-0bd832a9-9c03-42a3-9dc6-b840f45c86dd.png) | None | Spawn road on curve group |
 | ![mesh](https://user-images.githubusercontent.com/6177048/137652366-ffc53243-0df9-4e84-a0ab-3985c3c59302.png) | None | Spawn mesh inside curve group |
-| ![heli](https://user-images.githubusercontent.com/6177048/137652364-67eedf2b-8283-43b0-a2e6-e80e97f5cb89.png) | None | Spawn animated car on curve group |
+| ![heli](https://user-images.githubusercontent.com/6177048/137652364-67eedf2b-8283-43b0-a2e6-e80e97f5cb89.png) | None | Spawn animated helicopter on curve group |
 
 
 
