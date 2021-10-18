@@ -40,7 +40,11 @@ pub fn spawn_bezier_system(
 
         // the control points cannot be exactly in the same positions as the anchors
         // because the algorithm for finding position along the curves fail in that case
-        let epsilon = 5.01;
+        let mut epsilon = 5.01;
+        if globals.hide_control_points {
+            epsilon = 0.01;
+        }
+
         let mut control_start: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
         let control_end: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
 

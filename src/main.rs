@@ -7,8 +7,6 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 
 // TODO:
 // - make whole group move when selected
-// - add Delete to readme
-// - change readme: drag a rectangle to drag a selection window
 // - add enabled/disabled to buttons
 
 // long-term
@@ -46,11 +44,11 @@ fn camera_setup(mut commands: Commands, mut globals: ResMut<Globals>) {
 
     // sets the number of rows in the animation position look-up table. More points will
     // make an animation smoother, but will take more space in memory
-    globals.group_lut_num_points = 10;
+    globals.group_lut_num_points = 100;
     globals.road_width = 8.0;
 }
 
-fn test(keyboard_input: Res<Input<KeyCode>>, mut bezier_curves: ResMut<Assets<Bezier>>) {
+fn test(keyboard_input: Res<Input<KeyCode>>, mut _bezier_curves: ResMut<Assets<Bezier>>) {
     if keyboard_input.just_pressed(KeyCode::V) {
         println!("test: {:?}", 123);
     }

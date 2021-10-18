@@ -62,12 +62,12 @@ impl Plugin for PenPlugin {
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
                     .with_system(groupy.label("group"))
-                    .with_system(change_ends_and_controls_params.exclusive_system().at_end())
-                    .with_system(latch2)
-                    .with_system(officiate_latch_partnership)
-                    .with_system(recompute_lut)
                     .with_system(load.after("group"))
-                    .with_system(save)
+                    .with_system(recompute_lut.label("recompute_lut"))
+                    .with_system(save.after("recompute_lut"))
+                    .with_system(change_ends_and_controls_params.exclusive_system().at_end())
+                    .with_system(latchy)
+                    .with_system(officiate_latch_partnership)
                     .with_system(selection_box_init)
                     .with_system(selection_final)
                     .with_system(hide_anchors)
@@ -107,90 +107,6 @@ impl Plugin for PenPlugin {
                     .label("view")
                     .after("model"),
             );
-
-        //
-        //
-
-        // .add_system(
-        //     move_end_quads
-
-        //         .label("move_ends")
-        //         .after("mouse_color"),
-        // )
-        // .add_system(
-        //     spawn_curve_order_on_mouseclick
-
-        //         .label("spawn_curve")
-        //         .after("move_ends"),
-        // )
-        // .add_system(
-        //     begin_move_on_mouseclick
-        //         .label("move_curve")
-        //         .after("spawn_curve"),
-        // )
-        // .add_system(
-        //     check_mouse_on_canvas
-        //         .label("check_move")
-        //         .after("spawn_curve"),
-        // )
-        // .add_system(
-        //     spawn_bezier_system
-        //   .label("spawn_bezier")
-        //         .after("check_move"),
-        // )
-        // .add_system(
-        //     spawn_group_middle_quads
-        //        .label("group_mid")
-        //         .after("spawn_bezier"),
-        // )
-        // .add_system(
-        //     spawn_group_bounding_box
-        //         .label("spawn_group")
-        //         .after("group_mid"),
-        // )
-        // .add_system(groupy.after("spawn_group").label("groupy"))
-        // .add_system(load.after("groupy"))
-        // .add_system(
-        //     change_ends_and_controls_params
-        //         .label("update_params")
-        //         .after("spawn_bezier"),
-        // )
-        // .add_system(latch2.label("latch").after("update_params"))
-        // .add_system(
-        //     officiate_latch_partnership
-        //         .system()
-        //         .label("offi")
-        //         .after("latch"),
-        // )
-        // .add_system(move_middle_quads.after("move_ends"))
-        // .add_system(move_group_middle_quads.after("move_ends"))
-        // .add_system(move_control_quads.after("move_ends"))
-        // .add_system(move_bb_quads)
-        // .add_system(recompute_lut)
-        // .add_system(undo)
-        // .add_system(redo)
-        // .add_system(selection.label("selection"))
-        // .add_system(selection_box_init.label("selection_box"))
-        // .add_system(selection_final.label("select_final").after("selection_box"))
-        // .add_system(unselect)
-        // .add_system(adjust_selection_attributes.system())
-        // .add_system(adjust_selecting_attributes)
-        // .add_system(adjust_group_attributes.system())
-        // .add_system(hide_anchors.system())
-        // .add_system(do_long_lut.system().label("long_lut"))
-        // .add_system(save)
-        // .add_system(delete.label("delete"))
-        // .add_system(button_system.after("mouse_color"))
-        // .add_system(move_ui.system().label("move_ui"))
-        // .add_system(toggle_ui_button.system())
-        // .add_system(hide_control_points)
-        // .add_system(send_action)
-        // .add_system(spawn_heli)
-        // .add_system(make_mesh)
-        // .add_system(turn_round_animation)
-        // .add_system(follow_bezier_group)
-        // .add_system(make_road)
-        // .add_system(mouse_release_actions);
     }
 }
 

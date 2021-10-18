@@ -5,10 +5,13 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{
     mesh::Indices,
-    pipeline::{PipelineDescriptor, PrimitiveTopology, RenderPipeline},
-    render_graph::{base, AssetRenderResourcesNode, RenderGraph},
+    pipeline::PrimitiveTopology,
     renderer::RenderResources,
-    shader::{ShaderStage, ShaderStages},
+    //
+    // // in case of shader use in the future
+    // pipeline::{RenderPipeline, PipelineDescriptor},
+    // render_graph::{base, AssetRenderResourcesNode, RenderGraph},
+    // shader::{ShaderStage, ShaderStages},
 };
 
 use lyon::tessellation::geometry_builder::simple_builder;
@@ -102,25 +105,6 @@ pub fn make_road(
             colors.push([color.r(), color.g(), color.b()]);
         }
 
-        let xs: Vec<f32> = mesh_pos_attributes.iter().map(|v| v[0]).collect();
-        let ys: Vec<f32> = mesh_pos_attributes.iter().map(|v| v[1]).collect();
-
-        use std::cmp::Ordering;
-
-        fn bounds(v: &Vec<f32>) -> (f32, f32) {
-            let max_v: &f32 = v
-                .iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-                .unwrap();
-
-            let min_v: &f32 = v
-                .iter()
-                .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-                .unwrap();
-
-            return (*min_v, *max_v);
-        }
-
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
 
@@ -158,7 +142,7 @@ pub fn make_road(
         commands.spawn_bundle(PointLightBundle {
             transform: Transform::from_translation(Vec3::new(25.0, 15.0, -700.0)),
             point_light: PointLight {
-                intensity: 50000.,
+                intensity: 30000.,
                 range: 1000.,
                 ..Default::default()
             },
@@ -174,11 +158,10 @@ pub fn make_mesh(
     globals: Res<Globals>,
     groups: Res<Assets<Group>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    pipelines: ResMut<Assets<PipelineDescriptor>>,
-    shaders: ResMut<Assets<Shader>>,
     query: Query<Entity, With<GroupMesh>>,
-
-    asset_server: Res<AssetServer>,
+    //
+    // pipelines: ResMut<Assets<PipelineDescriptor>>,
+    // shaders: ResMut<Assets<Shader>>,
     // mut render_graph: ResMut<RenderGraph>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::MakeMesh) {
@@ -257,9 +240,9 @@ pub fn make_mesh(
             return (*min_v, *max_v);
         }
 
-        let mut bounds_x = bounds(&xs);
+        let bounds_x = bounds(&xs);
         let size_x = bounds_x.1 - bounds_x.0;
-        let mut bounds_y = bounds(&ys);
+        let bounds_y = bounds(&ys);
         let size_y = bounds_y.1 - bounds_y.0;
 
         for pos in &mesh_pos_attributes {
@@ -285,10 +268,8 @@ pub fn make_mesh(
         mesh.set_indices(Some(Indices::U32(new_indices)));
 
         let mesh_handle = meshes.add(mesh);
-        // maps.group_meshes.insert("group_mesh", mesh_handle.clone());
 
         use std::{thread, time};
-        let texture_handle: Handle<Texture> = asset_server.load("textures/road_texture.png");
         let hundred_millis = time::Duration::from_millis(100);
         thread::sleep(hundred_millis);
 
@@ -298,7 +279,6 @@ pub fn make_mesh(
         // }));
 
         let material_handle = materials.add(StandardMaterial {
-            // base_color_texture: Some(texture_handle),
             reflectance: 0.02,
             base_color: color,
             unlit: false,
@@ -316,6 +296,16 @@ pub fn make_mesh(
                 ..Default::default()
             })
             .insert(GroupMesh(color));
+
+        commands.spawn_bundle(PointLightBundle {
+            transform: Transform::from_translation(Vec3::new(25.0, -15.0, -700.0)),
+            point_light: PointLight {
+                intensity: 30000.,
+                range: 1000.,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
     }
 }
 

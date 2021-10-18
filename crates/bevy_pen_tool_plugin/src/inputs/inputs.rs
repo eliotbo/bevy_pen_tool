@@ -8,8 +8,6 @@ use crate::util::{
 use bevy::render::camera::OrthographicProjection;
 use bevy::{input::mouse::MouseWheel, prelude::*, window::CursorMoved};
 
-use std::ops::DerefMut;
-
 pub struct Cursor {
     pub position: Vec2,
     pub pos_relative_to_click: Vec2,
@@ -237,7 +235,7 @@ pub fn check_mouseclick_on_objects(
         &mut ButtonInteraction,
         &UiButton,
     )>,
-    mut color_button_query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
+    color_button_query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
     mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
     bezier_query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
     bezier_curves: ResMut<Assets<Bezier>>,
@@ -292,7 +290,7 @@ pub fn check_mouseclick_on_objects(
         //
         // check for mouseclick on color buttons
         for (transform, shader_param_handle, _color_button) in color_button_query.iter() {
-            let mut shader_params = my_shader_params
+            let shader_params = my_shader_params
                 .get(shader_param_handle.clone())
                 .unwrap()
                 .clone();

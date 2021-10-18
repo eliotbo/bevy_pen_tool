@@ -416,7 +416,8 @@ impl Group {
         t: f64,
     ) -> Vec2 {
         let mut curve_index = 0;
-        let mut pos = Vec2::ZERO;
+        let mut pos: Vec2 = Vec2::ZERO;
+        //
         for (_handle, _anchor, (t_min, t_max), _lut) in &self.lut {
             // println!("t: {}, t_min: {}, t_max: {}, ", t, t_min, t_max);
             if &t >= t_min && &t <= &(t_max + 0.000001) {
@@ -425,7 +426,9 @@ impl Group {
                 curve_index += 1;
             }
         }
+        //
         if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
+            //
             let bezier = bezier_curves.get(handle.clone()).unwrap();
 
             // some of this code is shared with move_middle_quads()
@@ -448,7 +451,7 @@ impl Group {
 
             pos = Vec2::new(pos_coord2.0 as f32, pos_coord2.1 as f32);
         } else {
-            panic!("couldn't get a curve at index: {}. ", curve_index);
+            println!("couldn't get a curve at index: {}. ", curve_index);
         }
 
         return pos;
@@ -460,6 +463,8 @@ impl Group {
         t: f64,
     ) -> Vec2 {
         let mut curve_index = 0;
+
+        #[allow(unused_assignments)]
         let mut normal = Vec2::ZERO;
         for (_handle, _anchor, (t_min, t_max), _lut) in &self.lut {
             // println!("t: {}, t_min: {}, t_max: {}, ", t, t_min, t_max);
@@ -1454,11 +1459,9 @@ pub fn compute_lut_long(
     return Some(look_up_table);
 }
 
-// TODO: refactor
 pub fn change_ends_and_controls_params(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
-    mut latch_event_reader: EventReader<OfficialLatch>,
     cursor: Res<Cursor>,
     maps: ResMut<Maps>,
 ) {
@@ -1467,7 +1470,9 @@ pub fn change_ends_and_controls_params(
 
         // TODO: use an event here instead of scanning for a moving quad
         for bezier_handle in query.iter_mut() {
+            //
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
+                //
                 latch_info = bezier.get_mover_latch_info();
                 bezier.update_positions_cursor(&cursor);
 
@@ -1479,9 +1484,9 @@ pub fn change_ends_and_controls_params(
 
         // change the control point of a latched point
         if let Some((partner_latch, mover_position, opposite_control)) = latch_info {
-            // println!("{:?}", mover_position);
-            // println!("moving latch");
+            //
             if let Some(bezier_handle) = maps.id_handle_map.get(&partner_latch.latched_to_id) {
+                //
                 let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
                 bezier.update_latched_position(
                     partner_latch.partners_edge,
@@ -1496,6 +1501,116 @@ pub fn change_ends_and_controls_params(
                     &partner_latch.latched_to_id
                 );
             }
+        }
+    }
+}
+
+use std::path::PathBuf;
+pub fn open_file_dialog(save_name: &str, folder: &str, extension: &str) -> Option<PathBuf> {
+    let mut k = 0;
+
+    let mut default_path = std::env::current_dir().unwrap();
+    default_path.push("saved");
+    default_path.push(folder.to_string());
+    let mut default_name: String;
+
+    loop {
+        default_name = save_name.to_string();
+        default_name.push_str(&(k.to_string()));
+        default_name.push_str(extension);
+
+        default_path.push(&default_name);
+
+        if !default_path.exists() {
+            break;
+        }
+        default_path.pop();
+
+        k += 1;
+    }
+
+    let res = rfd::FileDialog::new()
+        .set_file_name(&default_name)
+        .set_directory(&default_path)
+        .save_file();
+    println!("The user choose: {:#?}", &res);
+
+    return res;
+}
+
+pub fn save_mesh(
+    mesh_handle: &Handle<Mesh>,
+    meshes: &Res<Assets<Mesh>>,
+    dialog_result: Option<PathBuf>,
+) {
+    if let Some(path) = dialog_result {
+        let mesh = meshes.get(mesh_handle).unwrap();
+        let vertex_attributes = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
+        let indices_u32 = mesh.indices().unwrap();
+
+        match (vertex_attributes, indices_u32) {
+            (
+                bevy::render::mesh::VertexAttributeValues::Float32x3(vertices),
+                bevy::render::mesh::Indices::U32(indices),
+            ) => {
+                let obj_vertices = vertices
+                    .clone()
+                    .iter()
+                    .map(|arr| obj_exporter::Vertex {
+                        x: arr[0] as f64,
+                        y: arr[1] as f64,
+                        z: arr[2] as f64,
+                    })
+                    .collect::<Vec<obj_exporter::Vertex>>();
+
+                // let mut obj_inds_vecs: Vec<Vec<u32>> =
+                // indices.chunks(3).map(|x| x.to_vec()).collect();
+                let obj_inds_vecs: Vec<(usize, usize, usize)> = indices
+                    .chunks_exact(3)
+                    .map(|z| {
+                        let mut x = z.iter();
+                        return (
+                            *x.next().unwrap() as usize,
+                            *x.next().unwrap() as usize,
+                            *x.next().unwrap() as usize,
+                        );
+                    })
+                    .collect();
+
+                let normals = vec![obj_exporter::Vertex {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 1.0,
+                }];
+
+                let set = obj_exporter::ObjSet {
+                    material_library: None,
+                    objects: vec![obj_exporter::Object {
+                        name: "My_mesh".to_owned(),
+                        vertices: obj_vertices,
+                        tex_vertices: vec![],
+                        normals,
+                        geometry: vec![obj_exporter::Geometry {
+                            material_name: None,
+                            shapes: obj_inds_vecs
+                                .into_iter()
+                                .map(|(x, y, z)| obj_exporter::Shape {
+                                    primitive: obj_exporter::Primitive::Triangle(
+                                        (x, Some(x), Some(0)),
+                                        (y, Some(y), Some(0)),
+                                        (z, Some(z), Some(0)),
+                                    ),
+                                    groups: vec![],
+                                    smoothing_groups: vec![],
+                                })
+                                .collect(),
+                        }],
+                    }],
+                };
+
+                obj_exporter::export_to_file(&set, path).unwrap();
+            }
+            _ => {}
         }
     }
 }

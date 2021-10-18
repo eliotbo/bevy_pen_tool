@@ -260,7 +260,6 @@ pub fn toggle_ui_button(
         for (mut material_handle, mut on_off_mat, ui_button_queried) in query.iter_mut() {
             // toggle sprite
             if ui_button == ui_button_queried {
-                use std::ops::DerefMut;
                 let other_material = on_off_mat.material.clone();
                 let current_material = material_handle.clone();
                 let mat = material_handle.deref_mut();

@@ -22,7 +22,10 @@ pub fn recompute_lut(
     maps: ResMut<Maps>,
     time: Res<Time>,
 ) {
-    if action_event_reader.iter().any(|x| x == &Action::ComputeLut) {
+    if action_event_reader
+        .iter()
+        .any(|x| x == &Action::ComputeLut || x == &Action::Save)
+    {
         for bezier_handle in query.iter_mut() {
             let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap();
 
@@ -662,47 +665,13 @@ pub fn hide_control_points(
 //     }
 // }
 
-use std::path::PathBuf;
-fn open_file_dialog(save_name: &str, folder: &str, extension: &str) -> Option<PathBuf> {
-    let mut k = 0;
-
-    let mut default_path = std::env::current_dir().unwrap();
-    default_path.push("saved");
-    default_path.push(folder.to_string());
-    let mut default_name: String;
-
-    loop {
-        default_name = save_name.to_string();
-        default_name.push_str(&(k.to_string()));
-        default_name.push_str(extension);
-
-        default_path.push(&default_name);
-
-        if !default_path.exists() {
-            break;
-        }
-        default_path.pop();
-
-        k += 1;
-    }
-
-    let res = rfd::FileDialog::new()
-        .set_file_name(&default_name)
-        .set_directory(&default_path)
-        .save_file();
-    println!("The user choose: {:#?}", &res);
-
-    return res;
-}
-
 pub fn save(
-    query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     group_query: Query<&Handle<Group>, With<GroupBoxQuad>>,
     mesh_query: Query<(&Handle<Mesh>, &GroupMesh)>,
+    road_mesh_query: Query<(&Handle<Mesh>, &RoadMesh)>,
     mut groups: ResMut<Assets<Group>>,
     meshes: Res<Assets<Mesh>>,
-
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
 ) {
@@ -760,82 +729,19 @@ pub fn save(
         //
 
         ////////////// start. Save mesh in obj format
-        if let Some((mesh_handle, GroupMesh(color))) = mesh_query.iter().next() {
-            let group_dialog_result = open_file_dialog("my_mesh", "meshes", ".obj");
-            if let Some(group_path) = group_dialog_result {
-                let mesh = meshes.get(mesh_handle).unwrap();
-                let vertex_attributes = mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap();
-                let indices_u32 = mesh.indices().unwrap();
-
-                match (vertex_attributes, indices_u32) {
-                    (
-                        bevy::render::mesh::VertexAttributeValues::Float32x3(vertices),
-                        bevy::render::mesh::Indices::U32(indices),
-                    ) => {
-                        let obj_vertices = vertices
-                            .clone()
-                            .iter()
-                            .map(|arr| obj_exporter::Vertex {
-                                x: arr[0] as f64,
-                                y: arr[1] as f64,
-                                z: arr[2] as f64,
-                            })
-                            .collect::<Vec<obj_exporter::Vertex>>();
-
-                        // let mut obj_inds_vecs: Vec<Vec<u32>> =
-                        // indices.chunks(3).map(|x| x.to_vec()).collect();
-                        let obj_inds_vecs: Vec<(usize, usize, usize)> = indices
-                            .chunks_exact(3)
-                            .map(|z| {
-                                let mut x = z.iter();
-                                return (
-                                    *x.next().unwrap() as usize,
-                                    *x.next().unwrap() as usize,
-                                    *x.next().unwrap() as usize,
-                                );
-                            })
-                            .collect();
-
-                        let normals = vec![obj_exporter::Vertex {
-                            x: 0.0,
-                            y: 0.0,
-                            z: 1.0,
-                        }];
-
-                        let set = obj_exporter::ObjSet {
-                            material_library: None,
-                            objects: vec![obj_exporter::Object {
-                                name: "My_mesh".to_owned(),
-                                vertices: obj_vertices,
-                                tex_vertices: vec![],
-                                normals,
-                                geometry: vec![obj_exporter::Geometry {
-                                    material_name: None,
-                                    shapes: obj_inds_vecs
-                                        .into_iter()
-                                        .map(|(x, y, z)| obj_exporter::Shape {
-                                            primitive: obj_exporter::Primitive::Triangle(
-                                                (x, Some(x), Some(0)),
-                                                (y, Some(y), Some(0)),
-                                                (z, Some(z), Some(0)),
-                                            ),
-                                            groups: vec![],
-                                            smoothing_groups: vec![],
-                                        })
-                                        .collect(),
-                                }],
-                            }],
-                        };
-
-                        obj_exporter::export_to_file(&set, group_path).unwrap();
-                    }
-                    _ => {}
-                }
-            }
+        if let Some((mesh_handle, GroupMesh(_color))) = mesh_query.iter().next() {
+            let mesh_dialog_result = open_file_dialog("my_mesh", "meshes", ".obj");
+            save_mesh(mesh_handle, &meshes, mesh_dialog_result);
 
             ////////////// end. Save mesh in obj format
+        }
 
-            println!("{:?}", "saved");
+        ////////////// start. Save road in obj format
+        if let Some((road_mesh_handle, RoadMesh(_color))) = road_mesh_query.iter().next() {
+            let road_dialog_result = open_file_dialog("my_road", "meshes", ".obj");
+            save_mesh(road_mesh_handle, &meshes, road_dialog_result);
+
+            ////////////// end. Save road in obj format
         }
     }
 }
@@ -865,7 +771,8 @@ pub fn load(
             .set_directory(&default_path)
             .pick_files();
 
-        let mut path = std::path::PathBuf::new();
+        // cancel loading if user cancelled the file dialog
+        let path: std::path::PathBuf;
         if let Some(chosen_path) = res.clone() {
             let path_some = chosen_path.get(0);
             if let Some(path_local) = path_some {
@@ -876,8 +783,6 @@ pub fn load(
         } else {
             return ();
         }
-
-        // let path = "curve_groups.txt";
 
         let clearcolor = clearcolor_struct.0;
 
@@ -928,15 +833,13 @@ pub fn load(
         }
         selection.selected = group.clone();
 
-        // event_writer.send(group);
-
         // to create a group: select all the curves programmatically, and send a UiButton::Group event
         loaded_event_writer.send(Loaded);
         println!("{:?}", "loaded groups");
     }
 }
 
-pub fn latch2(
+pub fn latchy(
     cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: QuerySet<(

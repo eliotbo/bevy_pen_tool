@@ -1,6 +1,6 @@
 use bevy::{prelude::*, render::camera::OrthographicProjection};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::io::Read;
 
 //
@@ -12,8 +12,8 @@ use std::io::Read;
 //
 //
 
-// look-up table
-#[derive(Serialize, Deserialize)]
+// data structure for the look-up table that will be deserialized (read from disk)
+#[derive(Deserialize)]
 struct Lut {
     path_length: f32,
     lut: Vec<Vec2>,
