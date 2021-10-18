@@ -1,8 +1,7 @@
 # bevy_pen_tool
-A Bevy Engine plugin for making 2D paths and smooth animations with Bezier curves
+A Bevy Engine plugin for making 2D paths, smooth animations, meshes and roads with Bezier curves.
 
-TODO:
-- Mesh-making functionality for building 2D shapes and roads
+
 
 ## Controls
 
@@ -20,32 +19,37 @@ TODO:
 | ![hidectrl](https://user-images.githubusercontent.com/6177048/136477042-37ec4d17-4c6c-4959-a7b8-6bde042b5401.png) | Left Control + Left Shift + H | Hide the control points |
 | ![compute_lut](https://user-images.githubusercontent.com/6177048/136477061-96c02668-e44f-4e54-a92b-3f7ccd98dc6f.png) | Left Shift + T | Compute look-up table (linearizes animations) |
 | ![toggle_sound](https://user-images.githubusercontent.com/6177048/133933748-4769bd96-f6c6-4863-9de5-e283f614b6f4.png) | None | Toggle sound |
+| ![bin](https://user-images.githubusercontent.com/6177048/137649706-ddac2065-3992-4f8d-b9fe-6bbf7e3cb351.png) | Select curves or group + Delete | Delete curves or group |
 
+## Setup
+Have a look at main.rs to find out how to setup the plugin.
 
 ## How to
+The order of actions should be the following:
+1. Spawn curves
+2. Latch them together
+3. Group the latched curves (cannot be ungrouped)
+4. Move anchors and control points to desired position
+5. Compute the look-up table
+6. Save
 
-1. run main.rs
-2. explore and have fun
-3. spawn multiple curves
-4. compute the look-up tables for each curve 
-5. latch the curves together if they are not already latched at spawn
-6. move the anchors and control points to a desired position
-    (there is a "hide control points" button for when they overlap with anchors)
-7. select the latched curves by clicking and dragging a selection box
-8. group the curves and repeat step 4
-9. save the look-up table 
-10. use the look-up table in your app (see the simple_animation.rs example)
+A user can save and load the data structure for a group of Bezier curves -- called Group in the code -- in JSON format. The default directory for saving groups is "./saved/groups/", and the file extension is a custom one: ".group". Meshes can be saved in well-known ".obj" format, and their default save directory is "./saved/meshes". The one save button prompts a file dialog window for each data structure that can be saved in the current session.
+
 
 
 ## Notes
-
-- bevy_pen_tool does not work with a Perspective Camera (only Orthographic)
+bevy_pen_tool, in its current form,
+- attemps to follow Bevy's latest release
+- does not work with a Perspective Camera (only Orthographic)
 - cannot save multiple groups at once, only a single one
-- currently, the plugin only works with bevy version 0.5, rev="615d43b", but this will change rather soon
-- pressing load will delete everything on the canvas before loading
-- the gif below is a bit out of date: selection is now done by dragging the edge of a box, the look-up tables are computed upon pressing Left Shift + T or the corresponding button, and there is no undo/redo functionality at the moment
+- deletes everything on the canvas before loading a group
 
 
+
+## TODO
+- saving multiple groups
+- ability to move whole group
+- no guarantees, but maybe a 3D version
 
 
 
