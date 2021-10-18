@@ -55,6 +55,7 @@ There are two important parameters to tweak and they are both located in a Resou
 2. road_width: the width of the road meshes.
 Refer to main.rs to see how to modify these parameters.
 
+When the control points, shown as arrow tips, are hidden, the plugin places them almost exactly on top of the anchors. In this mode of operation, one can draw an arbitrary polygon and generate the corresponding mesh.
 
 
 ## Notes
