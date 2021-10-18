@@ -3,16 +3,7 @@ A Bevy Engine plugin for making 2D paths, smooth animations, meshes and roads wi
 
 
 
-
-
-
-
-
-
-
-
-
-
+![bevy_pen_tool](https://user-images.githubusercontent.com/6177048/137658210-387c304a-469c-4f65-a4a8-4612f39656cb.gif)
 
 
 ## Controls
@@ -84,5 +75,6 @@ bevy_pen_tool, in its current form,
 
 
 
-![bevy_pen_tool](https://user-images.githubusercontent.com/6177048/133936336-c9bc8a18-a54e-4fc6-a068-bf765d833d49.gif)
+
+
 
