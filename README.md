@@ -22,6 +22,7 @@ A Bevy Engine plugin for making 2D paths, smooth animations, meshes and roads wi
 | ![scale_up](https://user-images.githubusercontent.com/6177048/137652103-02a4b95b-61de-491a-92da-3ef74cf97498.png) | Left Control + Mousescroll up | Scale UI and curves up |
 | ![scale_down](https://user-images.githubusercontent.com/6177048/137652111-6d3e13aa-bca9-40d5-9a06-222cad9c23bf.png) | Left Control + Mousescroll down | Scale UI and curves down |
 | ![spawn_curve](https://user-images.githubusercontent.com/6177048/137652140-605744c5-e9a0-4c8d-ad8a-1c47dcb7db7c.png) | Left Shift + Click | Spawn curve |
+| ![select](https://user-images.githubusercontent.com/6177048/137652978-98319770-9cb2-43c2-af6f-3fbd05048626.png)  | Left Crtl + Drag | Select curves |
 | ![group](https://user-images.githubusercontent.com/6177048/137652145-adb487b7-c45d-4aa5-8a20-ddd45829dc2d.png) | Left Control + G | Group selected curves |
 | ![latch](https://user-images.githubusercontent.com/6177048/137652149-a604ed8d-83bb-4d2d-973c-05658c12ae6b.png) | Left Shift + Left Control + Drag |   Latch a curve to another curve by dragging a free anchor close to another free anchor |
 | ![unlatch](https://user-images.githubusercontent.com/6177048/137652201-3a6880c3-c149-4ff1-bc27-b8132bf52fc2.png) | Space + Drag | Unlatch anchors that were latched together. |
@@ -35,6 +36,7 @@ A Bevy Engine plugin for making 2D paths, smooth animations, meshes and roads wi
 | ![road](https://user-images.githubusercontent.com/6177048/137652369-0bd832a9-9c03-42a3-9dc6-b840f45c86dd.png) | None | Spawn road on curve group |
 | ![mesh](https://user-images.githubusercontent.com/6177048/137652366-ffc53243-0df9-4e84-a0ab-3985c3c59302.png) | None | Spawn mesh inside curve group |
 | ![heli](https://user-images.githubusercontent.com/6177048/137652364-67eedf2b-8283-43b0-a2e6-e80e97f5cb89.png) | None | Spawn animated helicopter on curve group |
+
 
 
 
