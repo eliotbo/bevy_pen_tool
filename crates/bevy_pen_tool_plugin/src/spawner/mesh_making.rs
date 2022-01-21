@@ -1,18 +1,9 @@
 use crate::inputs::Action;
 use crate::util::*;
 
-use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
-use bevy::render::{
-    mesh::Indices,
-    pipeline::PrimitiveTopology,
-    renderer::RenderResources,
-    //
-    // // in case of shader use in the future
-    // pipeline::{RenderPipeline, PipelineDescriptor},
-    // render_graph::{base, AssetRenderResourcesNode, RenderGraph},
-    // shader::{ShaderStage, ShaderStages},
-};
+use bevy::render::mesh::Indices;
+use bevy::{pbr::StandardMaterial, prelude::*, render::render_resource::PrimitiveTopology};
 
 use lyon::tessellation::geometry_builder::simple_builder;
 use lyon::tessellation::math::{point, Point};
@@ -106,6 +97,7 @@ pub fn make_road(
         }
 
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
 
         mesh.set_attribute("Vertex_Color", colors);
@@ -118,7 +110,8 @@ pub fn make_road(
 
         use std::{thread, time};
         // let texture_handle: Handle<Texture> = asset_server.load("textures/road_texture.png");
-        let texture_handle: Handle<Texture> = asset_server.load("textures/single_lane_road.png");
+        let texture_handle: Handle<Image> = asset_server.load("textures/single_lane_road.png");
+
         let hundred_millis = time::Duration::from_millis(100);
         thread::sleep(hundred_millis);
 
@@ -311,11 +304,11 @@ pub fn make_mesh(
 
 // struct MyPipeline(Handle<PipelineDescriptor>);
 
-#[derive(Component, RenderResources, Default, TypeUuid)]
-#[uuid = "93fb26fc-6c05-489b-9029-601edf703b6b"]
-pub struct MyArrayTexture {
-    pub texture: Handle<Texture>,
-}
+// #[derive(Component, RenderResources, Default, TypeUuid)]
+// #[uuid = "93fb26fc-6c05-489b-9029-601edf703b6b"]
+// pub struct MyArrayTexture {
+//     pub texture: Handle<Texture>,
+// }
 
 // const VERTEX_SHADER: &str = r"
 // #version 450

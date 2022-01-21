@@ -1,8 +1,8 @@
 use crate::inputs::Cursor;
 use crate::util::{
-    AnchorEdge, Bezier, BoundingBoxQuad, ControlPointQuad, EndpointQuad, FollowBezierAnimation,
-    Globals, GrandParent, Group, GroupMiddleQuad, MiddlePointQuad, MyShader, TurnRoundAnimation,
-    UiAction, UiBoard,
+    AnchorEdge, Bezier, BezierMat, BoundingBoxQuad, ControlPointQuad, EndpointQuad,
+    FollowBezierAnimation, Globals, GrandParent, Group, GroupMiddleQuad, MiddlePointQuad,
+    SelectionMat, TurnRoundAnimation, UiAction, UiBoard,
 };
 
 use bevy::prelude::*;
@@ -25,9 +25,9 @@ pub fn move_ui(
 pub fn move_middle_quads(
     time: Res<Time>,
     bezier_curves: ResMut<Assets<Bezier>>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mut my_shader_params: ResMut<Assets<BezierMat>>,
     mut query: Query<
-        (&mut GlobalTransform, &Handle<Bezier>, &Handle<MyShader>),
+        (&mut GlobalTransform, &Handle<Bezier>, &Handle<BezierMat>),
         With<MiddlePointQuad>,
     >,
     globals: ResMut<Globals>,
@@ -75,11 +75,11 @@ pub fn move_middle_quads(
 pub fn move_group_middle_quads(
     time: Res<Time>,
     bezier_curves: ResMut<Assets<Bezier>>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mut my_shader_params: ResMut<Assets<BezierMat>>,
     mut query: Query<(
         &mut GlobalTransform,
         &Handle<Group>,
-        &Handle<MyShader>,
+        &Handle<BezierMat>,
         &GroupMiddleQuad,
     )>,
     // globals: ResMut<Globals>,
@@ -122,11 +122,11 @@ pub fn move_bb_quads(
         &mut GlobalTransform,
         &Handle<Bezier>,
         &Handle<Mesh>,
-        &Handle<MyShader>,
+        &Handle<SelectionMat>,
         &BoundingBoxQuad,
     )>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mut my_shader_params: ResMut<Assets<SelectionMat>>,
 ) {
     for (mut transform, bezier_handle, mesh_handle, shader_params_handle, _bbquad) in
         query.iter_mut()
@@ -247,7 +247,7 @@ pub fn turn_round_animation(mut query: Query<(&mut Transform, &TurnRoundAnimatio
 pub fn follow_bezier_group(
     mut query: Query<(&mut Transform, &FollowBezierAnimation)>,
     mut visible_query: Query<
-        &mut Visible,
+        &mut Visibility,
         Or<(With<FollowBezierAnimation>, With<TurnRoundAnimation>)>,
     >,
     groups: Res<Assets<Group>>,

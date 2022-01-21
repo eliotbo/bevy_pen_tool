@@ -135,7 +135,7 @@ pub fn begin_move_on_mouseclick(
 //     cursor: ResMut<Cursor>,
 //     bezier_curves: ResMut<Assets<Bezier>>,
 //     groups: ResMut<Assets<Group>>,
-//     mut visible_selection_query: Query<&mut Visible, With<SelectedBoxQuad>>,
+//     mut visible_selection_query: Query<&mut Visibility, With<SelectedBoxQuad>>,
 //     group_query: Query<&Handle<Group>>,
 //     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
 //     mut action_event_reader: EventReader<Action>,
@@ -193,7 +193,7 @@ pub fn selection_box_init(
     bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
-    mut visible_selection_query: Query<&mut Visible, With<SelectingBoxQuad>>,
+    mut visible_selection_query: Query<&mut Visibility, With<SelectingBoxQuad>>,
 ) {
     if action_event_reader
         .iter()
@@ -225,8 +225,8 @@ pub fn selection_final(
     bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
     mut query_set: QuerySet<(
-        QueryState<&mut Visible, With<SelectingBoxQuad>>,
-        QueryState<&mut Visible, With<SelectedBoxQuad>>,
+        QueryState<&mut Visibility, With<SelectingBoxQuad>>,
+        QueryState<&mut Visibility, With<SelectedBoxQuad>>,
     )>,
     group_query: Query<&Handle<Group>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
@@ -299,7 +299,7 @@ pub fn selection_final(
 pub fn unselect(
     mut selection: ResMut<Selection>,
     mut visible_selection_query: Query<
-        &mut Visible,
+        &mut Visibility,
         Or<(With<SelectedBoxQuad>, With<GroupBoxQuad>)>,
     >,
     mut action_event_reader: EventReader<Action>,
@@ -404,6 +404,139 @@ pub fn groupy(
     }
 }
 
+pub fn latchy(
+    cursor: ResMut<Cursor>,
+    mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut query: QuerySet<(
+        QueryState<(&Handle<Bezier>, &BoundingBoxQuad)>,
+        QueryState<(&Handle<Bezier>, &BoundingBoxQuad)>,
+    )>,
+    globals: ResMut<Globals>,
+    mut action_event_reader: EventReader<Action>,
+) {
+    if action_event_reader.iter().any(|x| x == &Action::Latch) {
+        let latching_distance = 5.0;
+
+        let mut potential_mover: Option<(Vec2, u128, AnchorEdge, Handle<Bezier>)> = None;
+        let mut potential_partner: Option<(
+            u128,
+            AnchorEdge,
+            AnchorEdge,
+            Handle<Bezier>,
+            Handle<Bezier>,
+        )> = None;
+
+        // find moving quad and store its parameters
+
+        // TODO: insert a Moving component to a moving anchor
+        for (bezier_handle, _bb) in query.q0().iter() {
+            let mut bezier = bezier_curves.get(bezier_handle).unwrap().clone();
+            bezier.potential_latch = None;
+            if bezier.edge_is_moving() {
+                // a latched point does not latch to an additional point
+                let moving_anchor = bezier.get_mover_edge();
+                if bezier.quad_is_latched(moving_anchor) {
+                    return ();
+                }
+
+                let mover_pos = cursor.position;
+                potential_mover = Some((
+                    mover_pos,
+                    bezier.id,
+                    bezier.get_mover_edge(),
+                    bezier_handle.clone(),
+                ));
+
+                break;
+            }
+        }
+
+        // find quad within latching_distance. Upon success, setup a latch and store the
+        // paramters of the latchee (partner)
+        if let Some((pos, id, mover_edge, mover_handle)) = potential_mover {
+            if let Some((_dist, anchor_edge, partner_handle)) = get_close_still_anchor(
+                latching_distance * globals.scale,
+                pos,
+                &bezier_curves,
+                &query.q0(),
+            ) {
+                let partner_bezier = bezier_curves.get_mut(partner_handle.clone()).unwrap();
+
+                // if the potential partner is free, continue
+                if partner_bezier.quad_is_latched(anchor_edge) {
+                    return;
+                }
+
+                potential_partner = Some((
+                    partner_bezier.id,
+                    mover_edge,
+                    anchor_edge,
+                    mover_handle,
+                    partner_handle.clone(),
+                ));
+
+                let partner_latch_data = LatchData {
+                    latched_to_id: id,
+                    self_edge: anchor_edge,
+                    partners_edge: mover_edge,
+                };
+
+                partner_bezier.potential_latch = Some(partner_latch_data);
+
+                // event_writer.send(OfficialLatch(partner_latch_data, partner_handle.clone()));
+            }
+        }
+
+        // setup the latcher if a partner has been found
+        if let Some((partner_id, mover_anchor, pa_edge, mover_handle, partner_handle)) =
+            potential_partner
+        {
+            let partner_bezier = bezier_curves.get(partner_handle).unwrap().clone();
+            let bezier = bezier_curves.get_mut(mover_handle.clone()).unwrap();
+
+            let latch_anchor_position = partner_bezier.get_position(pa_edge.to_anchor());
+            let latch_control_position = partner_bezier.get_opposite_control(pa_edge);
+
+            let mover_latch_data = LatchData {
+                latched_to_id: partner_id,
+                self_edge: mover_anchor,
+                partners_edge: pa_edge,
+            };
+
+            bezier.potential_latch = Some(mover_latch_data.clone());
+
+            // set the position of the latched moving quad and its control point
+            if mover_anchor == AnchorEdge::Start {
+                bezier.positions.start = latch_anchor_position;
+                bezier.positions.control_start = latch_control_position;
+            } else if mover_anchor == AnchorEdge::End {
+                bezier.positions.end = latch_anchor_position;
+                bezier.positions.control_end = latch_control_position;
+            }
+        }
+    }
+}
+
+pub fn officiate_latch_partnership(
+    mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut latch_event_reader: EventReader<OfficialLatch>,
+    globals: ResMut<Globals>,
+    audio: Res<Audio>,
+    maps: ResMut<Maps>,
+) {
+    for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
+        let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
+        bezier.set_latch(latch.clone());
+        // bezier.has_just_latched = true;
+
+        if globals.sound_on {
+            if let Some(sound) = maps.sounds.get("latch") {
+                audio.play(sound.clone());
+            }
+        }
+    }
+}
+
 // pub fn ungroup(
 //     mut commands: Commands,
 //     mut groups: ResMut<Assets<Group>>,
@@ -439,7 +572,7 @@ pub fn delete(
     maps: ResMut<Maps>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
-    mut visible_query: Query<&mut Visible, With<SelectedBoxQuad>>,
+    mut visible_query: Query<&mut Visibility, With<SelectedBoxQuad>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
     query2: Query<(Entity, &Handle<Group>), With<GroupBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
@@ -608,7 +741,7 @@ pub fn delete(
 
 pub fn hide_anchors(
     mut globals: ResMut<Globals>,
-    mut query: Query<&mut Visible, Or<(With<ControlPointQuad>, With<EndpointQuad>)>>,
+    mut query: Query<&mut Visibility, Or<(With<ControlPointQuad>, With<EndpointQuad>)>>,
     mut action_event_reader: EventReader<Action>,
 ) {
     // if let Some(Action::HideAnchors) = action_event_reader.iter().next() {
@@ -625,7 +758,7 @@ pub fn hide_anchors(
 
 pub fn hide_control_points(
     mut globals: ResMut<Globals>,
-    mut query_control: Query<&mut Visible, With<ControlPointQuad>>,
+    mut query_control: Query<&mut Visibility, With<ControlPointQuad>>,
     mut action_event_reader: EventReader<Action>,
 ) {
     if action_event_reader
@@ -638,32 +771,6 @@ pub fn hide_control_points(
         }
     }
 }
-
-// pub fn toggle_sound(
-//     // asset_server: Res<AssetServer>,
-//     mut globals: ResMut<Globals>,
-//     // mut materials: ResMut<Assets<ColorMaterial>>,
-//     mut query: Query<(&mut Handle<ColorMaterial>, &mut OnOffMaterial)>,
-//     mut event_reader: EventReader<UiButton>,
-// ) {
-//     for ui_button in event_reader.iter() {
-//         //
-//         if ui_button == &UiButton::Sound {
-//             //
-//             globals.sound_on = !globals.sound_on;
-//             //
-//             for (mut material_handle, mut on_off_mat) in query.iter_mut() {
-//                 // toggle sprite
-//                 use std::ops::DerefMut;
-//                 let other_material = on_off_mat.material.clone();
-//                 let current_material = material_handle.clone();
-//                 let mat = material_handle.deref_mut();
-//                 *mat = other_material.clone();
-//                 on_off_mat.material = current_material;
-//             }
-//         }
-//     }
-// }
 
 pub fn save(
     mut bezier_curves: ResMut<Assets<Bezier>>,
@@ -753,13 +860,17 @@ pub fn load(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mut my_shader_params: ResMut<Assets<BezierMat>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
     mut selection: ResMut<Selection>,
     mut maps: ResMut<Maps>,
     mut action_event_reader: EventReader<Action>,
     mut loaded_event_writer: EventWriter<Loaded>,
+    mut selection_params: ResMut<Assets<SelectionMat>>,
+    mut controls_params: ResMut<Assets<BezierControlsMat>>,
+    mut ends_params: ResMut<Assets<BezierEndsMat>>,
+    mut mid_params: ResMut<Assets<BezierMidMat>>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Load) {
         let mut default_path = std::env::current_dir().unwrap();
@@ -820,7 +931,12 @@ pub fn load(
                     &mut commands,
                     &mut meshes,
                     // &mut pipelines,
-                    &mut my_shader_params,
+
+                    // &mut my_shader_params,
+                    &mut selection_params,
+                    &mut controls_params,
+                    &mut ends_params,
+                    &mut mid_params,
                     clearcolor,
                     &mut globals,
                     &mut maps,
@@ -839,144 +955,11 @@ pub fn load(
     }
 }
 
-pub fn latchy(
-    cursor: ResMut<Cursor>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: QuerySet<(
-        QueryState<(&Handle<Bezier>, &BoundingBoxQuad)>,
-        QueryState<(&Handle<Bezier>, &BoundingBoxQuad)>,
-    )>,
-    globals: ResMut<Globals>,
-    mut action_event_reader: EventReader<Action>,
-) {
-    if action_event_reader.iter().any(|x| x == &Action::Latch) {
-        let latching_distance = 5.0;
-
-        let mut potential_mover: Option<(Vec2, u128, AnchorEdge, Handle<Bezier>)> = None;
-        let mut potential_partner: Option<(
-            u128,
-            AnchorEdge,
-            AnchorEdge,
-            Handle<Bezier>,
-            Handle<Bezier>,
-        )> = None;
-
-        // find moving quad and store its parameters
-
-        // TODO: insert a Moving component to a moving anchor
-        for (bezier_handle, _bb) in query.q0().iter() {
-            let mut bezier = bezier_curves.get(bezier_handle).unwrap().clone();
-            bezier.potential_latch = None;
-            if bezier.edge_is_moving() {
-                // a latched point does not latch to an additional point
-                let moving_anchor = bezier.get_mover_edge();
-                if bezier.quad_is_latched(moving_anchor) {
-                    return ();
-                }
-
-                let mover_pos = cursor.position;
-                potential_mover = Some((
-                    mover_pos,
-                    bezier.id,
-                    bezier.get_mover_edge(),
-                    bezier_handle.clone(),
-                ));
-
-                break;
-            }
-        }
-
-        // find quad within latching_distance. Upon success, setup a latch and store the
-        // paramters of the latchee (partner)
-        if let Some((pos, id, mover_edge, mover_handle)) = potential_mover {
-            if let Some((_dist, anchor_edge, partner_handle)) = get_close_still_anchor(
-                latching_distance * globals.scale,
-                pos,
-                &bezier_curves,
-                &query.q0(),
-            ) {
-                let partner_bezier = bezier_curves.get_mut(partner_handle.clone()).unwrap();
-
-                // if the potential partner is free, continue
-                if partner_bezier.quad_is_latched(anchor_edge) {
-                    return;
-                }
-
-                potential_partner = Some((
-                    partner_bezier.id,
-                    mover_edge,
-                    anchor_edge,
-                    mover_handle,
-                    partner_handle.clone(),
-                ));
-
-                let partner_latch_data = LatchData {
-                    latched_to_id: id,
-                    self_edge: anchor_edge,
-                    partners_edge: mover_edge,
-                };
-
-                partner_bezier.potential_latch = Some(partner_latch_data);
-
-                // event_writer.send(OfficialLatch(partner_latch_data, partner_handle.clone()));
-            }
-        }
-
-        // setup the latcher if a partner has been found
-        if let Some((partner_id, mover_anchor, pa_edge, mover_handle, partner_handle)) =
-            potential_partner
-        {
-            let partner_bezier = bezier_curves.get(partner_handle).unwrap().clone();
-            let bezier = bezier_curves.get_mut(mover_handle.clone()).unwrap();
-
-            let latch_anchor_position = partner_bezier.get_position(pa_edge.to_anchor());
-            let latch_control_position = partner_bezier.get_opposite_control(pa_edge);
-
-            let mover_latch_data = LatchData {
-                latched_to_id: partner_id,
-                self_edge: mover_anchor,
-                partners_edge: pa_edge,
-            };
-
-            bezier.potential_latch = Some(mover_latch_data.clone());
-
-            // set the position of the latched moving quad and its control point
-            if mover_anchor == AnchorEdge::Start {
-                bezier.positions.start = latch_anchor_position;
-                bezier.positions.control_start = latch_control_position;
-            } else if mover_anchor == AnchorEdge::End {
-                bezier.positions.end = latch_anchor_position;
-                bezier.positions.control_end = latch_control_position;
-            }
-        }
-    }
-}
-
-pub fn officiate_latch_partnership(
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut latch_event_reader: EventReader<OfficialLatch>,
-    globals: ResMut<Globals>,
-    audio: Res<Audio>,
-    maps: ResMut<Maps>,
-) {
-    for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
-        let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
-        bezier.set_latch(latch.clone());
-        // bezier.has_just_latched = true;
-
-        if globals.sound_on {
-            if let Some(sound) = maps.sounds.get("latch") {
-                audio.play(sound.clone());
-            }
-        }
-    }
-}
-
 // makes UI and quads bigger or smaller using Ctrl + mousewheel
 pub fn rescale(
     mut grandparent_query: Query<&mut Transform, With<GrandParent>>,
-    shader_param_query: Query<&Handle<MyShader>>,
-    mut my_shaders: ResMut<Assets<MyShader>>,
+    shader_param_query: Query<&Handle<UiMat>>,
+    mut my_shaders: ResMut<Assets<UiMat>>,
     mut globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
 ) {

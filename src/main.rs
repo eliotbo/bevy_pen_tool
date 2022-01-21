@@ -17,6 +17,13 @@ use bevy::{prelude::*, render::camera::OrthographicProjection};
 
 fn main() {
     App::new()
+        .insert_resource(WindowDescriptor {
+            title: "I am a window!".to_string(),
+            width: 1200.,
+            height: 800.,
+            vsync: true,
+            ..Default::default()
+        })
         .add_plugins(DefaultPlugins)
         .add_plugin(CamPlugin)
         .add_startup_system(camera_setup)

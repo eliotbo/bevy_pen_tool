@@ -2,7 +2,7 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
     get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad,
-    ColorButton, Globals, GrandParent, MyShader, OfficialLatch, UiAction, UiBoard, UserState,
+    ButtonMat, ColorButton, Globals, GrandParent, OfficialLatch, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -214,7 +214,7 @@ pub fn record_mouse_events_system(
 
 pub enum MouseClickEvent {
     OnUiBoard,
-    OnColorButton((Color, Handle<MyShader>)),
+    OnColorButton((Color, Handle<ButtonMat>)),
     OnUiButton(UiButton),
     OnAnchor((Anchor, Handle<Bezier>, bool)), // the bool is for unlatching
     OnAnchorEdge((AnchorEdge, Handle<Bezier>)),
@@ -225,17 +225,17 @@ pub enum MouseClickEvent {
 pub fn check_mouseclick_on_objects(
     cursor: ResMut<Cursor>,
     keyboard_input: Res<Input<KeyCode>>,
-    my_shader_params: ResMut<Assets<MyShader>>,
+    my_shader_params: ResMut<Assets<ButtonMat>>,
     globals: ResMut<Globals>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut button_query: Query<(
         &ButtonState,
         &GlobalTransform,
-        &Handle<MyShader>,
+        &Handle<ButtonMat>,
         &mut ButtonInteraction,
         &UiButton,
     )>,
-    color_button_query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
+    color_button_query: Query<(&GlobalTransform, &Handle<ButtonMat>, &ColorButton)>,
     mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
     bezier_query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
     bezier_curves: ResMut<Assets<Bezier>>,
@@ -300,7 +300,7 @@ pub fn check_mouseclick_on_objects(
                 shader_params.size * 1.15 * cam_scale,
             ) {
                 mouse_event_writer.send(MouseClickEvent::OnColorButton((
-                    shader_params.color.clone(),
+                    shader_params.color.clone().into(),
                     shader_param_handle.clone(),
                 )));
                 return ();
@@ -440,8 +440,8 @@ pub fn check_mouseclick_on_objects(
 }
 
 pub fn pick_color(
-    mut my_shader_params: ResMut<Assets<MyShader>>,
-    query: Query<(&GlobalTransform, &Handle<MyShader>, &ColorButton)>,
+    mut my_shader_params: ResMut<Assets<ButtonMat>>,
+    query: Query<(&GlobalTransform, &Handle<ButtonMat>, &ColorButton)>,
     mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
     mut globals: ResMut<Globals>,
     mut mouse_event_reader: EventReader<MouseClickEvent>,

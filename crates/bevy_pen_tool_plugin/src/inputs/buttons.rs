@@ -1,5 +1,5 @@
 use crate::inputs::Cursor;
-use crate::util::{Globals, MyShader, OnOffMaterial, UiAction, UiBoard};
+use crate::util::{ButtonMat, Globals, OnOffMaterial, UiAction, UiBoard};
 
 use bevy::prelude::*;
 
@@ -46,11 +46,11 @@ pub enum UiButton {
 
 pub fn check_mouse_on_ui(
     cursor: ResMut<Cursor>,
-    my_shader_params: ResMut<Assets<MyShader>>,
+    my_shader_params: ResMut<Assets<ButtonMat>>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut query: Query<(
         &GlobalTransform,
-        &Handle<MyShader>,
+        &Handle<ButtonMat>,
         &mut ButtonInteraction,
         &UiButton,
     )>,
@@ -99,12 +99,12 @@ pub fn check_mouse_on_ui(
 }
 
 pub fn button_system(
-    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mut my_shader_params: ResMut<Assets<ButtonMat>>,
     keyboard_input: Res<Input<KeyCode>>,
     mut interaction_query: Query<
         (
             &ButtonInteraction,
-            &Handle<MyShader>,
+            &Handle<ButtonMat>,
             &UiButton,
             Option<&mut ButtonState>,
         ),
@@ -240,7 +240,7 @@ pub fn toggle_ui_button(
     // asset_server: Res<AssetServer>,
     mut globals: ResMut<Globals>,
     // mut materials: ResMut<Assets<ColorMaterial>>,
-    mut query: Query<(&mut Handle<ColorMaterial>, &mut OnOffMaterial, &UiButton)>,
+    mut query: Query<(&mut Handle<Image>, &mut OnOffMaterial, &UiButton)>,
     mut event_reader: EventReader<UiButton>,
 ) {
     for ui_button in event_reader.iter() {

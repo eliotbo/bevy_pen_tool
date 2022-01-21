@@ -1,12 +1,16 @@
 use crate::inputs::*;
+use crate::util::materials::*;
 
 use bevy::{
+    // ecs::system::{lifetimeless::SRes, SystemParamItem},
     prelude::*,
     reflect::TypeUuid,
-    render::{
-        mesh::VertexAttributeValues::Float32x3, pipeline::PipelineDescriptor,
-        renderer::RenderResources,
+    render::render_resource::{
+        std140::{AsStd140, Std140},
+        *,
     },
+    sprite::Mesh2dHandle, // sprite::Material2d,
+                          // sprite::{Material2dPipeline, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle}
 };
 
 use serde::{Deserialize, Serialize};
@@ -78,7 +82,7 @@ pub struct Icon;
 
 #[derive(Component)]
 pub struct OnOffMaterial {
-    pub material: Handle<ColorMaterial>,
+    pub material: Handle<Image>,
 }
 
 #[derive(Component)]
@@ -192,7 +196,7 @@ pub struct GroupSaveLoad {
 }
 
 #[derive(Debug, Clone, TypeUuid, PartialEq)]
-#[uuid = "1e08866c-0b8a-484e-8bce-31333b21137e"]
+#[uuid = "b16f31ff-a594-4fca-a0e3-85e626d3d01a"]
 pub struct Group {
     // TODO: rid Group of redundancy
     pub group: HashSet<(Entity, Handle<Bezier>)>,
@@ -548,8 +552,8 @@ impl Group {
 }
 
 pub struct Maps {
-    pub mesh_handles: HashMap<&'static str, Handle<Mesh>>,
-    pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
+    pub mesh_handles: HashMap<&'static str, Mesh2dHandle>,
+    // pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
     pub id_handle_map: HashMap<u128, Handle<Bezier>>,
     pub sounds: HashMap<&'static str, Handle<AudioSource>>,
 }
@@ -558,7 +562,7 @@ impl Default for Maps {
     fn default() -> Self {
         Maps {
             mesh_handles: HashMap::new(),
-            pipeline_handles: HashMap::new(),
+            // pipeline_handles: HashMap::new(),
             id_handle_map: HashMap::new(),
             sounds: HashMap::new(),
         }
@@ -628,34 +632,9 @@ pub struct BezierCoord2 {
     // control_end: Coord2,
 }
 
-#[derive(TypeUuid, Debug, Clone, RenderResources)]
-#[uuid = "1e08866c-0b8a-437e-8bce-37733b21137e"]
-#[allow(non_snake_case)]
-pub struct MyShader {
-    pub color: Color,
-    pub clearcolor: Color,
-    pub t: f32, // Bezier t-value for MiddleQuads, but is used for other purposes elsewhere
-    pub zoom: f32,
-    pub size: Vec2,
-    pub hovered: f32,
-}
-
-impl Default for MyShader {
-    fn default() -> Self {
-        Self {
-            color: Color::hex("F87575").unwrap(),
-            t: 0.5,
-            zoom: 0.15,
-            size: Vec2::new(1.0, 1.0),
-            clearcolor: Color::hex("6e7f80").unwrap(),
-            hovered: 0.0,
-        }
-    }
-}
-
 // #[derive(RenderResources, Default, TypeUuid, Debug, Clone)]
 #[derive(Debug, Clone, TypeUuid, Serialize, Deserialize)]
-#[uuid = "1e08866c-0b8a-437e-8bce-37733b21957e"]
+#[uuid = "8cb22c5d-5ab0-4912-8833-ab46062b7d38"]
 pub struct Bezier {
     pub positions: BezierPositions,
     pub previous_positions: BezierPositions, // was useful for an undo functionality
@@ -1152,9 +1131,9 @@ pub fn get_close_still_anchor(
 // change the selection mesh according to the bounding box of the selected curves
 pub fn adjust_selection_attributes(
     // mouse_button_input: Res<Input<MouseButton>>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
-    mut query: Query<&Handle<Mesh>, With<SelectedBoxQuad>>,
-    shader_query: Query<&Handle<MyShader>, With<SelectedBoxQuad>>,
+    mut my_shader_params: ResMut<Assets<SelectionMat>>,
+    mut query: Query<(&Handle<Mesh>), With<SelectedBoxQuad>>,
+    shader_query: Query<&Handle<SelectionMat>, With<SelectedBoxQuad>>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
     globals: ResMut<Globals>,
@@ -1212,7 +1191,8 @@ pub fn adjust_selection_attributes(
             let v_pos = mesh.attribute_mut("Vertex_Position");
 
             if let Some(array2) = v_pos {
-                *array2 = Float32x3(vertex_positions.clone());
+                *array2 =
+                    bevy::render::mesh::VertexAttributeValues::Float32x3(vertex_positions.clone());
             }
         }
     }
@@ -1222,9 +1202,9 @@ pub fn adjust_selection_attributes(
 pub fn adjust_selecting_attributes(
     user_state: ResMut<UserState>,
     cursor: ResMut<Cursor>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mut my_shader_params: ResMut<Assets<SelectingMat>>,
     mut query: Query<&Handle<Mesh>, With<SelectingBoxQuad>>,
-    shader_query: Query<&Handle<MyShader>, With<SelectingBoxQuad>>,
+    shader_query: Query<&Handle<SelectingMat>, With<SelectingBoxQuad>>,
     mut meshes: ResMut<Assets<Mesh>>,
     globals: ResMut<Globals>,
 ) {
@@ -1263,7 +1243,8 @@ pub fn adjust_selecting_attributes(
             let v_pos = mesh.attribute_mut("Vertex_Position");
 
             if let Some(array2) = v_pos {
-                *array2 = Float32x3(vertex_positions.clone());
+                *array2 =
+                    bevy::render::mesh::VertexAttributeValues::Float32x3(vertex_positions.clone());
             }
         }
     }
@@ -1272,10 +1253,10 @@ pub fn adjust_selecting_attributes(
 // change the group selection mesh according to the bounding box of the curves inside the group
 pub fn adjust_group_attributes(
     mouse_button_input: Res<Input<MouseButton>>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
+    mut my_shader_params: ResMut<Assets<SelectionMat>>,
     mut query: Query<&Handle<Mesh>, With<GroupBoxQuad>>,
     groups: ResMut<Assets<Group>>,
-    group_query: Query<(&Handle<Group>, &Handle<MyShader>)>,
+    group_query: Query<(&Handle<Group>, &Handle<SelectionMat>)>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
@@ -1321,7 +1302,9 @@ pub fn adjust_group_attributes(
                 let v_pos = mesh.attribute_mut("Vertex_Position");
 
                 if let Some(array2) = v_pos {
-                    *array2 = Float32x3(vertex_positions.clone());
+                    *array2 = bevy::render::mesh::VertexAttributeValues::Float32x3(
+                        vertex_positions.clone(),
+                    );
                 }
             }
         }

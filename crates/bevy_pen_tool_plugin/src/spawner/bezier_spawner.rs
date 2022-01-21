@@ -1,12 +1,13 @@
 use crate::inputs::{Cursor, Latch};
 use crate::util::{
-    compute_lut, Anchor, AnchorEdge, Bezier, BezierPositions, BoundingBoxQuad, ControlPointQuad,
-    EndpointQuad, Globals, GrandParent, LatchData, Maps, MiddlePointQuad, MyShader, UserState,
+    compute_lut, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierMat,
+    BezierMidMat, BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals,
+    GrandParent, LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
 };
 
 use bevy::{
     prelude::*,
-    render::pipeline::{RenderPipeline, RenderPipelines},
+    sprite::{Material2dPipeline, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle},
 };
 
 use std::collections::HashMap;
@@ -19,7 +20,11 @@ pub fn spawn_bezier_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut cursor: ResMut<Cursor>,
-    mut my_shader_params: ResMut<Assets<MyShader>>,
+    // mut my_shader_params: ResMut<Assets<BezierMat>>,
+    mut selection_params: ResMut<Assets<SelectionMat>>,
+    mut controls_params: ResMut<Assets<BezierControlsMat>>,
+    mut ends_params: ResMut<Assets<BezierEndsMat>>,
+    mut mid_params: ResMut<Assets<BezierMidMat>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
     mut maps: ResMut<Maps>,
@@ -89,7 +94,11 @@ pub fn spawn_bezier_system(
             &mut bezier_curves,
             &mut commands,
             &mut meshes,
-            &mut my_shader_params,
+            // &mut my_shader_params,
+            &mut selection_params,
+            &mut controls_params,
+            &mut ends_params,
+            &mut mid_params,
             clearcolor,
             &mut globals,
             &mut maps,
@@ -102,7 +111,10 @@ pub fn spawn_bezier(
     bezier_curves: &mut ResMut<Assets<Bezier>>,
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
-    my_shader_params: &mut ResMut<Assets<MyShader>>,
+    selection_params: &mut ResMut<Assets<SelectionMat>>,
+    controls_params: &mut ResMut<Assets<BezierControlsMat>>,
+    ends_params: &mut ResMut<Assets<BezierEndsMat>>,
+    mid_params: &mut ResMut<Assets<BezierMidMat>>,
     clearcolor: Color,
     globals: &mut ResMut<Globals>,
     maps: &mut ResMut<Maps>,
@@ -111,10 +123,10 @@ pub fn spawn_bezier(
 
     bezier.lut = compute_lut(curve0, 100);
 
-    let ecm_pipeline_handle = maps.pipeline_handles["mids"].clone();
-    let ends_pipeline_handle = maps.pipeline_handles["ends"].clone();
-    let bb_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
-    let ctrl_pipeline_handle = maps.pipeline_handles["controls"].clone();
+    // let ecm_pipeline_handle = maps.pipeline_handles["mids"].clone();
+    // let ends_pipeline_handle = maps.pipeline_handles["ends"].clone();
+    // let bb_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
+    // let ctrl_pipeline_handle = maps.pipeline_handles["controls"].clone();
 
     let ends_controls_mesh_handle = maps.mesh_handles["ends_controls"].clone();
     let ends_mesh_handle = maps.mesh_handles["ends"].clone();
@@ -152,10 +164,13 @@ pub fn spawn_bezier(
     let ctr0_pos = bezier.positions.control_start; // - bb_pos;
     let ctr1_pos = bezier.positions.control_end - bb_pos;
 
-    let mesh_handle_bb = meshes.add(Mesh::from(shape::Quad {
-        size: bigger_size,
-        flip: false,
-    }));
+    // let mesh_handle_bb = meshes.add(Mesh::from(shape::Quad {
+    //     size: bigger_size,
+    //     flip: false,
+    // }));
+
+    let mesh_handle_bb =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(bigger_size))));
 
     // since bezier is cloned, be careful about modifying it after the cloning, it won't have any side-effects
     let bezier_handle = bezier_curves.add(bezier.clone());
@@ -163,22 +178,20 @@ pub fn spawn_bezier(
     maps.id_handle_map.insert(bezier.id, bezier_handle.clone());
     //////////////////// Bounding box ////////////////////
 
-    let visible_bb = Visible {
+    let visible_bb = Visibility {
         is_visible: !globals.do_hide_bounding_boxes,
-        is_transparent: true,
     };
 
-    let visible_anchors = Visible {
+    let visible_anchors = Visibility {
         is_visible: !globals.do_hide_anchors,
-        is_transparent: true,
     };
 
-    let shader_params_handle_bb = my_shader_params.add(MyShader {
-        color,
+    let shader_params_handle_bb = selection_params.add(SelectionMat {
+        color: color.into(),
         t: 0.5,
         zoom: 0.15 / globals.scale,
         size: bb_size,
-        clearcolor: clearcolor.clone(),
+        clearcolor: clearcolor.clone().into(),
         ..Default::default()
     });
 
@@ -189,16 +202,17 @@ pub fn spawn_bezier(
     init_pos.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
     let parent = commands
-        .spawn_bundle(MeshBundle {
+        .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_bb,
-            visible: visible_bb,
-            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                bb_pipeline_handle,
-            )]),
+            visibility: visible_bb,
+            // render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+            //     bb_pipeline_handle,
+            // )]),
             transform: init_pos.clone(),
+            material: shader_params_handle_bb,
             ..Default::default()
         })
-        .insert(shader_params_handle_bb.clone())
+        // .insert(shader_params_handle_bb.clone())
         .insert(BoundingBoxQuad)
         .insert(GrandParent)
         .insert(bezier_handle.clone())
@@ -206,11 +220,11 @@ pub fn spawn_bezier(
 
     //////////////////// Bounding box ////////////////////
 
-    let render_piplines_ends =
-        RenderPipelines::from_pipelines(vec![RenderPipeline::new(ends_pipeline_handle)]);
+    // let render_piplines_ends =
+    //     RenderPipelines::from_pipelines(vec![RenderPipeline::new(ends_pipeline_handle)]);
 
-    let render_piplines =
-        RenderPipelines::from_pipelines(vec![RenderPipeline::new(ecm_pipeline_handle)]);
+    // let render_piplines =
+    //     RenderPipelines::from_pipelines(vec![RenderPipeline::new(ecm_pipeline_handle)]);
 
     // Although the interface is two-dimensional, the z position of the quads is important for transparency
 
@@ -226,27 +240,38 @@ pub fn spawn_bezier(
     start_pt_transform.rotation = start_rotation;
     end_pt_transform.rotation = end_rotation;
 
+    let ends_params_handle = ends_params.add(BezierEndsMat {
+        color: color.into(),
+        t: 0.5,
+        zoom: 0.15 / globals.scale,
+        size: bb_size,
+        clearcolor: clearcolor.clone().into(),
+        ..Default::default()
+    });
+
     let child_start = commands
-        .spawn_bundle(MeshBundle {
+        .spawn_bundle(MaterialMesh2dBundle {
             mesh: ends_mesh_handle.clone(),
-            visible: visible_anchors.clone(),
-            render_pipelines: render_piplines_ends.clone(),
+            visibility: visible_anchors.clone(),
+            // render_pipelines: render_piplines_ends.clone(),
             transform: start_pt_transform,
+            material: ends_params_handle.clone(),
             ..Default::default()
         })
         .insert(EndpointQuad(AnchorEdge::Start))
         .insert(bezier_handle.clone())
-        .insert(shader_params_handle_bb.clone())
+        // .insert(shader_params_handle_bb.clone())
         .id();
 
     commands.entity(parent).push_children(&[child_start]);
 
     let child_end = commands
-        .spawn_bundle(MeshBundle {
+        .spawn_bundle(MaterialMesh2dBundle {
             mesh: ends_mesh_handle.clone(),
-            visible: visible_anchors.clone(),
+            visibility: visible_anchors.clone(),
             transform: end_pt_transform,
-            render_pipelines: render_piplines_ends.clone(),
+            material: ends_params_handle.clone(),
+            // render_pipelines: render_piplines_ends.clone(),
             // RenderPipelines::from_pipelines(vec![RenderPipeline::new(
             //     pipeline_handle.clone(),
             // )]),
@@ -254,17 +279,17 @@ pub fn spawn_bezier(
         })
         .insert(EndpointQuad(AnchorEdge::End))
         .insert(bezier_handle.clone())
-        .insert(shader_params_handle_bb.clone())
+        // .insert(shader_params_handle_bb.clone())
         .id();
 
     commands.entity(parent).push_children(&[child_end]);
 
-    let ctrl_render_piplines =
-        RenderPipelines::from_pipelines(vec![RenderPipeline::new(ctrl_pipeline_handle)]);
+    // let ctrl_render_piplines =
+    //     RenderPipelines::from_pipelines(vec![RenderPipeline::new(ctrl_pipeline_handle)]);
 
-    let mut visible_ctrl = Visible {
+    let mut visible_ctrl = Visibility {
         is_visible: true,
-        is_transparent: true,
+        // is_transparent: true,
     };
     if globals.hide_control_points {
         visible_ctrl.is_visible = false;
@@ -280,17 +305,27 @@ pub fn spawn_bezier(
             ctr_pos_transform = Transform::from_translation(ctr1_pos.extend(z_ctr));
         }
 
+        let controls_params_handle = controls_params.add(BezierControlsMat {
+            color: color.into(),
+            t: 0.5,
+            zoom: 0.15 / globals.scale,
+            size: Vec2::new(1.0, 1.0) * globals.scale,
+            clearcolor: clearcolor.clone().into(),
+            ..Default::default()
+        });
+
         let child = commands
-            .spawn_bundle(MeshBundle {
+            .spawn_bundle(MaterialMesh2dBundle {
                 mesh: ends_controls_mesh_handle.clone(),
-                visible: visible_ctrl.clone(),
-                render_pipelines: ctrl_render_piplines.clone(),
+                visibility: visible_ctrl.clone(),
+                // render_pipelines: ctrl_render_piplines.clone(),
                 transform: ctr_pos_transform,
+                material: controls_params_handle.clone(),
                 ..Default::default()
             })
             .insert(ControlPointQuad(point))
             .insert(bezier_handle.clone())
-            .insert(shader_params_handle_bb.clone())
+            // .insert(shader_params_handle_bb.clone())
             .id();
 
         if k == 0 {
@@ -300,10 +335,7 @@ pub fn spawn_bezier(
         }
     }
 
-    let visible = Visible {
-        is_visible: true,
-        is_transparent: true,
-    };
+    let visible = Visibility { is_visible: true };
 
     let vrange: Vec<f32> = (0..num_mid_quads)
         .map(|x| ((x as f32) / (num_mid_quads as f32 - 1.0) - 0.5) * 2.0 * 50.0)
@@ -312,12 +344,12 @@ pub fn spawn_bezier(
     let mut z = 0.0;
     let mut x = -20.0;
     for _t in vrange {
-        let mid_shader_params_handle = my_shader_params.add(MyShader {
-            color,
+        let mid_shader_params_handle = mid_params.add(BezierMidMat {
+            color: color.into(),
             t: 0.5,
             zoom: 0.15 / globals.scale,
             size: Vec2::new(1.0, 1.0) * globals.scale,
-            clearcolor: clearcolor.clone(),
+            clearcolor: clearcolor.clone().into(),
             ..Default::default()
         });
 
@@ -325,16 +357,17 @@ pub fn spawn_bezier(
         z = z + 10.0;
         let child = commands
             // // left
-            .spawn_bundle(MeshBundle {
+            .spawn_bundle(MaterialMesh2dBundle {
                 mesh: middle_mesh_handle.clone(),
-                visible: visible.clone(),
-                render_pipelines: render_piplines.clone(),
+                visibility: visible.clone(),
+                // render_pipelines: render_piplines.clone(),
                 transform: Transform::from_xyz(0.0, 0.0, pos_z + 100.0 + z),
+                material: mid_shader_params_handle,
                 ..Default::default()
             })
             .insert(MiddlePointQuad)
             .insert(bezier_handle.clone())
-            .insert(mid_shader_params_handle.clone())
+            // .insert(mid_shader_params_handle.clone())
             .id();
 
         commands.entity(parent).push_children(&[child]);
