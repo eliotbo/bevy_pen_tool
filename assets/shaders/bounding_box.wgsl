@@ -1,3 +1,4 @@
+
 #import bevy_sprite::mesh2d_struct
 #import bevy_sprite::mesh2d_view_bind_group
 
@@ -78,17 +79,6 @@ struct FragmentInput {
 #endif
 };
 
-fn sdBox(p: vec2<f32>, b: vec2<f32>) -> f32 {
-  let d = abs(p) - b;
-  return length(max(d, vec2<f32>(0.))) + min(max(d.x, d.y), 0.);
-}
-
-fn sdCircle(p: vec2<f32>, r: f32) -> f32 {
-  return length(p) - r;
-}
-
-
-
 [[stage(fragment)]]
 fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
 
@@ -97,20 +87,70 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     var uv_original: float2 = in.uv  - float2(0.5);
     uv_original.y = uv_original.y * aspect_ratio ;
 
+    let cx =  material.size.x / 42.0;
+    let cy =  material.size.y / 42.0;
 
-    let margin = 0.15;
-    var d = sdBox( uv_original, float2(0.5 - margin ,  0.5*aspect_ratio - margin ) );
-    let offset = 0.1;
-    d = smoothStep(0.01+offset, -0.01+offset, d);
+    let p = 0.5 - 0.05 / 1.1;
+    let bb_size = 0.1;
 
-    var bg_color = (material.clearcolor);
-    bg_color.a = 0.0;
+    let zoo = material.zoom / 0.08; 
 
-    var color_mod = (material.color);
-    color_mod.a = 0.3;
+    let width = 0.0051;
+    let sw = 0.0025 * zoo;
 
-    var rect = mix( color_mod ,  bg_color , 1.0 -  d );
+    let w = sw / cx;
+    let m = p + w;
+    let l = p-w;
+    let q = width / cx;
+
+    let xdo = smoothStep( m+q, l+q, abs(uv_original.x ) );
+    let xdi = 1.0 - smoothStep( m-q, l-q, abs(uv_original.x ) );
+
+    let p = 0.5 - 0.05 / 1.0 - bb_size / cx;
+    let w = sw / cx;
+    let m = p + w;
+    let l = p-w;
+    let q = width / cx;
+    // let xda = 1 -smoothStep( m+q, l+q, (0.5-abs(uv_original.x) )/1.1 );
+    let xda= 1.0 - smoothStep( m+q, l+q, abs(uv_original.x ) );
+    // xda = 1 - step(uv.x*material.size.x, material.size.x/2 - 10.0 );
+    // xda = step(uv.x*material.size.x, material.size.x*0.9/2 );
+
+    let p = 0.5 - 0.05 / 1.1;
+    let w = sw / cy;
+    let m = p + w;
+    let l = p-w;
+    let q = width / cy;
+
+    let ydi = 1.0 - smoothStep( m-q, l-q, abs(uv_original.y ) );
+    let ydo = smoothStep( m+q, l+q, abs(uv_original.y ) );
     
 
+    let p = 0.5 - 0.05 / 1.0 - bb_size / cy;
+    let w = sw / cy;
+    let m = p + w;
+    let l = p-w;
+    let q = width / cy;
+    // let yda = smoothStep( p, p-0.01, 0.5 - abs(uv_original.y ) );
+    let yda= 1.0 - smoothStep( m+q, l+q, abs(uv_original.y ) );
+    // yda = step(0.5 - abs(uv_original.y ), p );
+
+
+    let xd = xdi * xdo * ydo * xda * yda;
+    let yd = ydi * ydo * xdo * xda * yda;
+
+
+    let red = float4(0.0, 0.0, 0.0, 0.00);
+    let color2 = material.color;
+    // color2.a = 0.3;
+
+    let rect = mix( red ,color2 , min(yd + xd, 1.0));
+    //  let rect = mix( red ,color2 , xda);
+
+
+
+
     return rect;
+    // return float4(1.0, 0.0, 0.0, 1.0);
+
 }

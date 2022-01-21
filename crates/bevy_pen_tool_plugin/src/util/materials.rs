@@ -162,9 +162,9 @@ macro_rules! make_mat {
                     Some(asset_server.load($frag_shader))
                 }
 
-                fn vertex_shader(asset_server: &AssetServer) -> Option<Handle<Shader>> {
-                    Some(asset_server.load($frag_shader))
-                }
+                // fn vertex_shader(asset_server: &AssetServer) -> Option<Handle<Shader>> {
+                //     Some(asset_server.load($frag_shader))
+                // }
 
                 fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
                     &render_asset.bind_group
@@ -238,19 +238,19 @@ make_mat![
     "6cf5ad10-8906-45d9-b29b-eba9ec6c0de8"
 ];
 
-make_mat![
-    BezierMat,
-    GpuBezier,
-    "shaders/bezier.vert",
-    "shaders/bezier.frag",
-    "2e08866c-0b8a-437e-8bce-37733b21137e"
-];
+// make_mat![
+//     BezierMat,
+//     GpuBezier,
+//     "shaders/bezier.vert",
+//     "shaders/bezier.frag",
+//     "2e08866c-0b8a-437e-8bce-37733b21137e"
+// ];
 
 make_mat![
     SelectionMat,
     GpuSelectionMat,
     "shaders/bezier.vert",
-    "shaders/bounding_box.frag",
+    "shaders/bounding_box.wgsl",
     "3e08866c-0b8a-437e-8bce-37733b21137e"
 ];
 
@@ -258,7 +258,7 @@ make_mat![
     SelectingMat,
     GpuSelectingMat,
     "shaders/bezier.vert",
-    "shaders/selecting.frag",
+    "shaders/selecting.wgsl",
     "4e08866c-0b8a-437e-8bce-37733b21137e"
 ];
 
@@ -282,7 +282,7 @@ make_mat![
     BezierControlsMat,
     GpuBezierControlsMat,
     "shaders/bezier.vert",
-    "shaders/controls.frag",
+    "shaders/controls.wgsl",
     "7e08866c-0b8a-437e-8bce-37733b21137e"
 ];
 
@@ -290,6 +290,6 @@ make_mat![
     BezierMidMat,
     GpuUiBezierMidMat,
     "shaders/bezier.vert",
-    "shaders/bezier.frag",
+    "shaders/mids.wgsl",
     "8e08866c-0b8a-437e-8bce-37733b21137e"
 ];

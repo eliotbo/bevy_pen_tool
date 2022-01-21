@@ -242,6 +242,24 @@ fn sdCircle(p: vec2<f32>, r: f32) -> f32 {
   return length(p) - r;
 }
 
+fn fromLinear(linearRGB: float4) -> float4
+{
+    let cutoff: vec4<f32> = vec4<f32>(linearRGB < float4(0.0031308));
+    let higher: vec4<f32> = float4(1.055)*pow(linearRGB, float4(1.0/2.4)) - float4(0.055);
+    let lower: vec4<f32> = linearRGB * float4(12.92);
+
+    return mix(higher, lower, cutoff);
+}
+
+// // Converts a color from sRGB gamma to linear light gamma
+fn toLinear(sRGB: float4) -> float4
+{
+    let cutoff = vec4<f32>(sRGB < float4(0.04045));
+    let higher = pow((sRGB + float4(0.055))/float4(1.055), float4(2.4));
+    let lower = sRGB/float4(12.92);
+
+    return mix(higher, lower, cutoff);
+}
 
 
 [[stage(fragment)]]
@@ -321,5 +339,5 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     // rect.w = 1.0;
 
 
-    return rect;
+    return toLinear( rect);
 }

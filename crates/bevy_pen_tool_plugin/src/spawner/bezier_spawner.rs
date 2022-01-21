@@ -1,8 +1,8 @@
 use crate::inputs::{Cursor, Latch};
 use crate::util::{
-    compute_lut, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierMat,
-    BezierMidMat, BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals,
-    GrandParent, LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
+    compute_lut, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierMidMat,
+    BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, GrandParent,
+    LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
 };
 
 use bevy::{
@@ -101,7 +101,7 @@ pub fn spawn_bezier_system(
             &mut mid_params,
             clearcolor,
             &mut globals,
-            &mut maps,
+            // &mut maps,
         );
     }
 }
@@ -117,7 +117,7 @@ pub fn spawn_bezier(
     mid_params: &mut ResMut<Assets<BezierMidMat>>,
     clearcolor: Color,
     globals: &mut ResMut<Globals>,
-    maps: &mut ResMut<Maps>,
+    // maps: &mut ResMut<Maps>,
 ) -> (Entity, Handle<Bezier>) {
     let curve0 = bezier.to_curve();
 
@@ -128,9 +128,23 @@ pub fn spawn_bezier(
     // let bb_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
     // let ctrl_pipeline_handle = maps.pipeline_handles["controls"].clone();
 
-    let ends_controls_mesh_handle = maps.mesh_handles["ends_controls"].clone();
-    let ends_mesh_handle = maps.mesh_handles["ends"].clone();
-    let middle_mesh_handle = maps.mesh_handles["middles"].clone();
+    // let ends_controls_mesh_handle = maps.mesh_handles["ends_controls"].clone();
+
+    // let mesh_handle_ends_controls = meshes.add(Mesh::from(shape::Quad {
+    //     size: Vec2::new(4.0, 4.0),
+    // }));
+
+    let ends_controls_mesh_handle =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(4.0, 4.0)))));
+
+    // let ends_mesh_handle = maps.mesh_handles["ends"].clone();
+    let ends_mesh_handle =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(2.0, 4.0)))));
+
+    // let middle_mesh_handle = maps.mesh_handles["middles"].clone();
+
+    let middle_mesh_handle =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(1.5, 1.5)))));
 
     let num_mid_quads = globals.num_points_on_curve;
 
@@ -175,7 +189,7 @@ pub fn spawn_bezier(
     // since bezier is cloned, be careful about modifying it after the cloning, it won't have any side-effects
     let bezier_handle = bezier_curves.add(bezier.clone());
 
-    maps.id_handle_map.insert(bezier.id, bezier_handle.clone());
+    // maps.id_handle_map.insert(bezier.id, bezier_handle.clone());
     //////////////////// Bounding box ////////////////////
 
     let visible_bb = Visibility {

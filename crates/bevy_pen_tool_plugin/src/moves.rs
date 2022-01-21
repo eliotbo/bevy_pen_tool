@@ -1,6 +1,6 @@
 use crate::inputs::Cursor;
 use crate::util::{
-    AnchorEdge, Bezier, BezierMat, BoundingBoxQuad, ControlPointQuad, EndpointQuad,
+    AnchorEdge, Bezier, BezierMidMat, BoundingBoxQuad, ControlPointQuad, EndpointQuad,
     FollowBezierAnimation, Globals, GrandParent, Group, GroupMiddleQuad, MiddlePointQuad,
     SelectionMat, TurnRoundAnimation, UiAction, UiBoard,
 };
@@ -25,9 +25,9 @@ pub fn move_ui(
 pub fn move_middle_quads(
     time: Res<Time>,
     bezier_curves: ResMut<Assets<Bezier>>,
-    mut my_shader_params: ResMut<Assets<BezierMat>>,
+    mut my_shader_params: ResMut<Assets<BezierMidMat>>,
     mut query: Query<
-        (&mut GlobalTransform, &Handle<Bezier>, &Handle<BezierMat>),
+        (&mut GlobalTransform, &Handle<Bezier>, &Handle<BezierMidMat>),
         With<MiddlePointQuad>,
     >,
     globals: ResMut<Globals>,
@@ -75,11 +75,11 @@ pub fn move_middle_quads(
 pub fn move_group_middle_quads(
     time: Res<Time>,
     bezier_curves: ResMut<Assets<Bezier>>,
-    mut my_shader_params: ResMut<Assets<BezierMat>>,
+    mut my_shader_params: ResMut<Assets<BezierMidMat>>,
     mut query: Query<(
         &mut GlobalTransform,
         &Handle<Group>,
-        &Handle<BezierMat>,
+        &Handle<BezierMidMat>,
         &GroupMiddleQuad,
     )>,
     // globals: ResMut<Globals>,

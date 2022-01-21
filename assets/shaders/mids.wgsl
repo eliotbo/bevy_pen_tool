@@ -78,6 +78,7 @@ struct FragmentInput {
 #endif
 };
 
+
 fn sdBox(p: vec2<f32>, b: vec2<f32>) -> f32 {
   let d = abs(p) - b;
   return length(max(d, vec2<f32>(0.))) + min(max(d.x, d.y), 0.);
@@ -94,23 +95,39 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
 
     let aspect_ratio = material.size.y / material.size.x ;
 
-    var uv_original: float2 = in.uv  - float2(0.5);
-    uv_original.y = uv_original.y * aspect_ratio ;
+    var uv_original: float2 = (in.uv  - float2(0.5));
+    // uv_original.x = uv_original.x / 2.0 ;
 
 
-    let margin = 0.15;
-    var d = sdBox( uv_original, float2(0.5 - margin ,  0.5*aspect_ratio - margin ) );
-    let offset = 0.1;
-    d = smoothStep(0.01+offset, -0.01+offset, d);
+    // let zoo = material.zoom / 0.08;
+    let zoo = 1.0;
+    let w = -0.03 * zoo;
 
-    var bg_color = (material.clearcolor);
+    let offset = 0.0;
+
+    let radius = 0.5;
+
+    var d0 = sdCircle( uv_original - offset * float2(0.5,0.), radius );
+    d0 = smoothStep(-w, w, d0);
+
+    var d1 = sdCircle( uv_original - offset * float2(0.5, 0.), radius * 0.5 );
+    d1 = smoothStep(-w, w, d1);
+
+    let d = 1. - d0 * (1. - d1);
+
+
+    var color_with_t = material.color;
+    color_with_t.a = smoothStep(0.0, 0.1, material.t) *  smoothStep(0.0, 0.1, 1.0 - material.t) ;
+
+    var bg_color = material.clearcolor;
     bg_color.a = 0.0;
 
-    var color_mod = (material.color);
-    color_mod.a = 0.3;
-
-    var rect = mix( color_mod ,  bg_color , 1.0 -  d );
     
+    let circle = mix( color_with_t ,bg_color  , d );
+    // 
+   
 
-    return rect;
+    return circle;
 }
+
+

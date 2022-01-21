@@ -860,7 +860,7 @@ pub fn load(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut my_shader_params: ResMut<Assets<BezierMat>>,
+    // mut my_shader_params: ResMut<Assets<BezierMat>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
     mut selection: ResMut<Selection>,
@@ -939,7 +939,7 @@ pub fn load(
                     &mut mid_params,
                     clearcolor,
                     &mut globals,
-                    &mut maps,
+                    // &mut maps,
                 );
                 group.group.insert((entity.clone(), handle.clone()));
                 group.handles.insert(handle.clone());

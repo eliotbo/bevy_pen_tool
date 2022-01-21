@@ -28,9 +28,7 @@ pub struct PenPlugin;
 
 impl Plugin for PenPlugin {
     fn build(&self, app: &mut App) {
-        app
-
-            .add_asset::<Bezier>()
+        app.add_asset::<Bezier>()
             .add_asset::<Group>()
             .add_event::<MouseClickEvent>()
             .add_event::<Group>()
@@ -41,7 +39,7 @@ impl Plugin for PenPlugin {
             .add_event::<Action>()
             .add_event::<UiButton>()
             .add_event::<Handle<Group>>()
-            .add_plugin(Material2dPlugin::<BezierMat>::default())
+            // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(Material2dPlugin::<SelectionMat>::default())
             .add_plugin(Material2dPlugin::<SelectingMat>::default())
             .add_plugin(Material2dPlugin::<ButtonMat>::default())
@@ -56,77 +54,76 @@ impl Plugin for PenPlugin {
             .insert_resource(Selection::default())
             .insert_resource(Maps::default())
             .insert_resource(UserState::default())
-        // .add_startup_system(setup.exclusive_system().at_start()) //.label("setup"))
-        // .add_startup_system(spawn_selection_bounding_box) //.after("setup"))
-        .add_startup_system(spawn_ui) //.after("setup"))
-        ;
-        // .add_startup_system(spawn_selecting_bounding_box) //.after("setup"))
-        // //
-        // // Update controller
-        // .add_system_set(
-        //     SystemSet::on_update("ModelViewController")
-        //         .with_system(record_mouse_events_system.exclusive_system().at_start())
-        //         .with_system(check_mouseclick_on_objects)
-        //         .with_system(rescale)
-        //         .with_system(check_mouse_on_ui)
-        //         .with_system(pick_color)
-        //         .with_system(check_mouse_on_canvas)
-        //         .with_system(spawn_curve_order_on_mouseclick)
-        //         .with_system(button_system)
-        //         .with_system(toggle_ui_button)
-        //         .with_system(send_action.exclusive_system().at_end())
-        //         .label("controller"),
-        // )
-        // //
-        // // Update model
-        // .add_system_set(
-        //     SystemSet::on_update("ModelViewController")
-        //         .with_system(groupy.label("group"))
-        //         .with_system(load.after("group"))
-        //         .with_system(recompute_lut.label("recompute_lut"))
-        //         .with_system(save.after("recompute_lut"))
-        //         .with_system(change_ends_and_controls_params.exclusive_system().at_end())
-        //         .with_system(latchy)
-        //         .with_system(officiate_latch_partnership)
-        //         .with_system(selection_box_init)
-        //         .with_system(selection_final)
-        //         .with_system(hide_anchors)
-        //         .with_system(delete)
-        //         .with_system(hide_control_points)
-        //         .with_system(spawn_heli)
-        //         .with_system(make_mesh)
-        //         .with_system(make_road)
-        //         .with_system(unselect)
-        //         .label("model")
-        //         .after("controller"),
-        // )
-        // //
-        // // Update view
-        // .add_system_set(
-        //     SystemSet::on_update("ModelViewController")
-        //         // TODO:
-        //         // mouse_release_actions should be in the controller,
-        //         // but there is a bug with the position of new latches when it's there
-        //         .with_system(mouse_release_actions)
-        //         //
-        //         .with_system(begin_move_on_mouseclick)
-        //         .with_system(move_end_quads)
-        //         .with_system(move_middle_quads)
-        //         .with_system(move_group_middle_quads)
-        //         .with_system(move_control_quads)
-        //         .with_system(move_bb_quads)
-        //         .with_system(move_ui)
-        //         .with_system(turn_round_animation)
-        //         .with_system(follow_bezier_group)
-        //         .with_system(adjust_selection_attributes)
-        //         .with_system(adjust_selecting_attributes)
-        //         .with_system(adjust_group_attributes)
-        //         .with_system(spawn_bezier_system)
-        //         .with_system(spawn_group_middle_quads)
-        //         .with_system(spawn_group_bounding_box)
-        //         .label("view")
-        //         .after("model"),
-        // );
+            .add_startup_system(setup.exclusive_system().at_start()) //.label("setup"))
+            .add_startup_system(spawn_selection_bounding_box) //.after("setup"))
+            .add_startup_system(spawn_ui) //.after("setup"))
+            .add_startup_system(spawn_selecting_bounding_box) //.after("setup"))
+            //
+            // Update controller
+            .add_system_set(
+                SystemSet::on_update("ModelViewController")
+                    .with_system(record_mouse_events_system.exclusive_system().at_start())
+                    .with_system(check_mouseclick_on_objects)
+                    .with_system(rescale)
+                    .with_system(check_mouse_on_ui)
+                    .with_system(pick_color)
+                    .with_system(check_mouse_on_canvas)
+                    .with_system(spawn_curve_order_on_mouseclick)
+                    .with_system(button_system)
+                    .with_system(toggle_ui_button)
+                    .with_system(send_action.exclusive_system().at_end())
+                    .label("controller"),
+            )
+            //
+            // Update model
+            .add_system_set(
+                SystemSet::on_update("ModelViewController")
+                    .with_system(groupy.label("group"))
+                    .with_system(load.after("group"))
+                    .with_system(recompute_lut.label("recompute_lut"))
+                    .with_system(save.after("recompute_lut"))
+                    .with_system(change_ends_and_controls_params.exclusive_system().at_end())
+                    .with_system(latchy)
+                    .with_system(officiate_latch_partnership)
+                    .with_system(selection_box_init)
+                    .with_system(selection_final)
+                    .with_system(hide_anchors)
+                    .with_system(delete)
+                    .with_system(hide_control_points)
+                    .with_system(spawn_heli)
+                    .with_system(make_mesh)
+                    .with_system(make_road)
+                    .with_system(unselect)
+                    .label("model")
+                    .after("controller"),
+            )
+            //
+            // Update view
+            .add_system_set(
+                SystemSet::on_update("ModelViewController")
+                    // TODO:
+                    // mouse_release_actions should be in the controller,
+                    // but there is a bug with the position of new latches when it's there
+                    .with_system(mouse_release_actions)
+                    //
+                    .with_system(begin_move_on_mouseclick)
+                    .with_system(move_end_quads)
+                    .with_system(move_middle_quads)
+                    .with_system(move_group_middle_quads)
+                    .with_system(move_control_quads)
+                    .with_system(move_bb_quads)
+                    .with_system(move_ui)
+                    .with_system(turn_round_animation)
+                    .with_system(follow_bezier_group)
+                    .with_system(adjust_selection_attributes)
+                    .with_system(adjust_selecting_attributes)
+                    .with_system(adjust_group_attributes)
+                    .with_system(spawn_bezier_system)
+                    .with_system(spawn_group_middle_quads)
+                    .with_system(spawn_group_bounding_box)
+                    .label("view")
+                    .after("model"),
+            );
     }
 }
 
