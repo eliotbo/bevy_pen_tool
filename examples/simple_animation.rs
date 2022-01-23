@@ -66,9 +66,13 @@ fn spawn_quad(mut commands: Commands, mut materials: ResMut<Assets<ColorMaterial
     // spawn sprite that will be animated
     commands
         .spawn_bundle(SpriteBundle {
-            material: materials.add(Color::rgb(0.5, 0.5, 1.0).into()),
+            // material: materials.add(Color::rgb(0.5, 0.5, 1.0).into()),
             transform: Transform::from_xyz(0.0, -0.0, 0.0),
-            sprite: Sprite::new(Vec2::new(10.0, 10.0)),
+            sprite: Sprite {
+                color: Color::BLACK,
+                custom_size: Some(Vec2::new(10.0, 10.0)),
+                ..Default::default()
+            },
 
             ..Default::default()
         })
@@ -78,9 +82,14 @@ fn spawn_quad(mut commands: Commands, mut materials: ResMut<Assets<ColorMaterial
     // show points from look-up table
     for position in lut.lut.iter() {
         commands.spawn_bundle(SpriteBundle {
-            material: materials.add(Color::rgb(0.7, 0.5, 1.0).into()),
+            // material: materials.add(Color::rgb(0.7, 0.5, 1.0).into()),
             transform: Transform::from_translation(position.extend(-50.0)),
-            sprite: Sprite::new(Vec2::new(1.0, 1.0)),
+            // sprite: Sprite::new(Vec2::new(1.0, 1.0)),
+            sprite: Sprite {
+                color: Color::GREEN,
+                custom_size: Some(Vec2::new(1.0, 1.0)),
+                ..Default::default()
+            },
 
             ..Default::default()
         });
