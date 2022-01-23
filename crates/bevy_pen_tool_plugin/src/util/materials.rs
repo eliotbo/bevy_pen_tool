@@ -11,10 +11,8 @@ use bevy::{
         renderer::RenderDevice,
     },
     sprite::Material2d,
-    sprite::{Material2dPipeline, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle},
+    sprite::Material2dPipeline,
 };
-
-use crate::util::*;
 
 // /////////////////////////////////  UiMat //////////////////////////////////////////
 

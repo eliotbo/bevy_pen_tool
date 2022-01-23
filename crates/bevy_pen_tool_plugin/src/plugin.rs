@@ -3,26 +3,8 @@ use crate::moves::*;
 use crate::spawner::*;
 
 use crate::util::*;
-// use crate::util::{
-//     Bezier, BezierControlsMat, BezierEndsMat, BezierMat, BezierMidMat, ButtonMat, Globals,
-//     SelectingMat, SelectionMat, UiMat,
-// };
 
-// use bevy::{
-//     prelude::*,
-//     render::{
-//         pipeline::PipelineDescriptor,
-//         render_graph::{base, AssetRenderResourcesNode, RenderGraph},
-//         shader::ShaderStages,
-//     },
-// };
-
-use bevy::{
-    prelude::*,
-    sprite::{Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle},
-};
-
-use std::{thread, time};
+use bevy::{prelude::*, sprite::Material2dPlugin};
 
 pub struct PenPlugin;
 

@@ -5,10 +5,7 @@ use crate::util::{
 
 use crate::inputs::Action;
 
-use bevy::{
-    prelude::*,
-    sprite::{Material2dPipeline, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle},
-};
+use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
 // There is culling between two transparent quads at the same distance from the camera.
 // Is this normal behavior?
@@ -54,7 +51,7 @@ pub fn spawn_selection_bounding_box(
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     // mut render_graph: ResMut<RenderGraph>,
     globals: ResMut<Globals>,
-    maps: ResMut<Maps>,
+    // maps: ResMut<Maps>,
     mut my_shader_params: ResMut<Assets<SelectionMat>>,
     clearcolor_struct: Res<ClearColor>,
 ) {
@@ -102,7 +99,7 @@ pub fn spawn_selecting_bounding_box(
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     // mut render_graph: ResMut<RenderGraph>,
     globals: ResMut<Globals>,
-    maps: ResMut<Maps>,
+    // maps: ResMut<Maps>,
     mut my_shader_params: ResMut<Assets<SelectingMat>>,
     clearcolor_struct: Res<ClearColor>,
 ) {
@@ -151,7 +148,7 @@ pub fn spawn_group_bounding_box(
     mut my_shader_params: ResMut<Assets<SelectionMat>>,
     clearcolor_struct: Res<ClearColor>,
     mut group_event_reader: EventReader<Handle<Group>>,
-    maps: ResMut<Maps>,
+    // maps: ResMut<Maps>,
     // group: &Group,
 ) {
     // Bounding Box for group
@@ -267,14 +264,14 @@ pub fn spawn_group_middle_quads(
 pub fn spawn_heli(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    // mut materials: ResMut<Assets<ColorMaterial>>,
     mut action_event_reader: EventReader<Action>,
     groups: Res<Assets<Group>>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::SpawnHeli) {
         if let Some(_) = groups.iter().next() {
             // let rotation = Quat::IDENTITY;
-            let rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
+            let _rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)
                 .mul_quat(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2));
 
             let heli_handle = asset_server.load("textures/heli.png");

@@ -2,12 +2,10 @@ use crate::inputs::{ButtonInteraction, ButtonState, UiButton};
 // use crate::util::materials::*;
 use crate::util::{
     BezierEndsMat, ButtonMat, ColorButton, Globals, GrandParent, Icon, Maps, OnOffMaterial,
-    SelectingMat, SelectionMat, UiAction, UiBoard, UiMat,
+    UiAction, UiBoard, UiMat,
 };
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
-
-use std::{thread, time};
 
 pub fn spawn_ui(
     asset_server: Res<AssetServer>,
@@ -18,7 +16,7 @@ pub fn spawn_ui(
     mut ui_materials: ResMut<Assets<UiMat>>,
     mut button_materials: ResMut<Assets<ButtonMat>>,
     mut ends_materials: ResMut<Assets<BezierEndsMat>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    // mut materials: ResMut<Assets<ColorMaterial>>,
     mut globals: ResMut<Globals>,
     mut maps: ResMut<Maps>,
 ) {
@@ -61,7 +59,7 @@ pub fn spawn_ui(
     let button_ui_position = Vec3::new(-70.0, 37.5, -550.0);
     let ui_transform = Transform::from_translation(button_ui_position);
 
-    let mut ui_mat = UiMat::default();
+    let ui_mat = UiMat::default();
 
     // ui_mat.size = button_ui_size;
 

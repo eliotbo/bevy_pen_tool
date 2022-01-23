@@ -5,10 +5,7 @@ use crate::util::{
     LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
 };
 
-use bevy::{
-    prelude::*,
-    sprite::{Material2dPipeline, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle},
-};
+use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
 use std::collections::HashMap;
 
