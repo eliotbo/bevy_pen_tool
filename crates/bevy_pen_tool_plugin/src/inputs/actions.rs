@@ -939,7 +939,7 @@ pub fn load(
                     &mut mid_params,
                     clearcolor,
                     &mut globals,
-                    // &mut maps,
+                    &mut maps,
                 );
                 group.group.insert((entity.clone(), handle.clone()));
                 group.handles.insert(handle.clone());

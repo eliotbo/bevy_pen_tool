@@ -85,7 +85,7 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     let aspect_ratio = material.size.y / material.size.x ;
 
     var uv_original: float2 = in.uv  - float2(0.5);
-    uv_original.y = uv_original.y * aspect_ratio ;
+    // uv_original.y = uv_original.y * aspect_ratio ;
 
     let cx =  material.size.x / 42.0;
     let cy =  material.size.y / 42.0;

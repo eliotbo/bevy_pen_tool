@@ -34,9 +34,6 @@ pub fn spawn_ui(
         vec!["2e003e", "3d2352", "3d1e6d", "8874a3", "e4dcf1"],
     ];
 
-    // let hundred_millis = time::Duration::from_millis(100);
-    // thread::sleep(hundred_millis);
-
     let num_rows = colors_str.len();
 
     let colors: Vec<Vec<Color>> = colors_str
@@ -44,67 +41,35 @@ pub fn spawn_ui(
         .map(|x| x.iter().map(|y| Color::hex(y).unwrap()).collect())
         .collect();
 
-    // let colors: Vec<Color> = color_list.iter().map(|x| Color::hex(x).unwrap()).collect();
-
-    // asset_server.watch_for_changes().unwrap();
-    // let hundred_millis = time::Duration::from_millis(100);
-    // thread::sleep(hundred_millis);
-
-    // let vert = asset_server.load::<Shader, _>("shaders/bezier.vert"); // duplicate
-    // let button_frag = asset_server.load::<Shader, _>("shaders/button.frag");
-    // let ui_frag = asset_server.load::<Shader, _>("shaders/ui.frag");
-
-    // let button_pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
-    //     vertex: vert.clone(),
-    //     fragment: Some(button_frag.clone()),
-    // }));
-
-    // let ui_pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
-    //     vertex: vert.clone(),
-    //     fragment: Some(ui_frag.clone()),
-    // }));
-
-    // maps.pipeline_handles
-    //     .insert("button", button_pipeline_handle.clone());
-
-    // maps.pipeline_handles
-    //     .insert("ui", ui_pipeline_handle.clone());
-
     let color_ui_size = Vec2::new(40.0, 75.0);
-
-    let mesh_handle_color_ui =
-        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(color_ui_size))));
-
     let button_ui_size = Vec2::new(40.0, 45.0);
+    let button_width = 8.0;
+    let button_size = Vec2::new(button_width, button_width);
+    let icon_size = Vec2::new(button_width / 4.0, button_width / 2.0);
 
-    let mesh_handle_button_ui =
-        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(button_ui_size))));
-
-    maps.mesh_handles
-        .insert("color_ui", mesh_handle_color_ui.clone());
-
-    maps.mesh_handles
-        .insert("button_ui", mesh_handle_button_ui.clone());
+    let mesh_handle_button_ui = maps.mesh_handles.get("button_ui").unwrap();
+    let mesh_handle_color_ui = maps.mesh_handles.get("color_ui").unwrap();
+    let mesh_handle_button = maps.mesh_handles.get("button").unwrap();
+    let mesh_handle_icon = maps.mesh_handles.get("icon").unwrap();
 
     globals.picked_color = Some(colors[0][0]);
 
     let visible_ui = bevy::render::view::Visibility { is_visible: true };
 
     /////////////////////// buttons ui ////////////////////////////
-    // let mut trans = Transform::from_translation(Vec3::new(00.0, 0.0, -100.0));
-    // trans.rotation = Quat::from_rotation_y(-std::f32::consts::PI / 4.0);
 
     let button_ui_position = Vec3::new(-70.0, 37.5, -550.0);
     let ui_transform = Transform::from_translation(button_ui_position);
 
     let mut ui_mat = UiMat::default();
 
-    ui_mat.size = button_ui_size;
+    // ui_mat.size = button_ui_size;
+
     let ui_material = ui_materials.add(ui_mat);
 
     let main_ui = commands
         .spawn_bundle(MaterialMesh2dBundle {
-            mesh: mesh_handle_button_ui,
+            mesh: mesh_handle_button_ui.clone(),
             transform: ui_transform.clone(),
             material: ui_material,
             ..Default::default()
@@ -118,20 +83,12 @@ pub fn spawn_ui(
             action: UiAction::None,
         })
         .id();
-
+    /////////////////////// buttons ui ////////////////////////////
     //
     //
     //
     //
     ///////////////////// latch button /////////////////////
-    let button_width = 8.0;
-    let button_size = Vec2::new(button_width, button_width);
-
-    let mesh_handle_button =
-        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(button_size))));
-
-    maps.mesh_handles
-        .insert("button", mesh_handle_button.clone());
 
     let shader_params_latch = button_materials.add(ButtonMat {
         color: Color::hex("4a4e4d").unwrap().into(),
@@ -157,14 +114,6 @@ pub fn spawn_ui(
         .id();
 
     commands.entity(main_ui).push_children(&[button]);
-
-    let icon_size = Vec2::new(button_width / 4.0, button_width / 2.0);
-
-    let mesh_handle_icon =
-        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(icon_size))));
-
-    maps.mesh_handles
-        .insert("latch_button_icons", mesh_handle_icon.clone());
 
     let shader_params_icon1 = ends_materials.add(BezierEndsMat {
         color: Color::hex("f6abb6").unwrap().into(),
@@ -1093,7 +1042,7 @@ pub fn spawn_ui(
     let ui_transform = Transform::from_translation(color_ui_position);
     let parent = commands
         .spawn_bundle(MaterialMesh2dBundle {
-            mesh: mesh_handle_color_ui,
+            mesh: mesh_handle_color_ui.clone(),
             material: shader_params_color_ui,
             transform: ui_transform.clone(),
             ..Default::default()

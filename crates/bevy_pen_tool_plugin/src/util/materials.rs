@@ -138,7 +138,7 @@ macro_rules! make_mat {
             impl Default for $name_of_mat {
                 fn default() -> Self {
 
-                    println!("color: {:?}", Color::hex("6e7f80"));
+                    // println!("color: {:?}", Color::hex("6e7f80"));
                     Self {
                         color: Color::hex("F87575").unwrap().into(),
                         t: 0.5,
@@ -292,4 +292,12 @@ make_mat![
     "shaders/bezier.vert",
     "shaders/mids.wgsl",
     "8e08866c-0b8a-437e-8bce-37733b21137e"
+];
+
+make_mat![
+    FillMat,
+    GpuFillMat,
+    "shaders/bezier.vert",
+    "shaders/mids.wgsl",
+    "9e08866c-0b8a-437e-8bce-37733b21137e"
 ];

@@ -10,7 +10,7 @@ members = ["crates/*"]
 
 [dependencies]
 bevy = "0.6"
-bevy_pen_tool_plugin = { path = "crates/bevy_pen_tool_plugin", version = "0.2.0" }
+bevy_pen_tool_plugin = { path = "crates/bevy_pen_tool_plugin", version = "0.3.0" }
 
 serde_json = "1.0.59"
 serde = { version = "1", features = ["derive"] }

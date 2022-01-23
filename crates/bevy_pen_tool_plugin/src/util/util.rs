@@ -556,6 +556,7 @@ pub struct Maps {
     // pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
     pub id_handle_map: HashMap<u128, Handle<Bezier>>,
     pub sounds: HashMap<&'static str, Handle<AudioSource>>,
+    pub textures: HashMap<&'static str, Handle<Image>>,
 }
 
 impl Default for Maps {
@@ -565,6 +566,7 @@ impl Default for Maps {
             // pipeline_handles: HashMap::new(),
             id_handle_map: HashMap::new(),
             sounds: HashMap::new(),
+            textures: HashMap::new(),
         }
     }
 }
@@ -1132,7 +1134,7 @@ pub fn get_close_still_anchor(
 pub fn adjust_selection_attributes(
     // mouse_button_input: Res<Input<MouseButton>>,
     mut my_shader_params: ResMut<Assets<SelectionMat>>,
-    mut query: Query<(&Handle<Mesh>), With<SelectedBoxQuad>>,
+    mut query: Query<&Mesh2dHandle, With<SelectedBoxQuad>>,
     shader_query: Query<&Handle<SelectionMat>, With<SelectedBoxQuad>>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -1149,6 +1151,7 @@ pub fn adjust_selection_attributes(
     let us = user_state.as_ref();
     if let UserState::Selected(_) = us {
         do_adjust = true;
+        // println!("slected state");
     }
 
     if do_adjust {
@@ -1185,12 +1188,14 @@ pub fn adjust_selection_attributes(
             [x_pos + x_width, y_pox + y_width, 0.0],
             [x_pos + x_width, y_pox - y_width, 0.0],
         ];
+        // println!("will attempt SELECTION");
 
         for mesh_handle in query.iter_mut() {
-            let mesh = meshes.get_mut(mesh_handle).unwrap();
+            let mesh = meshes.get_mut(mesh_handle.0.clone()).unwrap();
             let v_pos = mesh.attribute_mut("Vertex_Position");
 
             if let Some(array2) = v_pos {
+                // println!("changed SELECTION");
                 *array2 =
                     bevy::render::mesh::VertexAttributeValues::Float32x3(vertex_positions.clone());
             }
@@ -1203,7 +1208,7 @@ pub fn adjust_selecting_attributes(
     user_state: ResMut<UserState>,
     cursor: ResMut<Cursor>,
     mut my_shader_params: ResMut<Assets<SelectingMat>>,
-    mut query: Query<&Handle<Mesh>, With<SelectingBoxQuad>>,
+    mut query: Query<&Mesh2dHandle, With<SelectingBoxQuad>>,
     shader_query: Query<&Handle<SelectingMat>, With<SelectingBoxQuad>>,
     mut meshes: ResMut<Assets<Mesh>>,
     globals: ResMut<Globals>,
@@ -1237,12 +1242,14 @@ pub fn adjust_selecting_attributes(
             [x_pos + x_width, y_pox + y_width, 0.0],
             [x_pos + x_width, y_pox - y_width, 0.0],
         ];
+        // println!("will attempt selecting");
 
         for mesh_handle in query.iter_mut() {
-            let mesh = meshes.get_mut(mesh_handle).unwrap();
+            let mesh = meshes.get_mut(mesh_handle.0.clone()).unwrap();
             let v_pos = mesh.attribute_mut("Vertex_Position");
 
             if let Some(array2) = v_pos {
+                println!("changed selecting");
                 *array2 =
                     bevy::render::mesh::VertexAttributeValues::Float32x3(vertex_positions.clone());
             }

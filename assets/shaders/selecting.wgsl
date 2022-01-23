@@ -95,12 +95,12 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     let aspect_ratio = material.size.y / material.size.x ;
 
     var uv_original: float2 = in.uv  - float2(0.5);
-    uv_original.y = uv_original.y * aspect_ratio ;
+    // uv_original.y = uv_original.y * aspect_ratio ;
 
 
 
-    let cx =  qsize.x / 42.0;
-    let cy =  qsize.y / 42.0;
+    let cx =  material.size.x / 42.0;
+    let cy =  material.size.y / 42.0;
 
     let p = 0.5 - 0.05 / 1.1;
     let bb_size = 0.1;
@@ -115,8 +115,8 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     let l = p-w;
     let q = width / cx;
 
-    let xdo = smoothStep( m+q, l+q, abs(uv.x ) );
-    let xdi = 1.0 - smoothStep( m-q, l-q, abs(uv.x ) );
+    let xdo = smoothStep( m+q, l+q, abs(uv_original.x ) );
+    let xdi = 1.0 - smoothStep( m-q, l-q, abs(uv_original.x ) );
 
     let p = 0.5 - 0.05 / 1. - bb_size/cx;
     let w = sw / cx;
@@ -133,8 +133,8 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     let l = p-w;
     let q = width / cy;
 
-    let ydi = 1.0 - smoothStep( m-q, l-q, abs(uv.y ) );
-    let ydo = smoothStep( m+q, l+q, abs(uv.y ) );
+    let ydi = 1.0 - smoothStep( m-q, l-q, abs(uv_original.y ) );
+    let ydo = smoothStep( m+q, l+q, abs(uv_original.y ) );
     
 
     // p = 0.5 - 0.05/1. - bb_size/cy;

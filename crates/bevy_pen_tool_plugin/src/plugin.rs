@@ -40,6 +40,8 @@ impl Plugin for PenPlugin {
             .add_event::<UiButton>()
             .add_event::<Handle<Group>>()
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
+            .add_plugin(ColoredMesh2dPlugin) // mesh making
+            .add_plugin(RoadMesh2dPlugin) // mesh making
             .add_plugin(Material2dPlugin::<SelectionMat>::default())
             .add_plugin(Material2dPlugin::<SelectingMat>::default())
             .add_plugin(Material2dPlugin::<ButtonMat>::default())
@@ -47,6 +49,7 @@ impl Plugin for PenPlugin {
             .add_plugin(Material2dPlugin::<BezierEndsMat>::default())
             .add_plugin(Material2dPlugin::<BezierControlsMat>::default())
             .add_plugin(Material2dPlugin::<BezierMidMat>::default())
+            .add_plugin(Material2dPlugin::<FillMat>::default())
             .add_state("ModelViewController")
             .insert_resource(ClearColor(Color::hex("6e7f80").unwrap()))
             .insert_resource(Cursor::default())
@@ -127,144 +130,103 @@ impl Plugin for PenPlugin {
     }
 }
 
-// fn setup(
-//     // mut commands: Commands,
-//     asset_server: Res<AssetServer>,
-//     mut meshes: ResMut<Assets<Mesh>>,
-//     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
-//     mut render_graph: ResMut<RenderGraph>,
-//     mut maps: ResMut<Maps>,
-// ) {
-//     asset_server.watch_for_changes().unwrap();
-
-//     let latch_sound: Handle<AudioSource> = asset_server.load("sounds/latch.mp3");
-//     let unlatch_sound: Handle<AudioSource> = asset_server.load("sounds/unlatch.mp3");
-//     let group_sound: Handle<AudioSource> = asset_server.load("sounds/group.mp3");
-
-//     maps.sounds.insert("latch", latch_sound);
-//     maps.sounds.insert("unlatch", unlatch_sound);
-//     maps.sounds.insert("group", group_sound);
-
-//     let frag = asset_server.load::<Shader, _>("shaders/bezier.frag");
-//     let vert = asset_server.load::<Shader, _>("shaders/bezier.vert");
-//     let ends = asset_server.load::<Shader, _>("shaders/ends.frag");
-//     let button = asset_server.load::<Shader, _>("shaders/button.frag");
-//     let frag_bb = asset_server.load::<Shader, _>("shaders/bounding_box.frag");
-//     let selecting = asset_server.load::<Shader, _>("shaders/selecting.frag");
-//     let controls_frag = asset_server.load::<Shader, _>("shaders/controls.frag");
-
-//     let hundred_millis = time::Duration::from_millis(100);
-//     thread::sleep(hundred_millis);
-
-//     render_graph.add_system_node(
-//         "my_shader_params",
-//         AssetRenderResourcesNode::<MyShader>::new(true),
-//     );
-//     render_graph
-//         .add_node_edge("my_shader_params", base::node::MAIN_PASS)
-//         .unwrap();
-
-//     let ends_pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
-//         vertex: vert.clone(),
-//         fragment: Some(ends.clone()),
-//     }));
-
-//     let mids_pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
-//         vertex: vert.clone(),
-//         fragment: Some(frag.clone()),
-//     }));
-
-//     let controls_pipeline_handle =
-//         pipelines.add(PipelineDescriptor::default_config(ShaderStages {
-//             vertex: vert.clone(),
-//             fragment: Some(controls_frag.clone()),
-//         }));
-
-//     let bb_pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
-//         vertex: vert.clone(),
-//         fragment: Some(frag_bb),
-//     }));
-
-//     let selecting_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
-//         vertex: vert.clone(),
-//         fragment: Some(selecting),
-//     }));
-
-//     let button_pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
-//         vertex: vert.clone(),
-//         fragment: Some(button),
-//     }));
-
-//     let mesh_handle_ends_controls = meshes.add(Mesh::from(shape::Quad {
-//         size: Vec2::new(4.0, 4.0),
-//         flip: false,
-//     }));
-
-//     let mesh_handle_ends = meshes.add(Mesh::from(shape::Quad {
-//         size: Vec2::new(2.0, 4.0),
-//         flip: false,
-//     }));
-
-//     let mesh_handle_middle = meshes.add(Mesh::from(shape::Quad {
-//         size: Vec2::new(1.5, 1.5),
-//         flip: false,
-//     }));
-
-//     let mesh_handle_button = meshes.add(Mesh::from(shape::Quad {
-//         size: Vec2::new(3.0, 3.0),
-//         flip: false,
-//     }));
-
-//     maps.pipeline_handles.insert("ends", ends_pipeline_handle);
-//     maps.pipeline_handles
-//         .insert("controls", controls_pipeline_handle);
-//     maps.pipeline_handles.insert("mids", mids_pipeline_handle);
-//     maps.pipeline_handles
-//         .insert("button", button_pipeline_handle);
-
-//     maps.pipeline_handles
-//         .insert("bounding_box", bb_pipeline_handle);
-
-//     maps.pipeline_handles.insert("selecting", selecting_handle);
-
-//     maps.mesh_handles.insert("middles", mesh_handle_middle);
-
-//     maps.mesh_handles.insert("ends", mesh_handle_ends);
-
-//     maps.mesh_handles
-//         .insert("ends_controls", mesh_handle_ends_controls);
-
-//     maps.mesh_handles.insert("button", mesh_handle_button);
-
-//     thread::sleep(hundred_millis);
-// }
-
 fn setup(
     // mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
-    // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
-    // mut render_graph: ResMut<RenderGraph>,
-    // mut maps: ResMut<Maps>,
-    mut commands: Commands,
-    // mut meshes: ResMut<Assets<Mesh>>,
-    // mut materials: ResMut<Assets<MyShader>>,
+    mut maps: ResMut<Maps>,
 ) {
-    let size = Vec2::new(300.0, 300.0);
+    asset_server.watch_for_changes().unwrap();
 
-    // let material = materials.add(MyShader::default());
+    let latch_sound: Handle<AudioSource> = asset_server.load("sounds/latch.mp3");
+    let unlatch_sound: Handle<AudioSource> = asset_server.load("sounds/unlatch.mp3");
+    let group_sound: Handle<AudioSource> = asset_server.load("sounds/group.mp3");
 
-    // // quad
-    // commands.spawn().insert_bundle(MaterialMesh2dBundle {
-    //     mesh: Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(size)))),
-    //     material,
-    //     ..Default::default()
-    // });
+    maps.sounds.insert("latch", latch_sound);
+    maps.sounds.insert("unlatch", unlatch_sound);
+    maps.sounds.insert("group", group_sound);
 
-    // commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    // let hundred_millis = time::Duration::from_millis(100);
+    // thread::sleep(hundred_millis);
 
-    // asset_server.watch_for_changes().unwrap();
+    let color_ui_size = Vec2::new(40.0, 75.0);
+    let button_ui_size = Vec2::new(40.0, 45.0);
+
+    let button_width = 8.0;
+    let button_size = Vec2::new(button_width, button_width);
+    let icon_size = Vec2::new(button_width / 4.0, button_width / 2.0);
+
+    let mesh_handle_color_ui =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(color_ui_size))));
+
+    let mesh_handle_button_ui =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(button_ui_size))));
+    let mesh_handle_button =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(button_size))));
+
+    let ends_controls_mesh_handle =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(4.0, 4.0)))));
+
+    let ends_mesh_handle =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(2.0, 4.0)))));
+
+    let middle_mesh_handle =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(1.5, 1.5)))));
+
+    let mesh_handle_icon =
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(icon_size))));
+
+    maps.mesh_handles.insert("middles", middle_mesh_handle);
+
+    maps.mesh_handles.insert("ends", ends_mesh_handle);
+
+    maps.mesh_handles
+        .insert("ends_controls", ends_controls_mesh_handle);
+
+    maps.mesh_handles.insert("button", mesh_handle_button);
+
+    maps.mesh_handles
+        .insert("color_ui", mesh_handle_color_ui.clone());
+
+    maps.mesh_handles
+        .insert("button_ui", mesh_handle_button_ui.clone());
+
+    maps.mesh_handles.insert("icon", mesh_handle_icon.clone());
+
+    let road_texture_handle: Handle<Image> = asset_server.load("textures/single_lane_road.png");
+
+    maps.textures
+        .insert("single_lane_road", road_texture_handle);
+
+    // thread::sleep(hundred_millis);
 }
+
+// fn setup(
+//     // mut commands: Commands,
+//     asset_server: Res<AssetServer>,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
+//     // mut render_graph: ResMut<RenderGraph>,
+//     // mut maps: ResMut<Maps>,
+//     mut commands: Commands,
+//     // mut meshes: ResMut<Assets<Mesh>>,
+//     // mut materials: ResMut<Assets<MyShader>>,
+// ) {
+//     let size = Vec2::new(300.0, 300.0);
+
+//     // let material = materials.add(MyShader::default());
+
+//     // // quad
+//     // commands.spawn().insert_bundle(MaterialMesh2dBundle {
+//     //     mesh: Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(size)))),
+//     //     material,
+//     //     ..Default::default()
+//     // });
+
+//     // commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+
+//     // asset_server.watch_for_changes().unwrap();
+// }
 
 // #[derive(Debug, Clone, TypeUuid, AsStd140)]
 // #[uuid = "da63852d-f82b-459d-9790-3e652f92eaf7"]
