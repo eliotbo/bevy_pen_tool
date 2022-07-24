@@ -65,8 +65,8 @@ pub fn move_middle_quads(
                 let t_distance = bezier.compute_real_distance(t_time);
                 let pos = curve.point_at_pos(t_distance);
 
-                transform.translation.x = pos.0 as f32;
-                transform.translation.y = pos.1 as f32;
+                transform.translation().x = pos.0 as f32;
+                transform.translation().y = pos.1 as f32;
             }
         }
     }
@@ -110,16 +110,23 @@ pub fn move_group_middle_quads(
             let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
             // let pos = group.compute_position_with_lut(t_time as f32);
 
-            transform.translation.x = pos.x;
-            transform.translation.y = pos.y;
+            transform.translation().x = pos.x;
+            transform.translation().y = pos.y;
         }
     }
 }
 
 pub fn move_bb_quads(
     mut bezier_curves: ResMut<Assets<Bezier>>,
+    // mut query: Query<(
+    //     &mut GlobalTransform,
+    //     &Handle<Bezier>,
+    //     &Handle<Mesh>,
+    //     &Handle<SelectionMat>,
+    //     &BoundingBoxQuad,
+    // )>,
     mut query: Query<(
-        &mut GlobalTransform,
+        &mut Transform,
         &Handle<Bezier>,
         &Handle<Mesh>,
         &Handle<SelectionMat>,
@@ -158,7 +165,8 @@ pub fn move_bb_quads(
 
 pub fn move_end_quads(
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &EndpointQuad)>,
+    // mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &EndpointQuad)>,
+    mut query: Query<(&mut Transform, &Handle<Bezier>, &EndpointQuad)>,
     globals: Res<Globals>,
 ) {
     for (mut transform, bezier_handle, endpoint_quad_id) in query.iter_mut() {
@@ -191,7 +199,8 @@ pub fn move_end_quads(
 
 pub fn move_control_quads(
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &ControlPointQuad)>,
+    // mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &ControlPointQuad)>,
+    mut query: Query<(&mut Transform, &Handle<Bezier>, &ControlPointQuad)>,
 ) {
     for (mut transform, bezier_handle, ctr_pt_id) in query.iter_mut() {
         let ControlPointQuad(point) = ctr_pt_id;

@@ -46,16 +46,16 @@ fn main() {
 fn camera_setup(mut commands: Commands) {
     //
     // bevy_pen_tool is not compatible with Perspective Cameras
-    commands.spawn_bundle(OrthographicCameraBundle {
+    commands.spawn_bundle(Camera2dBundle {
         transform: Transform::from_translation(Vec3::new(00.0, 0.0, 10.0))
             .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-        orthographic_projection: OrthographicProjection {
+        projection: OrthographicProjection {
             scale: 0.20,
             far: 100000.0,
             near: -100000.0,
             ..Default::default()
         },
-        ..OrthographicCameraBundle::new_2d()
+        ..Default::default()
     });
 }
 

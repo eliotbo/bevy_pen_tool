@@ -72,7 +72,7 @@ pub fn begin_move_on_mouseclick(
     let mut latch_partners: Vec<LatchData> = Vec::new();
 
     if let Some(move_anchor) = move_event_reader.iter().next() {
-        let mut bezier = bezier_curves.get_mut(move_anchor.handle.clone()).unwrap();
+        let mut bezier = bezier_curves.get_mut(&move_anchor.handle.clone()).unwrap();
 
         let chose_a_control_point =
             move_anchor.anchor == Anchor::ControlStart || move_anchor.anchor == Anchor::ControlEnd;
@@ -224,9 +224,9 @@ pub fn selection_final(
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
-    mut query_set: QuerySet<(
-        QueryState<&mut Visibility, With<SelectingBoxQuad>>,
-        QueryState<&mut Visibility, With<SelectedBoxQuad>>,
+    mut query_set: ParamSet<(
+        Query<&mut Visibility, With<SelectingBoxQuad>>,
+        Query<&mut Visibility, With<SelectedBoxQuad>>,
     )>,
     group_query: Query<&Handle<Group>>,
     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
@@ -261,10 +261,10 @@ pub fn selection_final(
                         //
                         if group.handles.contains(&bezier_handle) {
                             selected = group.clone();
-                            for mut visible in query_set.q0().iter_mut() {
+                            for mut visible in query_set.p0().iter_mut() {
                                 visible.is_visible = true;
                             }
-                            for mut visible_selecting in query_set.q0().iter_mut() {
+                            for mut visible_selecting in query_set.p0().iter_mut() {
                                 visible_selecting.is_visible = false;
                             }
                             selection.selected = selected;
@@ -287,10 +287,10 @@ pub fn selection_final(
         let us = user_state.as_mut();
         *us = UserState::Selected(selected);
 
-        for mut visible_selected in query_set.q1().iter_mut() {
+        for mut visible_selected in query_set.p1().iter_mut() {
             visible_selected.is_visible = true;
         }
-        for mut visible_selecting in query_set.q0().iter_mut() {
+        for mut visible_selecting in query_set.p0().iter_mut() {
             visible_selecting.is_visible = false;
         }
     }
@@ -392,7 +392,7 @@ pub fn groupy(
         }
 
         for bezier_handle in selected.handles.clone() {
-            let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
+            let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
             bezier.grouped = true;
         }
 
@@ -407,9 +407,9 @@ pub fn groupy(
 pub fn latchy(
     cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: QuerySet<(
-        QueryState<(&Handle<Bezier>, &BoundingBoxQuad)>,
-        QueryState<(&Handle<Bezier>, &BoundingBoxQuad)>,
+    mut query: ParamSet<(
+        Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
+        Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
     )>,
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
@@ -429,7 +429,7 @@ pub fn latchy(
         // find moving quad and store its parameters
 
         // TODO: insert a Moving component to a moving anchor
-        for (bezier_handle, _bb) in query.q0().iter() {
+        for (bezier_handle, _bb) in query.p0().iter() {
             let mut bezier = bezier_curves.get(bezier_handle).unwrap().clone();
             bezier.potential_latch = None;
             if bezier.edge_is_moving() {
@@ -458,9 +458,9 @@ pub fn latchy(
                 latching_distance * globals.scale,
                 pos,
                 &bezier_curves,
-                &query.q0(),
+                &query.p0(),
             ) {
-                let partner_bezier = bezier_curves.get_mut(partner_handle.clone()).unwrap();
+                let partner_bezier = bezier_curves.get_mut(&partner_handle.clone()).unwrap();
 
                 // if the potential partner is free, continue
                 if partner_bezier.quad_is_latched(anchor_edge) {
@@ -491,8 +491,8 @@ pub fn latchy(
         if let Some((partner_id, mover_anchor, pa_edge, mover_handle, partner_handle)) =
             potential_partner
         {
-            let partner_bezier = bezier_curves.get(partner_handle).unwrap().clone();
-            let bezier = bezier_curves.get_mut(mover_handle.clone()).unwrap();
+            let partner_bezier = bezier_curves.get(&partner_handle).unwrap().clone();
+            let bezier = bezier_curves.get_mut(&mover_handle.clone()).unwrap();
 
             let latch_anchor_position = partner_bezier.get_position(pa_edge.to_anchor());
             let latch_control_position = partner_bezier.get_opposite_control(pa_edge);
@@ -584,7 +584,7 @@ pub fn delete(
             //
             for (_entity_selected, handle) in selection.selected.group.clone() {
                 //
-                let bezier = bezier_curves.get_mut(handle.clone()).unwrap();
+                let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
 
                 latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
                 latched_partners.push(bezier.latches[&AnchorEdge::End].clone());

@@ -1,7 +1,7 @@
 use crate::inputs::{Cursor, Latch};
 use crate::util::{
     compute_lut, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierMidMat,
-    BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, GrandParent,
+    BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, GrandParent, Icon,
     LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
 };
 
@@ -84,6 +84,7 @@ pub fn spawn_bezier_system(
             latches,
             ..Default::default()
         };
+
         bezier.update_previous_pos();
 
         spawn_bezier(
@@ -196,7 +197,7 @@ pub fn spawn_bezier(
     let parent = commands
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_bb,
-            visibility: visible_bb,
+            visibility: bevy::render::view::Visibility { is_visible: true },
             // render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
             //     bb_pipeline_handle,
             // )]),
@@ -227,6 +228,7 @@ pub fn spawn_bezier(
     end_pt_pos += end_displacement;
 
     let mut start_pt_transform = Transform::from_translation(start_pt_pos.extend(pos_z + 30.0));
+    // let mut start_pt_transform = Transform::from_translation(start_pt_pos.extend(400.0));
     let mut end_pt_transform = Transform::from_translation(end_pt_pos.extend(pos_z + 40.0));
 
     start_pt_transform.rotation = start_rotation;
@@ -246,6 +248,7 @@ pub fn spawn_bezier(
             mesh: ends_mesh_handle.clone(),
             visibility: visible_anchors.clone(),
             // render_pipelines: render_piplines_ends.clone(),
+            // transform: Transform::from_translation(Vec3::new(-8.0 / 8.0, 0.0, 10.1)),
             transform: start_pt_transform,
             material: ends_params_handle.clone(),
             ..Default::default()
@@ -255,6 +258,25 @@ pub fn spawn_bezier(
         // .insert(shader_params_handle_bb.clone())
         .id();
 
+    // /////////////////////////////////////////////////////////////////////////////
+    // println!("spawning bezier with id: {:?}", start_pt_transform);
+
+    // let child_start = commands
+    //     .spawn_bundle(MaterialMesh2dBundle {
+    //         mesh: ends_mesh_handle.clone(),
+    //         visibility: visible_anchors.clone(),
+    //         // transform: Transform::from_translation(Vec3::new(-8.0 / 8.0, 0.0, 10.1)),
+    //         transform: start_pt_transform,
+    //         material: ends_params_handle.clone(),
+    //         ..Default::default()
+    //     })
+    //     .insert(EndpointQuad(AnchorEdge::Start))
+    //     .insert(bezier_handle.clone())
+    //     // .insert(ButtonInteraction::None)
+    //     // .insert(shader_params_icon1)
+    //     .insert(Icon)
+    //     .id();
+    // /////////////////////////////////////////////////////////////////////////////
     commands.entity(parent).push_children(&[child_start]);
 
     let child_end = commands

@@ -28,7 +28,7 @@ pub struct CamPlugin;
 
 impl Plugin for CamPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(camera_movevement_system.system());
+        app.add_system(camera_movevement_system);
         // .add_system(zoom_camera.system());
     }
 }
@@ -48,14 +48,14 @@ pub fn movement_axis(input: &Res<Input<KeyCode>>, plus: KeyCode, minus: KeyCode)
 pub fn camera_movevement_system(
     keyboard_input: Res<Input<KeyCode>>,
     // mut query: Query<(&Cam, &mut Transform)>,
-    mut transforms: QuerySet<(
-        QueryState<(&Cam, &mut Transform)>,
-        QueryState<(&mut UiBoard, &mut Transform)>,
+    mut transforms: ParamSet<(
+        Query<(&Cam, &mut Transform)>,
+        Query<(&mut UiBoard, &mut Transform)>,
     )>,
     // mouse_button_input: Res<Input<MouseButton>>,
     // mut query_ui: Query<&mut Transform, With<UiBoard>>,
 ) {
-    let mut cam_query = transforms.q0();
+    let mut cam_query = transforms.p0();
     let mut velocity = Vec3::ZERO;
     let mut do_move_cam = false;
     for (cam, mut transform) in cam_query.iter_mut() {
@@ -76,7 +76,7 @@ pub fn camera_movevement_system(
 
         transform.translation += velocity;
     }
-    for (mut ui_board, mut ui_transform) in transforms.q1().iter_mut() {
+    for (mut ui_board, mut ui_transform) in transforms.p1().iter_mut() {
         ui_transform.translation += velocity;
         if do_move_cam {
             ui_board.previous_position = ui_transform.translation.truncate();

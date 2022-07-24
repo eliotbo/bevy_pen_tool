@@ -277,7 +277,7 @@ pub fn check_mouseclick_on_objects(
             let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
             //
             if cursor.within_rect(
-                button_transform.translation.truncate(),
+                button_transform.translation().truncate(),
                 shader_params.size * 0.95 * cam_scale,
             ) {
                 // this sends into nothingness
@@ -291,12 +291,12 @@ pub fn check_mouseclick_on_objects(
         // check for mouseclick on color buttons
         for (transform, shader_param_handle, _color_button) in color_button_query.iter() {
             let shader_params = my_shader_params
-                .get(shader_param_handle.clone())
+                .get(&shader_param_handle.clone())
                 .unwrap()
                 .clone();
 
             if cursor.within_rect(
-                transform.translation.truncate(),
+                transform.translation().truncate(),
                 shader_params.size * 1.15 * cam_scale,
             ) {
                 mouse_event_writer.send(MouseClickEvent::OnColorButton((

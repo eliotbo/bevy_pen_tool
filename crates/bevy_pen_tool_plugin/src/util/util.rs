@@ -229,7 +229,7 @@ impl Group {
     pub fn into_group_save(&self, bezier_curves: &mut ResMut<Assets<Bezier>>) -> GroupSaveLoad {
         let mut lut = Vec::new();
         for (handle, anchor, t_ends, local_lut) in self.lut.iter() {
-            let mut bezier = bezier_curves.get(handle.clone()).unwrap().clone();
+            let mut bezier = bezier_curves.get(&handle.clone()).unwrap().clone();
             bezier.lut = Vec::new();
             lut.push((
                 bezier.clone(),
@@ -259,7 +259,7 @@ impl Group {
         let handle = handles.iter().next().unwrap().clone();
         handles.remove(&handle);
 
-        let initial_bezier = bezier_curves.get(handle.clone()).unwrap();
+        let initial_bezier = bezier_curves.get(&handle.clone()).unwrap();
 
         let anchors_temp = vec![AnchorEdge::Start, AnchorEdge::End];
         let anchors = anchors_temp
@@ -303,7 +303,7 @@ impl Group {
 
                 let next_curve_handle = id_handle_map.get(&latch.latched_to_id).unwrap().clone();
 
-                let bezier_next = bezier_curves.get(next_curve_handle.clone()).unwrap();
+                let bezier_next = bezier_curves.get(&next_curve_handle.clone()).unwrap();
                 if let Some(next_latch) = bezier_next.latches[&next_edge].get(0) {
                     latch = next_latch;
                     num_con += 1;
@@ -339,7 +339,7 @@ impl Group {
 
             let mut sorted_handles: Vec<Handle<Bezier>> = vec![starting_handle.clone()];
 
-            let initial_bezier = bezier_curves.get(starting_handle.clone()).unwrap();
+            let initial_bezier = bezier_curves.get(&starting_handle.clone()).unwrap();
             //
             luts.push((
                 initial_bezier.lut.clone(),
@@ -367,7 +367,7 @@ impl Group {
                         break;
                     }
 
-                    let bezier_next = bezier_curves.get(next_curve_handle.clone()).unwrap();
+                    let bezier_next = bezier_curves.get(&next_curve_handle.clone()).unwrap();
                     sorted_handles.push(next_curve_handle.clone());
                     luts.push((
                         bezier_next.lut.clone(),
@@ -430,7 +430,7 @@ impl Group {
         //
         if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
             //
-            let bezier = bezier_curves.get(handle.clone()).unwrap();
+            let bezier = bezier_curves.get(&handle.clone()).unwrap();
 
             // some of this code is shared with move_middle_quads()
             let curve = bezier.to_curve();
@@ -476,7 +476,7 @@ impl Group {
             }
         }
         if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
-            let bezier = bezier_curves.get(handle.clone()).unwrap();
+            let bezier = bezier_curves.get(&handle.clone()).unwrap();
 
             // some of this code is shared with move_middle_quads()
             let curve = bezier.to_curve();
@@ -514,7 +514,7 @@ impl Group {
     ) {
         let mut total_length: f32 = 0.0;
         for lut in self.lut.clone() {
-            let bezier = bezier_curves.get(lut.0).unwrap();
+            let bezier = bezier_curves.get(&lut.0).unwrap();
             total_length += bezier.length();
         }
 
@@ -1159,7 +1159,7 @@ pub fn adjust_selection_attributes(
         // This could be done by removing the mesh from the mesh asset
         // and adding a brand new mesh
         for (_entity, selected_handle) in selection.selected.group.clone() {
-            let bezier = bezier_curves.get(selected_handle).unwrap();
+            let bezier = bezier_curves.get(&selected_handle).unwrap();
 
             let (bound0, bound1) = bezier.bounding_box();
             minx = minx.min(bound0.x);
@@ -1188,8 +1188,8 @@ pub fn adjust_selection_attributes(
         // println!("will attempt SELECTION");
 
         for mesh_handle in query.iter_mut() {
-            let mesh = meshes.get_mut(mesh_handle.0.clone()).unwrap();
-            let v_pos = mesh.attribute_mut("Vertex_Position");
+            let mesh = meshes.get_mut(&mesh_handle.0.clone()).unwrap();
+            let v_pos = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION);
 
             if let Some(array2) = v_pos {
                 // println!("changed SELECTION");
@@ -1242,8 +1242,8 @@ pub fn adjust_selecting_attributes(
         // println!("will attempt selecting");
 
         for mesh_handle in query.iter_mut() {
-            let mesh = meshes.get_mut(mesh_handle.0.clone()).unwrap();
-            let v_pos = mesh.attribute_mut("Vertex_Position");
+            let mesh = meshes.get_mut(&mesh_handle.0.clone()).unwrap();
+            let v_pos = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION);
 
             if let Some(array2) = v_pos {
                 println!("changed selecting");
@@ -1275,7 +1275,7 @@ pub fn adjust_group_attributes(
             // This could be done by removing the mesh from the mesh asset
             // and adding a brand new mesh
             for (_entity, selected_handle) in group.group.clone() {
-                let bezier = bezier_curves.get(selected_handle).unwrap();
+                let bezier = bezier_curves.get(&selected_handle).unwrap();
 
                 let (bound0, bound1) = bezier.bounding_box();
                 minx = minx.min(bound0.x);
@@ -1303,7 +1303,7 @@ pub fn adjust_group_attributes(
 
             for mesh_handle in query.iter_mut() {
                 let mesh = meshes.get_mut(mesh_handle).unwrap();
-                let v_pos = mesh.attribute_mut("Vertex_Position");
+                let v_pos = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION);
 
                 if let Some(array2) = v_pos {
                     *array2 = bevy::render::mesh::VertexAttributeValues::Float32x3(

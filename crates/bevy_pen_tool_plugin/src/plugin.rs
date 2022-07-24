@@ -112,17 +112,20 @@ impl Plugin for PenPlugin {
     }
 }
 
+// git checkout -t origin/bevy_8_dev
+
 fn setup(
     // mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut maps: ResMut<Maps>,
+    audio: Res<Audio>,
 ) {
     asset_server.watch_for_changes().unwrap();
 
-    let latch_sound: Handle<AudioSource> = asset_server.load("sounds/latch.mp3");
-    let unlatch_sound: Handle<AudioSource> = asset_server.load("sounds/unlatch.mp3");
-    let group_sound: Handle<AudioSource> = asset_server.load("sounds/group.mp3");
+    let latch_sound: Handle<AudioSource> = asset_server.load("sounds/latch.ogg");
+    let unlatch_sound: Handle<AudioSource> = asset_server.load("sounds/unlatch.ogg");
+    let group_sound: Handle<AudioSource> = asset_server.load("sounds/group.ogg");
 
     maps.sounds.insert("latch", latch_sound);
     maps.sounds.insert("unlatch", unlatch_sound);

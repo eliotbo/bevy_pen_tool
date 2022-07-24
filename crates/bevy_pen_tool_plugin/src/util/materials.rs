@@ -1,18 +1,18 @@
 use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
+    // sprite::Material2dPipeline,
+    // ecs::system::{lifetimeless::SRes, SystemParamItem},
     prelude::*,
     reflect::TypeUuid,
     render::{
         render_asset::{PrepareAssetError, RenderAsset},
-        render_resource::{
-            std140::{AsStd140, Std140},
-            *,
-        },
+        render_resource::*,
         renderer::RenderDevice,
     },
-    sprite::Material2d,
-    sprite::Material2dPipeline,
+    sprite::{Material2d, Material2dPipeline},
 };
+
+// use crevice::std140::*;
 
 // /////////////////////////////////  UiMat //////////////////////////////////////////
 
@@ -118,18 +118,24 @@ use bevy::{
 #[macro_export]
 macro_rules! make_mat {
     // ($($value:expr, $ty_of_val:ty, ),*) => {{
-    ($( $name_of_mat:ident, $gpu_name_of_mat:ident, $vert_shader:expr, $frag_shader:expr, $uuid:expr ),*) => {
+    ($( $name_of_mat:ident, $gpu_name_of_mat:ident,  $frag_shader:expr, $uuid:expr ),*) => {
 
         $(
-            #[derive(TypeUuid, Debug, Clone, AsStd140)]
+            #[derive(TypeUuid, Debug, Clone, AsBindGroup)]
             #[uuid = $uuid]
             #[allow(non_snake_case)]
             pub struct $name_of_mat {
+                #[uniform(0)]
                 pub color: Vec4,
+                #[uniform(0)]
                 pub clearcolor: Vec4,
+                #[uniform(0)]
                 pub t: f32, // Bezier t-value for MiddleQuads, but is used for other purposes elsewhere
+                #[uniform(0)]
                 pub zoom: f32,
+                #[uniform(0)]
                 pub size: Vec2,
+                #[uniform(0)]
                 pub hovered: f32,
             }
 
@@ -156,73 +162,75 @@ macro_rules! make_mat {
             }
 
             impl Material2d for $name_of_mat {
-                fn fragment_shader(asset_server: &AssetServer) -> Option<Handle<Shader>> {
-                    Some(asset_server.load($frag_shader))
+                fn fragment_shader() -> ShaderRef {
+                    // Some(asset_server.load($frag_shader))
+                    $frag_shader.into()
                 }
 
                 // fn vertex_shader(asset_server: &AssetServer) -> Option<Handle<Shader>> {
                 //     Some(asset_server.load($frag_shader))
                 // }
 
-                fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
-                    &render_asset.bind_group
-                }
+                // fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
+                //     &render_asset.bind_group
+                // }
 
-                fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
-                    render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                        entries: &[BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: ShaderStages::FRAGMENT,
-                            ty: BindingType::Buffer {
-                                ty: BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: BufferSize::new($name_of_mat::std140_size_static() as u64),
-                            },
-                            count: None,
-                        }],
-                        label: None,
-                    })
-                }
+                // fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
+                //     render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                //         entries: &[BindGroupLayoutEntry {
+                //             binding: 0,
+                //             visibility: ShaderStages::FRAGMENT,
+                //             ty: BindingType::Buffer {
+                //                 ty: BufferBindingType::Uniform,
+                //                 has_dynamic_offset: false,
+                //                 min_binding_size: BufferSize::new($name_of_mat::std140_size_static() as u64),
+                //             },
+                //             count: None,
+                //         }],
+                //         label: None,
+                //     })
+                // }
             }
 
 
 
 
-            impl RenderAsset for $name_of_mat {
-                type ExtractedAsset = $name_of_mat;
-                type PreparedAsset = $gpu_name_of_mat;
-                type Param = (SRes<RenderDevice>, SRes<Material2dPipeline<Self>>);
-                fn extract_asset(&self) -> Self::ExtractedAsset {
-                    self.clone()
-                }
+            // impl RenderAsset for $name_of_mat {
+            //     type ExtractedAsset = $name_of_mat;
+            //     type PreparedAsset = $gpu_name_of_mat;
+            //     type Param = (SRes<RenderDevice>, SRes<Material2dPipeline<Self>>);
 
-                fn prepare_asset(
-                    extracted_asset: Self::ExtractedAsset,
-                    (render_device, material_pipeline): &mut SystemParamItem<Self::Param>,
-                ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
-                    let custom_material_std140 = extracted_asset.as_std140();
-                    let custom_material_bytes = custom_material_std140.as_bytes();
+            //     fn extract_asset(&self) -> Self::ExtractedAsset {
+            //         self.clone()
+            //     }
 
-                    let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-                        contents: custom_material_bytes,
-                        label: None,
-                        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-                    });
-                    let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-                        entries: &[BindGroupEntry {
-                            binding: 0,
-                            resource: buffer.as_entire_binding(),
-                        }],
-                        label: None,
-                        layout: &material_pipeline.material2d_layout,
-                    });
+            //     fn prepare_asset(
+            //         extracted_asset: Self::ExtractedAsset,
+            //         (render_device, material_pipeline): &mut SystemParamItem<Self::Param>,
+            //     ) -> Result<Self::PreparedAsset, PrepareAssetError<Self::ExtractedAsset>> {
+            //         let custom_material_std140 = extracted_asset.as_std140();
+            //         let custom_material_bytes = custom_material_std140.as_bytes();
 
-                    Ok($gpu_name_of_mat {
-                        _buffer: buffer,
-                        bind_group,
-                    })
-                }
-            }
+            //         let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
+            //             contents: custom_material_bytes,
+            //             label: None,
+            //             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            //         });
+            //         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+            //             entries: &[BindGroupEntry {
+            //                 binding: 0,
+            //                 resource: buffer.as_entire_binding(),
+            //             }],
+            //             label: None,
+            //             layout: &material_pipeline.material2d_layout,
+            //         });
+
+            //         Ok($gpu_name_of_mat {
+            //             _buffer: buffer,
+            //             bind_group,
+            //         })
+            //     }
+            // }
 
         )*
     }
@@ -231,7 +239,6 @@ macro_rules! make_mat {
 make_mat![
     UiMat,
     GpuUiMat,
-    "shaders/bezier.vert",
     "shaders/ui.wgsl",
     "6cf5ad10-8906-45d9-b29b-eba9ec6c0de8"
 ];
@@ -239,7 +246,7 @@ make_mat![
 // make_mat![
 //     BezierMat,
 //     GpuBezier,
-//     "shaders/bezier.vert",
+
 //     "shaders/bezier.frag",
 //     "2e08866c-0b8a-437e-8bce-37733b21137e"
 // ];
@@ -247,7 +254,6 @@ make_mat![
 make_mat![
     SelectionMat,
     GpuSelectionMat,
-    "shaders/bezier.vert",
     "shaders/bounding_box.wgsl",
     "3e08866c-0b8a-437e-8bce-37733b21137e"
 ];
@@ -255,7 +261,6 @@ make_mat![
 make_mat![
     SelectingMat,
     GpuSelectingMat,
-    "shaders/bezier.vert",
     "shaders/selecting.wgsl",
     "4e08866c-0b8a-437e-8bce-37733b21137e"
 ];
@@ -263,7 +268,6 @@ make_mat![
 make_mat![
     ButtonMat,
     GpuButtonMat,
-    "shaders/bezier.vert",
     "shaders/button.wgsl",
     "5e08866c-0b8a-437e-8bce-37733b21137e"
 ];
@@ -271,7 +275,6 @@ make_mat![
 make_mat![
     BezierEndsMat,
     GpuBezierEnds,
-    "shaders/bezier.vert",
     "shaders/ends.wgsl",
     "6e08866c-0b8a-437e-8bce-37733b21137e"
 ];
@@ -279,7 +282,6 @@ make_mat![
 make_mat![
     BezierControlsMat,
     GpuBezierControlsMat,
-    "shaders/bezier.vert",
     "shaders/controls.wgsl",
     "7e08866c-0b8a-437e-8bce-37733b21137e"
 ];
@@ -287,7 +289,6 @@ make_mat![
 make_mat![
     BezierMidMat,
     GpuUiBezierMidMat,
-    "shaders/bezier.vert",
     "shaders/mids.wgsl",
     "8e08866c-0b8a-437e-8bce-37733b21137e"
 ];
@@ -295,7 +296,6 @@ make_mat![
 make_mat![
     FillMat,
     GpuFillMat,
-    "shaders/bezier.vert",
     "shaders/mids.wgsl",
     "9e08866c-0b8a-437e-8bce-37733b21137e"
 ];
