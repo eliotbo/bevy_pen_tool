@@ -1246,7 +1246,7 @@ pub fn adjust_selecting_attributes(
             let v_pos = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION);
 
             if let Some(array2) = v_pos {
-                println!("changed selecting");
+                // println!("changed selecting");
                 *array2 =
                     bevy::render::mesh::VertexAttributeValues::Float32x3(vertex_positions.clone());
             }

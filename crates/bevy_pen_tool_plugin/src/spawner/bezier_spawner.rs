@@ -288,6 +288,7 @@ pub fn spawn_bezier(
         visible_ctrl.is_visible = true;
     };
 
+    // control points
     for k in 0..2 {
         let z_ctr = pos_z + 50.0 + (k as f32) * 10.0;
         let mut ctr_pos_transform = Transform::from_translation(ctr0_pos.extend(z_ctr));
@@ -321,11 +322,13 @@ pub fn spawn_bezier(
             // .insert(shader_params_handle_bb.clone())
             .id();
 
-        if k == 0 {
-            commands.entity(child_start).push_children(&[child]);
-        } else {
-            commands.entity(child_end).push_children(&[child]);
-        }
+        commands.entity(parent).push_children(&[child]);
+
+        // if k == 0 {
+        //     commands.entity(child_start).push_children(&[child]);
+        // } else {
+        //     commands.entity(child_end).push_children(&[child]);
+        // }
     }
 
     let visible = Visibility { is_visible: true };

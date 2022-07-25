@@ -191,33 +191,6 @@ pub struct ShaderHandle {
     maybe_handle: Option<Handle<Shader>>,
 }
 
-// impl Plugin for SpritePlugin {
-//     fn build(&self, app: &mut App) {
-//         let mut shaders = app.world.get_resource_mut::<Assets<Shader>>().unwrap();
-//         let sprite_shader = Shader::from_wgsl(include_str!("render/sprite.wgsl"));
-//         shaders.set_untracked(SPRITE_SHADER_HANDLE, sprite_shader);
-//         app.add_asset::<TextureAtlas>()
-//             .register_type::<Sprite>()
-//             .add_plugin(Mesh2dRenderPlugin)
-//             .add_plugin(ColorMaterialPlugin);
-//         let render_app = app.sub_app_mut(RenderApp);
-//         render_app
-//             // .init_resource::<ImageBindGroups>()
-//             // .init_resource::<SpritePipeline>()
-//             // .init_resource::<SpecializedPipelines<SpritePipeline>>()
-//             .init_resource::<SpriteMeta>()
-//             .init_resource::<ExtractedSprites>()
-//             // .init_resource::<SpriteAssetEvents>()
-//             // .add_render_command::<Transparent2d, DrawSprite>()
-//             .add_system_to_stage(
-//                 RenderStage::Extract,
-//                 render::extract_sprites.label(SpriteSystem::ExtractSprites),
-//             )
-//             // .add_system_to_stage(RenderStage::Extract, render::extract_texture_events)
-//             .add_system_to_stage(RenderStage::Queue, queue_sprites);
-//     }
-// }
-
 impl Plugin for RoadMesh2dPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ShaderHandle { maybe_handle: None })
@@ -231,10 +204,10 @@ impl Plugin for RoadMesh2dPlugin {
             .init_resource::<ImageBindGroups>()
             .init_resource::<RoadMesh2dPipeline>()
             .init_resource::<SpriteAssetEvents>()
-            .init_resource::<SpecializedRenderPipelines<RoadMesh2dPipeline>>();
-        // .add_system_to_stage(RenderStage::Extract, extract_texture_events)
-        // .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
-        // .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
+            .init_resource::<SpecializedRenderPipelines<RoadMesh2dPipeline>>()
+            .add_system_to_stage(RenderStage::Extract, extract_texture_events)
+            .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
+            .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
     }
 }
 
@@ -308,6 +281,7 @@ pub fn queue_colored_mesh2d(
 ) {
     // If an image has changed, the GpuImage has (probably) changed
     for event in &events.images {
+        println!("cool");
         match event {
             AssetEvent::Created { .. } => None,
             AssetEvent::Modified { handle } => image_bind_groups.values.remove(handle),
@@ -398,19 +372,22 @@ pub struct SpriteAssetEvents {
 }
 
 pub fn extract_texture_events(
-    mut render_world: ResMut<MainWorld>,
-    mut image_events: EventReader<AssetEvent<Image>>,
+    // mut render_world: ResMut<MainWorld>,
+    mut image_events: Extract<EventReader<AssetEvent<Image>>>,
+    // mut events: Extract<SpriteAssetEvents>,
 ) {
-    let mut events = render_world
-        .get_resource_mut::<SpriteAssetEvents>()
-        .unwrap();
+    // let image_events = render_world
+    //     .get_resource::<EventReader<AssetEvent<Image>>>()
+    //     .unwrap();
 
-    let SpriteAssetEvents { ref mut images } = *events;
-    images.clear();
+    // let events = render_world.get_resource::<SpriteAssetEvents>().unwrap();
+
+    // let mut images = events.images;
+    // images.clear();
+    let mut images: Vec<AssetEvent<Image>> = vec![];
 
     for image in image_events.iter() {
-        // AssetEvent: !Clone
-
+        println!("cool");
         images.push(match image {
             AssetEvent::Created { handle } => AssetEvent::Created {
                 handle: handle.clone_weak(),
