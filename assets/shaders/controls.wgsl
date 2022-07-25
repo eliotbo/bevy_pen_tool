@@ -1,49 +1,52 @@
+#import bevy_sprite::mesh2d_types
+#import bevy_sprite::mesh2d_view_types
 
-#import bevy_sprite::mesh2d_struct
-#import bevy_sprite::mesh2d_view_bind_group
 
-type float4 = vec4<f32>;
-type float2 = vec2<f32>;
+
 
 struct UiMat {
-    color: vec4<f32>;
-    clearcolor: vec4<f32>;
-    t: f32;
-    zoom: f32;
-    size: vec2<f32>;
-    hovered: f32;
+    color: vec4<f32>,
+    clearcolor: vec4<f32>,
+    t: f32,
+    zoom: f32,
+    size: vec2<f32>,
+    hovered: f32,
 };
 
-[[group(1), binding(0)]]
+
+
+@group(1) @binding(0)
 var<uniform> material: UiMat;
 
 
 struct Vertex {
-    [[location(0)]] position: vec3<f32>;
-    [[location(1)]] normal: vec3<f32>;
-    [[location(2)]] uv: vec2<f32>;
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 #ifdef VERTEX_TANGENTS
-    [[location(3)]] tangent: vec4<f32>;
+    @location(3) tangent: vec4<f32>,
 #endif
 };
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] world_normal: vec3<f32>;
-    [[location(2)]] uv: vec2<f32>;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) world_normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 #ifdef VERTEX_TANGENTS
-    [[location(3)]] world_tangent: vec4<f32>;
+    @location(3) world_tangent: vec4<f32>,
 #endif
 };
 
-[[group(0), binding(0)]]
+
+@group(0) @binding(0)
 var<uniform> view: View;
 
-[[group(2), binding(0)]]
+
+@group(2) @binding(0)
 var<uniform> mesh: Mesh2d;
 
-fn sdTriangle(   p: float2, p0: float2, p1: float2, p2: float2 ) -> f32
+fn sdTriangle(   p: vec2<f32>, p0: vec2<f32>, p1: vec2<f32>, p2: vec2<f32> ) -> f32
 {
     let e0 = p1-p0;
     let e1 = p2-p1;
@@ -55,14 +58,14 @@ fn sdTriangle(   p: float2, p0: float2, p1: float2, p2: float2 ) -> f32
     let pq1 = v1 - e1*clamp( dot(v1,e1)/dot(e1,e1), 0.0, 1.0 );
     let pq2 = v2 - e2*clamp( dot(v2,e2)/dot(e2,e2), 0.0, 1.0 );
     let s = sign( e0.x*e2.y - e0.y*e2.x );
-    let d = min(min(float2(dot(pq0,pq0), s*(v0.x*e0.y-v0.y*e0.x)),
-                     float2(dot(pq1,pq1), s*(v1.x*e1.y-v1.y*e1.x))),
-                     float2(dot(pq2,pq2), s*(v2.x*e2.y-v2.y*e2.x)));
+    let d = min(min(vec2<f32>(dot(pq0,pq0), s*(v0.x*e0.y-v0.y*e0.x)),
+                     vec2<f32>(dot(pq1,pq1), s*(v1.x*e1.y-v1.y*e1.x))),
+                     vec2<f32>(dot(pq2,pq2), s*(v2.x*e2.y-v2.y*e2.x)));
     return -sqrt(d.x)*sign(d.y);
 }
 
 
-[[stage(vertex)]]
+@vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
     let world_position = mesh.model * vec4<f32>(vertex.position, 1.0);
 
@@ -89,12 +92,12 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 }
 
 struct FragmentInput {
-    [[builtin(front_facing)]] is_front: bool;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] world_normal: vec3<f32>;
-    [[location(2)]] uv: vec2<f32>;
+    @builtin(front_facing) is_front: bool,
+    @location(0) world_position: vec4<f32>,
+    @location(1) world_normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 #ifdef VERTEX_TANGENTS
-    [[location(3)]] world_tangent: vec4<f32>;
+    @location(3) world_tangent: vec4<f32>,
 #endif
 };
 
@@ -109,34 +112,34 @@ fn sdCircle(p: vec2<f32>, r: f32) -> f32 {
 
 
 
-[[stage(fragment)]]
-fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
 
     let aspect_ratio = material.size.y / material.size.x ;
 
-    var uv_original: float2 = in.uv  - float2(0.5);
+    var uv_original: vec2<f32> = in.uv  - vec2<f32>(0.5);
     uv_original.y = uv_original.y * aspect_ratio ;
 
-    // let pos = float2(0.5, 0.5);
+    // let pos = vec2<f32>(0.5, 0.5);
     // let uv_original = (Vertex_Uv.xy-pos);
 
 
 
-    let p0 = float2(0.0, -0.4);
-    let p1 = float2(0.4, 0.4);
-    let p2 = float2(-0.4, 0.4);
+    let p0 = vec2<f32>(0.0, -0.4);
+    let p1 = vec2<f32>(0.4, 0.4);
+    let p2 = vec2<f32>(-0.4, 0.4);
     var d0 = sdTriangle( uv_original,  p0,  p1,  p2 );
 
     let zoo = material.zoom / 0.08;
     let w = -0.02 * zoo;
-    d0 = smoothStep(-w, w, d0);
+    d0 = smoothstep(-w, w, d0);
 
-    let p3 = float2(0.0, -0.0);
-    let p4 = float2(0.4, 0.45);
-    let p5 = float2(-0.4, 0.45);
+    let p3 = vec2<f32>(0.0, -0.0);
+    let p4 = vec2<f32>(0.4, 0.45);
+    let p5 = vec2<f32>(-0.4, 0.45);
     
     var d1 = sdTriangle( uv_original,  p3,  p4,  p5 );
-    d1 = smoothStep(-w, w, d1);
+    d1 = smoothstep(-w, w, d1);
 
 
     let d = d0 * (1.0 - d1);
@@ -154,5 +157,5 @@ fn fragment(in: FragmentInput) -> [[location(0)]] vec4<f32> {
     
 
     return circle;
-    // return float4(1.0, 1.0, 1.0, 1.0);
+    // return vec4<f32>(1.0, 1.0, 1.0, 1.0);
 }

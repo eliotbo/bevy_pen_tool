@@ -171,7 +171,8 @@ pub fn spawn_bezier(
     //////////////////// Bounding box ////////////////////
 
     let visible_bb = Visibility {
-        is_visible: !globals.do_hide_bounding_boxes,
+        // is_visible: !globals.do_hide_bounding_boxes,
+        is_visible: true,
     };
 
     let visible_anchors = Visibility {
@@ -284,7 +285,7 @@ pub fn spawn_bezier(
         // is_transparent: true,
     };
     if globals.hide_control_points {
-        visible_ctrl.is_visible = false;
+        visible_ctrl.is_visible = true;
     };
 
     for k in 0..2 {
