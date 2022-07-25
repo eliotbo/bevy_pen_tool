@@ -438,9 +438,9 @@ impl Plugin for ColoredMesh2dPlugin {
         render_app
             .add_render_command::<Transparent2d, DrawColoredMesh2d>()
             .init_resource::<ColoredMesh2dPipeline>()
-            .init_resource::<SpecializedRenderPipelines<ColoredMesh2dPipeline>>()
-            .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
-            .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
+            .init_resource::<SpecializedRenderPipelines<ColoredMesh2dPipeline>>();
+        // .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
+        // .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
     }
 }
 

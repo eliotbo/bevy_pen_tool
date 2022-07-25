@@ -231,10 +231,10 @@ impl Plugin for RoadMesh2dPlugin {
             .init_resource::<ImageBindGroups>()
             .init_resource::<RoadMesh2dPipeline>()
             .init_resource::<SpriteAssetEvents>()
-            .init_resource::<SpecializedRenderPipelines<RoadMesh2dPipeline>>()
-            .add_system_to_stage(RenderStage::Extract, extract_texture_events)
-            .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
-            .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
+            .init_resource::<SpecializedRenderPipelines<RoadMesh2dPipeline>>();
+        // .add_system_to_stage(RenderStage::Extract, extract_texture_events)
+        // .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
+        // .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
     }
 }
 
@@ -397,46 +397,15 @@ pub struct SpriteAssetEvents {
     pub images: Vec<AssetEvent<Image>>,
 }
 
-// pub fn extract_texture_events(
-//     mut render_world: ResMut<MainWorld>,
-//     mut image_events: EventReader<AssetEvent<Image>>,
-// ) {
-//     let mut events = render_world
-//         .get_resource_mut::<SpriteAssetEvents>()
-//         .unwrap();
-
-//     let SpriteAssetEvents { ref mut images } = *events;
-//     images.clear();
-
-//     for image in image_events.iter() {
-//         // AssetEvent: !Clone
-
-//         images.push(match image {
-//             AssetEvent::Created { handle } => AssetEvent::Created {
-//                 handle: handle.clone_weak(),
-//             },
-//             AssetEvent::Modified { handle } => AssetEvent::Modified {
-//                 handle: handle.clone_weak(),
-//             },
-//             AssetEvent::Removed { handle } => AssetEvent::Removed {
-//                 handle: handle.clone_weak(),
-//             },
-//         });
-//     }
-// }
-
 pub fn extract_texture_events(
     mut render_world: ResMut<MainWorld>,
-    mut sprite_asset_event: ResMut<SpriteAssetEvents>,
     mut image_events: EventReader<AssetEvent<Image>>,
 ) {
-    // let mut events = render_world
-    //     .get_resource_mut::<SpriteAssetEvents>()
-    //     .unwrap();
+    let mut events = render_world
+        .get_resource_mut::<SpriteAssetEvents>()
+        .unwrap();
 
-    // let SpriteAssetEvents { ref mut images } = *events;
-
-    let SpriteAssetEvents { ref mut images } = *sprite_asset_event;
+    let SpriteAssetEvents { ref mut images } = *events;
     images.clear();
 
     for image in image_events.iter() {
