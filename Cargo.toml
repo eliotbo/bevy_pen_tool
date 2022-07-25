@@ -9,7 +9,7 @@ categories = ["animation", "ui", "game-development", "mesh", "bezier-curves"]
 members = ["crates/*"]
 
 [dependencies]
-bevy = "0.6"
+bevy = { git = "https://github.com/bevyengine/bevy", rev = "619c30c" }
 bevy_pen_tool_plugin = { path = "crates/bevy_pen_tool_plugin", version = "0.3.0" }
 
 serde_json = "1.0.59"

@@ -5,6 +5,7 @@ use crate::util::{
     SelectionMat, TurnRoundAnimation, UiAction, UiBoard,
 };
 
+use bevy::math::Vec3A;
 use bevy::prelude::*;
 
 pub fn move_ui(
@@ -65,8 +66,12 @@ pub fn move_middle_quads(
                 let t_distance = bezier.compute_real_distance(t_time);
                 let pos = curve.point_at_pos(t_distance);
 
-                transform.translation.x = pos.0 as f32;
-                transform.translation.y = pos.1 as f32;
+                let z = transform.translation().z;
+
+                *transform.translation_mut() = Vec3A::new(pos.0 as f32, pos.1 as f32, z);
+
+                // transform.translation.x = pos.0 as f32;
+                // transform.translation.y = pos.1 as f32;
             }
         }
     }
@@ -110,8 +115,11 @@ pub fn move_group_middle_quads(
             let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
             // let pos = group.compute_position_with_lut(t_time as f32);
 
-            transform.translation.x = pos.x;
-            transform.translation.y = pos.y;
+            let z = transform.translation().z;
+            *transform.translation_mut() = Vec3A::new(pos.x, pos.y, z);
+
+            // transform.translation.x = pos.x;
+            // transform.translation.y = pos.y;
         }
     }
 }
@@ -144,7 +152,12 @@ pub fn move_bb_quads(
         let bb_pos = (bound1 + bound0) / 2.0;
 
         // println!("{:?}, {:?}", bb_size,);
-        transform.translation = bb_pos.extend(transform.translation.z);
+
+        let z = transform.translation().z;
+
+        *transform.translation_mut() = Vec3A::new(bb_pos.x, bb_pos.y, z);
+        // transform.translation = bb_pos.extend(transform.translation.z);
+
         shader_params.size = bigger_size;
 
         // TODO: change the transform scale instead of the mesh
@@ -156,9 +169,44 @@ pub fn move_bb_quads(
     }
 }
 
+// pub fn move_end_quads(
+//     mut bezier_curves: ResMut<Assets<Bezier>>,
+//     mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &EndpointQuad)>,
+//     globals: Res<Globals>,
+// ) {
+//     for (mut transform, bezier_handle, endpoint_quad_id) in query.iter_mut() {
+//         //
+//         let EndpointQuad(point) = endpoint_quad_id;
+//         //
+//         // checks whether the transforms are equal to the positions in the Bezier data structure
+//         if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
+//             if (*point == AnchorEdge::Start
+//                 && transform.translation().truncate() != bezier.positions.start)
+//                 || (*point == AnchorEdge::End
+//                     && transform.translation().truncate() != bezier.positions.end)
+//             {
+//                 let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
+//                     bezier.ends_displacement(globals.scale);
+
+//                 if *point == AnchorEdge::Start {
+//                     transform.translation = (bezier.positions.start + start_displacement)
+//                         .extend(transform.translation.z);
+
+//                     transform.rotation = start_rotation;
+//                 } else {
+//                     transform.translation =
+//                         (bezier.positions.end + end_displacement).extend(transform.translation.z);
+//                     transform.rotation = end_rotation;
+//                 }
+//             }
+//         }
+//     }
+// }
+
 pub fn move_end_quads(
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &EndpointQuad)>,
+    // mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &EndpointQuad)>,
+    mut query: Query<(&mut Transform, &Handle<Bezier>, &EndpointQuad)>,
     globals: Res<Globals>,
 ) {
     for (mut transform, bezier_handle, endpoint_quad_id) in query.iter_mut() {
@@ -198,7 +246,7 @@ pub fn move_control_quads(
         //
         if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
             //
-            let (_axis, quad_angle) = transform.rotation.to_axis_angle();
+            // let (_axis, quad_angle) = transform.rotation.to_axis_angle();
 
             let control_point: Vec2;
             let anchor_point: Vec2;
@@ -219,13 +267,16 @@ pub fn move_control_quads(
 
             let bezier_angle_90: f32 = bezier_angle + constant_angle;
 
-            let offset: bool = transform.translation.truncate() != control_point;
-            let rotated: bool = !((quad_angle.abs() - bezier_angle_90.abs()).abs() < 0.01);
+            let offset: bool = transform.translation().truncate() != control_point;
+            // let rotated: bool = !((quad_angle.abs() - bezier_angle_90.abs()).abs() < 0.01);
 
             // if the quad's translation and rotation are not equal to the corresponding control point, fix them
-            if offset || rotated {
-                transform.translation = control_point.extend(transform.translation.z);
-                transform.rotation = Quat::from_rotation_z(bezier_angle_90);
+            // if offset || rotated {
+            if offset {
+                let z = transform.translation().z;
+                *transform.translation_mut() = Vec3A::new(control_point.x, control_point.y, z);
+                // transform.translation = control_point.extend(transform.translation.z);
+                // transform.rotation = Quat::from_rotation_z(bezier_angle_90);
             }
         }
     }

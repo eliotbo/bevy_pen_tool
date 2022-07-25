@@ -210,7 +210,7 @@ pub fn spawn_group_middle_quads(
 
         let num_mid_quads = 50;
 
-        let group = groups.get(group_handle.clone()).unwrap();
+        let group = groups.get(&group_handle.clone()).unwrap();
 
         let (parent, _handle) = group.group.iter().next().unwrap();
 

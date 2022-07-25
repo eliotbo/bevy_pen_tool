@@ -6,8 +6,7 @@ use crate::util::*;
 // use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
 use bevy::{
-    core::FloatOrd,
-    core_pipeline::Transparent2d,
+    core_pipeline::core_2d::Transparent2d,
     prelude::*,
     reflect::TypeUuid,
     render::{
@@ -16,18 +15,20 @@ use bevy::{
         render_phase::{AddRenderCommand, DrawFunctions, RenderPhase, SetItemPipeline},
         render_resource::{
             BlendState, ColorTargetState, ColorWrites, Face, FragmentState, FrontFace,
-            MultisampleState, PolygonMode, PrimitiveState, PrimitiveTopology, RenderPipelineCache,
-            RenderPipelineDescriptor, SpecializedPipeline, SpecializedPipelines, TextureFormat,
-            VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+            MultisampleState, PipelineCache, PolygonMode, PrimitiveState, PrimitiveTopology,
+            RenderPipelineDescriptor, SpecializedRenderPipeline, SpecializedRenderPipelines,
+            TextureFormat, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
+            VertexStepMode,
         },
         texture::BevyDefault,
         view::VisibleEntities,
-        RenderApp, RenderStage,
+        Extract, RenderApp, RenderStage,
     },
     sprite::{
         DrawMesh2d, Mesh2dHandle, Mesh2dPipeline, Mesh2dPipelineKey, Mesh2dUniform,
         SetMesh2dBindGroup, SetMesh2dViewBindGroup,
     },
+    utils::FloatOrd,
 };
 
 use lyon::tessellation::geometry_builder::simple_builder;
@@ -125,17 +126,17 @@ pub fn make_road(
 
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
-        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
 
         // mesh.set_attribute("Vertex_Color", colors);
-        mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
 
         // mesh.set_attribute("Vertex_Normal", mesh_attr_normals);
         // mesh.set_attribute("Vertex_Uv", mesh_attr_uvs);
 
         mesh.set_indices(Some(Indices::U32(new_indices)));
 
-        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, mesh_attr_uvs);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, mesh_attr_uvs);
 
         // use std::{thread, time};
         // let texture_handle: Handle<Texture> = asset_server.load("textures/road_texture.png");
@@ -274,13 +275,13 @@ pub fn make_mesh(
 
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
-        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
 
-        mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
 
         mesh.set_indices(Some(Indices::U32(new_indices)));
 
-        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, mesh_attr_uvs);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, mesh_attr_uvs);
 
         // We can now spawn the entities for the star and the camera
         commands.spawn_bundle((
@@ -314,7 +315,7 @@ impl FromWorld for ColoredMesh2dPipeline {
 }
 
 // We implement `SpecializedPipeline` to customize the default rendering from `Mesh2dPipeline`
-impl SpecializedPipeline for ColoredMesh2dPipeline {
+impl SpecializedRenderPipeline for ColoredMesh2dPipeline {
     type Key = Mesh2dPipelineKey;
 
     fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
@@ -363,11 +364,16 @@ impl SpecializedPipeline for ColoredMesh2dPipeline {
                 shader: COLORED_MESH2D_SHADER_HANDLE.typed::<Shader>(),
                 shader_defs: Vec::new(),
                 entry_point: "fragment".into(),
-                targets: vec![ColorTargetState {
+                // targets: vec![ColorTargetState {
+                //     format: TextureFormat::bevy_default(),
+                //     blend: Some(BlendState::ALPHA_BLENDING),
+                //     write_mask: ColorWrites::ALL,
+                // }],
+                targets: vec![Some(ColorTargetState {
                     format: TextureFormat::bevy_default(),
                     blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::ALL,
-                }],
+                })],
             }),
             // Use the two standard uniforms for 2d meshes
             layout: Some(vec![
@@ -432,7 +438,7 @@ impl Plugin for ColoredMesh2dPlugin {
         render_app
             .add_render_command::<Transparent2d, DrawColoredMesh2d>()
             .init_resource::<ColoredMesh2dPipeline>()
-            .init_resource::<SpecializedPipelines<ColoredMesh2dPipeline>>()
+            .init_resource::<SpecializedRenderPipelines<ColoredMesh2dPipeline>>()
             .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
             .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
     }
@@ -452,7 +458,7 @@ pub fn finalize_setup_shader(
     shader_handle: ResMut<ShaderHandle>,
 ) {
     let s = shaders
-        .get(shader_handle.maybe_handle.clone().unwrap())
+        .get(&shader_handle.maybe_handle.clone().unwrap())
         .unwrap()
         .clone();
 
@@ -463,11 +469,11 @@ pub fn finalize_setup_shader(
 pub fn extract_colored_mesh2d(
     mut commands: Commands,
     mut previous_len: Local<usize>,
-    query: Query<(Entity, &ComputedVisibility), With<ColoredMesh2d>>,
+    query: Extract<Query<(Entity, &ComputedVisibility), With<ColoredMesh2d>>>,
 ) {
     let mut values = Vec::with_capacity(*previous_len);
     for (entity, computed_visibility) in query.iter() {
-        if !computed_visibility.is_visible {
+        if !computed_visibility.is_visible() {
             continue;
         }
         values.push((entity, (ColoredMesh2d,)));
@@ -481,8 +487,8 @@ pub fn extract_colored_mesh2d(
 pub fn queue_colored_mesh2d(
     transparent_draw_functions: Res<DrawFunctions<Transparent2d>>,
     colored_mesh2d_pipeline: Res<ColoredMesh2dPipeline>,
-    mut pipelines: ResMut<SpecializedPipelines<ColoredMesh2dPipeline>>,
-    mut pipeline_cache: ResMut<RenderPipelineCache>,
+    mut pipelines: ResMut<SpecializedRenderPipelines<ColoredMesh2dPipeline>>,
+    mut pipeline_cache: ResMut<PipelineCache>,
     msaa: Res<Msaa>,
     render_meshes: Res<RenderAssets<Mesh>>,
     colored_mesh2d: Query<(&Mesh2dHandle, &Mesh2dUniform), With<ColoredMesh2d>>,
