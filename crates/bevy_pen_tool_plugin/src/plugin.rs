@@ -177,6 +177,7 @@ fn setup(
     maps.mesh_handles.insert("icon", mesh_handle_icon.clone());
 
     let road_texture_handle: Handle<Image> = asset_server.load("textures/single_lane_road.png");
+    // print!("road_texture_handle: {:?}", road_texture_handle);
 
     maps.textures
         .insert("single_lane_road", road_texture_handle);

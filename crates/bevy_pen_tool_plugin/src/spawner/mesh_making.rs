@@ -1,5 +1,5 @@
 use crate::inputs::Action;
-use crate::spawner::RoadMesh2d;
+use crate::spawner::RoadMesh2dMaterial;
 use crate::util::*;
 // use bevy::reflect::TypeUuid;
 // use bevy::render::mesh::Indices;
@@ -25,8 +25,8 @@ use bevy::{
         Extract, RenderApp, RenderStage,
     },
     sprite::{
-        DrawMesh2d, Mesh2dHandle, Mesh2dPipeline, Mesh2dPipelineKey, Mesh2dUniform,
-        SetMesh2dBindGroup, SetMesh2dViewBindGroup,
+        DrawMesh2d, MaterialMesh2dBundle, Mesh2dHandle, Mesh2dPipeline, Mesh2dPipelineKey,
+        Mesh2dUniform, SetMesh2dBindGroup, SetMesh2dViewBindGroup,
     },
     utils::FloatOrd,
 };
@@ -44,6 +44,7 @@ pub fn make_road(
     groups: Res<Assets<Group>>,
     mut meshes: ResMut<Assets<Mesh>>,
     query: Query<Entity, With<RoadMesh>>,
+    mut road_materials: ResMut<Assets<RoadMesh2dMaterial>>,
 
     // mut materials: ResMut<Assets<StandardMaterial>>,
     // asset_server: Res<AssetServer>,
@@ -115,6 +116,7 @@ pub fn make_road(
         // show points from look-up table
         let color = globals.picked_color.unwrap();
         let mut colors = Vec::new();
+        let mut normals = Vec::new();
 
         for position in mesh_contour {
             // mesh_pos_attributes.push([position.x, position.y, 0.0]);
@@ -122,6 +124,7 @@ pub fn make_road(
             mesh_attr_normals.push([0.0, 0.0, 1.0]);
 
             colors.push([color.r(), color.g(), color.b(), 1.0]);
+            normals.push([0.0, 0.0, 1.0]);
         }
 
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
@@ -129,6 +132,7 @@ pub fn make_road(
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
 
         // mesh.set_attribute("Vertex_Color", colors);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
 
         // mesh.set_attribute("Vertex_Normal", mesh_attr_normals);
@@ -158,16 +162,36 @@ pub fn make_road(
 
         let texture_handle = maps.textures.get("single_lane_road").unwrap();
 
-        commands.spawn_bundle((
-            RoadMesh2d::default(),
-            Mesh2dHandle(meshes.add(mesh)),
-            // Transform::default(),
-            GlobalTransform::default(),
-            Transform::from_translation(Vec3::new(0.0, 0.0, 310.0)),
-            Visibility::default(),
-            ComputedVisibility::default(),
-            texture_handle.clone(),
-        ));
+        let mat_handle = road_materials.add(RoadMesh2dMaterial {
+            road_texture: texture_handle.clone(),
+        });
+
+        // pub mesh: Mesh2dHandle,
+        // pub material: Handle<M>,
+        // pub transform: Transform,
+        // pub global_transform: GlobalTransform,
+        // pub visibility: Visibility,
+        // pub computed_visibility: ComputedVisibility,
+
+        // commands.spawn_bundle((
+        //     RoadMesh2d {
+        //         road_texture: texture_handle.clone(),
+        //     },
+        //     Mesh2dHandle(meshes.add(mesh)),
+        //     // Transform::default(),
+        //     GlobalTransform::default(),
+        //     Transform::from_translation(Vec3::new(0.0, 0.0, 310.0)),
+        //     Visibility::default(),
+        //     ComputedVisibility::default(),
+        //     // texture_handle.clone(),
+        // ));
+
+        commands.spawn_bundle(MaterialMesh2dBundle {
+            mesh: Mesh2dHandle(meshes.add(mesh)),
+            material: mat_handle,
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 310.0)),
+            ..default()
+        });
     }
 }
 
@@ -273,6 +297,8 @@ pub fn make_mesh(
             new_indices.push(ind.clone() as u32);
         }
 
+        // println!("making mesh: {:?}", "aah");
+
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
@@ -321,30 +347,41 @@ impl SpecializedRenderPipeline for ColoredMesh2dPipeline {
     fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
         // Customize how to store the meshes' vertex attributes in the vertex buffer
         // Our meshes only have position and color
-        let vertex_attributes = vec![
-            // Position (GOTCHA! Vertex_Position isn't first in the buffer due to how Mesh sorts attributes (alphabetically))
-            VertexAttribute {
-                format: VertexFormat::Float32x3,
-                // this offset is the size of the color attribute, which is stored first
-                offset: 16,
-                // position is available at location 0 in the shader
-                shader_location: 0,
-            },
-            // Color
-            VertexAttribute {
-                format: VertexFormat::Float32x4,
-                offset: 0,
-                shader_location: 1,
-            },
-            // uv
-            VertexAttribute {
-                format: VertexFormat::Float32x2,
-                offset: 28,
-                shader_location: 2,
-            },
+        let formats = vec![
+            // Position
+            VertexFormat::Float32x3,
+            VertexFormat::Float32x4,
+            // UV
+            VertexFormat::Float32x2,
         ];
-        // This is the sum of the size of position, color uv attributes (12 + 16 + 8 = 36)
-        let vertex_array_stride = 36;
+
+        let vertex_layout =
+            VertexBufferLayout::from_vertex_formats(VertexStepMode::Vertex, formats);
+
+        // let vertex_attributes = vec![
+        //     // Position (GOTCHA! Vertex_Position isn't first in the buffer due to how Mesh sorts attributes (alphabetically))
+        //     VertexAttribute {
+        //         format: VertexFormat::Float32x3,
+        //         // this offset is the size of the color attribute, which is stored first
+        //         offset: 16,
+        //         // position is available at location 0 in the shader
+        //         shader_location: 0,
+        //     },
+        //     // Color
+        //     VertexAttribute {
+        //         format: VertexFormat::Float32x4,
+        //         offset: 0,
+        //         shader_location: 1,
+        //     },
+        //     // uv
+        //     VertexAttribute {
+        //         format: VertexFormat::Float32x2,
+        //         offset: 28,
+        //         shader_location: 2,
+        //     },
+        // ];
+        // // This is the sum of the size of position, color uv attributes (12 + 16 + 8 = 36)
+        // let vertex_array_stride = 36;
 
         RenderPipelineDescriptor {
             vertex: VertexState {
@@ -353,11 +390,12 @@ impl SpecializedRenderPipeline for ColoredMesh2dPipeline {
                 entry_point: "vertex".into(),
                 shader_defs: Vec::new(),
                 // Use our custom vertex buffer
-                buffers: vec![VertexBufferLayout {
-                    array_stride: vertex_array_stride,
-                    step_mode: VertexStepMode::Vertex,
-                    attributes: vertex_attributes,
-                }],
+                // buffers: vec![VertexBufferLayout {
+                //     array_stride: vertex_array_stride,
+                //     step_mode: VertexStepMode::Vertex,
+                //     attributes: vertex_attributes,
+                // }],
+                buffers: vec![vertex_layout],
             },
             fragment: Some(FragmentState {
                 // Use our custom shader
@@ -438,9 +476,9 @@ impl Plugin for ColoredMesh2dPlugin {
         render_app
             .add_render_command::<Transparent2d, DrawColoredMesh2d>()
             .init_resource::<ColoredMesh2dPipeline>()
-            .init_resource::<SpecializedRenderPipelines<ColoredMesh2dPipeline>>();
-        // .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
-        // .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
+            .init_resource::<SpecializedRenderPipelines<ColoredMesh2dPipeline>>()
+            .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
+            .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
     }
 }
 
