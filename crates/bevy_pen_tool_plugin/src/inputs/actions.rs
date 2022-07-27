@@ -191,7 +191,7 @@ pub fn selection_box_init(
     mut user_state: ResMut<UserState>,
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
-    query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+    query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
     mut action_event_reader: EventReader<Action>,
     mut visible_selection_query: Query<&mut Visibility, With<SelectingBoxQuad>>,
 ) {
@@ -229,7 +229,7 @@ pub fn selection_final(
         Query<&mut Visibility, With<SelectedBoxQuad>>,
     )>,
     group_query: Query<&Handle<Group>>,
-    query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+    query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
     mut action_event_reader: EventReader<Action>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Selected) {
@@ -408,8 +408,8 @@ pub fn latchy(
     cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: ParamSet<(
-        Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
-        Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
+        Query<(&Handle<Bezier>, &BezierParent)>,
+        Query<(&Handle<Bezier>, &BezierParent)>,
     )>,
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
@@ -573,7 +573,7 @@ pub fn delete(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
     mut visible_query: Query<&mut Visibility, With<SelectedBoxQuad>>,
-    query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+    query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
     query2: Query<(Entity, &Handle<Group>), With<GroupBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
 ) {
@@ -856,7 +856,7 @@ pub fn save(
 // only loads groups
 
 pub fn load(
-    query: Query<Entity, Or<(With<BoundingBoxQuad>, With<GroupBoxQuad>)>>,
+    query: Query<Entity, Or<(With<BezierParent>, With<GroupBoxQuad>)>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -957,7 +957,7 @@ pub fn load(
 
 // makes UI and quads bigger or smaller using Ctrl + mousewheel
 pub fn rescale(
-    mut grandparent_query: Query<&mut Transform, With<GrandParent>>,
+    mut grandparent_query: Query<&mut Transform, With<BezierGrandParent>>,
     shader_param_query: Query<&Handle<UiMat>>,
     mut my_shaders: ResMut<Assets<UiMat>>,
     mut globals: ResMut<Globals>,

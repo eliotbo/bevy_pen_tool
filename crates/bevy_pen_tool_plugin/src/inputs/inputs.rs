@@ -1,8 +1,9 @@
 use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
-    get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BoundingBoxQuad,
-    ButtonMat, ColorButton, Globals, GrandParent, OfficialLatch, UiAction, UiBoard, UserState,
+    get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BezierGrandParent,
+    BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, OfficialLatch, UiAction,
+    UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -236,8 +237,8 @@ pub fn check_mouseclick_on_objects(
         &UiButton,
     )>,
     color_button_query: Query<(&GlobalTransform, &Handle<ButtonMat>, &ColorButton)>,
-    mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
-    bezier_query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
+    mut ui_query: Query<(&Transform, &mut UiBoard), With<BezierGrandParent>>,
+    bezier_query: Query<(&Handle<Bezier>, &BezierParent)>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut mouse_event_writer: EventWriter<MouseClickEvent>,
     mut action_event_writer: EventWriter<Action>,
@@ -442,7 +443,7 @@ pub fn check_mouseclick_on_objects(
 pub fn pick_color(
     mut my_shader_params: ResMut<Assets<ButtonMat>>,
     query: Query<(&GlobalTransform, &Handle<ButtonMat>, &ColorButton)>,
-    mut ui_query: Query<(&Transform, &mut UiBoard), With<GrandParent>>,
+    mut ui_query: Query<(&Transform, &mut UiBoard), With<BezierGrandParent>>,
     mut globals: ResMut<Globals>,
     mut mouse_event_reader: EventReader<MouseClickEvent>,
 ) {
@@ -534,7 +535,7 @@ pub fn mouse_release_actions(
     mouse_button_input: Res<Input<MouseButton>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
-    mut ui_query: Query<(&mut Transform, &mut UiBoard), With<GrandParent>>,
+    mut ui_query: Query<(&mut Transform, &mut UiBoard), With<BezierGrandParent>>,
     mut user_state: ResMut<UserState>,
     mut cursor: ResMut<Cursor>,
     mut action_event_writer: EventWriter<Action>,

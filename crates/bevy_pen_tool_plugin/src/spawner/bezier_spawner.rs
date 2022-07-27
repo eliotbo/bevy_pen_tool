@@ -1,8 +1,8 @@
 use crate::inputs::{Cursor, Latch};
 use crate::util::{
-    compute_lut, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierMidMat,
-    BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, GrandParent,
-    LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
+    compute_lut, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent,
+    BezierMidMat, BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad,
+    Globals, LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
 };
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
@@ -172,7 +172,7 @@ pub fn spawn_bezier(
 
     let visible_bb = Visibility {
         // is_visible: !globals.do_hide_bounding_boxes,
-        is_visible: true,
+        is_visible: false,
     };
 
     let visible_anchors = Visibility {
@@ -191,25 +191,39 @@ pub fn spawn_bezier(
     // TODO: make the depth deterministic
     let mut rng = thread_rng();
     let pos_z = -rng.gen::<f32>() * 5000.0 - 1110.0;
-    let mut init_pos = Transform::from_translation(bb_pos.extend(-20.0));
+    // let mut init_pos = Transform::from_translation(bb_pos.extend(-20.0));
+    let global_init_pos = GlobalTransform::from_translation(bb_pos.extend(-20.0));
+    let mut init_pos = Transform::default();
+
     init_pos.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
+    // This is the parent of every entity belonging to a rendered bezier curve.
     let parent = commands
+        .spawn_bundle((
+            BezierParent,
+            BezierGrandParent,
+            init_pos.clone(),
+            Visibility { is_visible: true }, // visibility is inherited by all children
+            global_init_pos,
+            bezier_handle.clone(),
+            ComputedVisibility::not_visible(), // the parent entity is not a rendered object
+        ))
+        .id();
+
+    let bbquad_entity = commands
+        // let parent = commands
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_bb,
             visibility: visible_bb,
-            // render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-            //     bb_pipeline_handle,
-            // )]),
-            transform: init_pos.clone(),
+            transform: Transform::from_translation(Vec2::ZERO.extend(-0.01)),
             material: shader_params_handle_bb,
             ..Default::default()
         })
-        // .insert(shader_params_handle_bb.clone())
         .insert(BoundingBoxQuad)
-        .insert(GrandParent)
         .insert(bezier_handle.clone())
         .id();
+
+    commands.entity(parent).push_children(&[bbquad_entity]);
 
     //////////////////// Bounding box ////////////////////
 
@@ -331,6 +345,7 @@ pub fn spawn_bezier(
         // }
     }
 
+    //////////////////// Small moving rings aka middle quads ////////////////////
     let visible = Visibility { is_visible: true };
 
     let vrange: Vec<f32> = (0..num_mid_quads)

@@ -1,8 +1,8 @@
 use crate::inputs::Cursor;
 use crate::util::{
-    AnchorEdge, Bezier, BezierMidMat, BoundingBoxQuad, ControlPointQuad, EndpointQuad,
-    FollowBezierAnimation, Globals, GrandParent, Group, GroupMiddleQuad, MiddlePointQuad,
-    SelectionMat, TurnRoundAnimation, UiAction, UiBoard,
+    AnchorEdge, Bezier, BezierGrandParent, BezierMidMat, BezierParent, BoundingBoxQuad,
+    ControlPointQuad, EndpointQuad, FollowBezierAnimation, Globals, Group, GroupMiddleQuad,
+    MiddlePointQuad, SelectionMat, TurnRoundAnimation, UiAction, UiBoard,
 };
 
 use bevy::math::Vec3A;
@@ -10,7 +10,7 @@ use bevy::prelude::*;
 
 pub fn move_ui(
     cursor: ResMut<Cursor>,
-    mut ui_query: Query<(&mut Transform, &mut UiBoard), With<GrandParent>>,
+    mut ui_query: Query<(&mut Transform, &mut UiBoard), With<BezierGrandParent>>,
 ) {
     for (mut transform, ui_board) in ui_query.iter_mut() {
         //
@@ -169,45 +169,10 @@ pub fn move_bb_quads(
     }
 }
 
-// pub fn move_end_quads(
-//     mut bezier_curves: ResMut<Assets<Bezier>>,
-//     mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &EndpointQuad)>,
-//     globals: Res<Globals>,
-// ) {
-//     for (mut transform, bezier_handle, endpoint_quad_id) in query.iter_mut() {
-//         //
-//         let EndpointQuad(point) = endpoint_quad_id;
-//         //
-//         // checks whether the transforms are equal to the positions in the Bezier data structure
-//         if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
-//             if (*point == AnchorEdge::Start
-//                 && transform.translation().truncate() != bezier.positions.start)
-//                 || (*point == AnchorEdge::End
-//                     && transform.translation().truncate() != bezier.positions.end)
-//             {
-//                 let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
-//                     bezier.ends_displacement(globals.scale);
-
-//                 if *point == AnchorEdge::Start {
-//                     transform.translation = (bezier.positions.start + start_displacement)
-//                         .extend(transform.translation.z);
-
-//                     transform.rotation = start_rotation;
-//                 } else {
-//                     transform.translation =
-//                         (bezier.positions.end + end_displacement).extend(transform.translation.z);
-//                     transform.rotation = end_rotation;
-//                 }
-//             }
-//         }
-//     }
-// }
-
 pub fn move_end_quads(
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    // mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &EndpointQuad)>,
     mut query: Query<(&mut Transform, &Handle<Bezier>, &EndpointQuad, &Parent)>,
-    q_parent: Query<&GlobalTransform>,
+    q_parent: Query<&GlobalTransform, (With<BezierParent>, Without<EndpointQuad>)>,
     globals: Res<Globals>,
 ) {
     for (mut transform, bezier_handle, endpoint_quad_id, parent) in query.iter_mut() {
@@ -242,44 +207,10 @@ pub fn move_end_quads(
     }
 }
 
-// pub fn move_end_quads(
-//     mut bezier_curves: ResMut<Assets<Bezier>>,
-//     // mut query: Query<(&mut GlobalTransform, &Handle<Bezier>, &EndpointQuad)>,
-//     mut query: Query<(&mut Transform, &Handle<Bezier>, &EndpointQuad)>,
-//     globals: Res<Globals>,
-// ) {
-//     for (mut transform, bezier_handle, endpoint_quad_id) in query.iter_mut() {
-//         //
-//         let EndpointQuad(point) = endpoint_quad_id;
-//         //
-//         // checks whether the transforms are equal to the positions in the Bezier data structure
-//         if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
-//             if (*point == AnchorEdge::Start
-//                 && transform.translation.truncate() != bezier.positions.start)
-//                 || (*point == AnchorEdge::End
-//                     && transform.translation.truncate() != bezier.positions.end)
-//             {
-//                 let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
-//                     bezier.ends_displacement(globals.scale);
-
-//                 if *point == AnchorEdge::Start {
-//                     transform.translation = (bezier.positions.start + start_displacement)
-//                         .extend(transform.translation.z);
-//                     transform.rotation = start_rotation;
-//                 } else {
-//                     transform.translation =
-//                         (bezier.positions.end + end_displacement).extend(transform.translation.z);
-//                     transform.rotation = end_rotation;
-//                 }
-//             }
-//         }
-//     }
-// }
-
 pub fn move_control_quads(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<(&mut Transform, &Handle<Bezier>, &ControlPointQuad, &Parent)>,
-    q_parent: Query<&GlobalTransform>,
+    q_parent: Query<&GlobalTransform, (With<BezierParent>, Without<ControlPointQuad>)>,
 ) {
     for (mut transform, bezier_handle, ctr_pt_id, parent) in query.iter_mut() {
         let ControlPointQuad(point) = ctr_pt_id;

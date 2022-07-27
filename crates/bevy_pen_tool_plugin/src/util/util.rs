@@ -63,6 +63,9 @@ impl Default for UserState {
     }
 }
 
+#[derive(Component)]
+pub struct BezierParent;
+
 pub struct Loaded;
 
 #[derive(Component)]
@@ -72,7 +75,7 @@ pub struct GroupMesh(pub Color);
 pub struct RoadMesh(pub Color);
 
 #[derive(Component)]
-pub struct GrandParent;
+pub struct BezierGrandParent;
 
 #[derive(Component)]
 pub struct Icon;
@@ -1012,7 +1015,7 @@ pub fn get_close_anchor(
     max_dist: f32,
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
-    query: &Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
+    query: &Query<(&Handle<Bezier>, &BezierParent)>,
     // mut globals: ResMut<Globals>,
     scale: f32,
 ) -> Option<(f32, Anchor, Handle<Bezier>)> {
@@ -1054,7 +1057,7 @@ pub fn get_close_anchor_entity(
     max_dist: f32,
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
-    query: &Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
+    query: &Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
     scale: f32,
 ) -> Option<(f32, Anchor, Entity, Handle<Bezier>)> {
     //
@@ -1110,7 +1113,7 @@ pub fn get_close_still_anchor(
     max_dist: f32,
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
-    query: &Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
+    query: &Query<(&Handle<Bezier>, &BezierParent)>,
 ) -> Option<(f32, AnchorEdge, Handle<Bezier>)> {
     for (bezier_handle, _bb) in query.iter() {
         if let Some(bezier) = bezier_curves.get(bezier_handle) {
@@ -1448,7 +1451,7 @@ pub fn compute_lut_long(
 
 pub fn change_ends_and_controls_params(
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+    mut query: Query<&Handle<Bezier>, With<BezierParent>>,
     cursor: Res<Cursor>,
     maps: ResMut<Maps>,
 ) {

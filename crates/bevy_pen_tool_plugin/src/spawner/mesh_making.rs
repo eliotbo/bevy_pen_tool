@@ -17,8 +17,7 @@ use bevy::{
             BlendState, ColorTargetState, ColorWrites, Face, FragmentState, FrontFace,
             MultisampleState, PipelineCache, PolygonMode, PrimitiveState, PrimitiveTopology,
             RenderPipelineDescriptor, SpecializedRenderPipeline, SpecializedRenderPipelines,
-            TextureFormat, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
-            VertexStepMode,
+            TextureFormat, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
         },
         texture::BevyDefault,
         view::VisibleEntities,
@@ -131,60 +130,22 @@ pub fn make_road(
 
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
 
-        // mesh.set_attribute("Vertex_Color", colors);
         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-
-        // mesh.set_attribute("Vertex_Normal", mesh_attr_normals);
-        // mesh.set_attribute("Vertex_Uv", mesh_attr_uvs);
 
         mesh.set_indices(Some(Indices::U32(new_indices)));
 
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, mesh_attr_uvs);
 
+        let texture_handle = maps.textures.get("single_lane_road").unwrap();
+
         // use std::{thread, time};
-        // let texture_handle: Handle<Texture> = asset_server.load("textures/road_texture.png");
-
-        // let material_handle = materials.add(StandardMaterial {
-        //     base_color_texture: Some(texture_handle),
-        //     reflectance: 0.02,
-        //     unlit: false,
-        //     ..Default::default()
-        // });
-
-        // println!("material_handle: {:?}", "yaaaaa");
-
-        // TODO: add texture to road
-        // let texture_handle: Handle<Image> = asset_server.load("textures/single_lane_road.png");
-
         // let hundred_millis = time::Duration::from_millis(200);
         // thread::sleep(hundred_millis);
-
-        let texture_handle = maps.textures.get("single_lane_road").unwrap();
 
         let mat_handle = road_materials.add(RoadMesh2dMaterial {
             road_texture: texture_handle.clone(),
         });
-
-        // pub mesh: Mesh2dHandle,
-        // pub material: Handle<M>,
-        // pub transform: Transform,
-        // pub global_transform: GlobalTransform,
-        // pub visibility: Visibility,
-        // pub computed_visibility: ComputedVisibility,
-
-        // commands.spawn_bundle((
-        //     RoadMesh2d {
-        //         road_texture: texture_handle.clone(),
-        //     },
-        //     Mesh2dHandle(meshes.add(mesh)),
-        //     // Transform::default(),
-        //     GlobalTransform::default(),
-        //     Transform::from_translation(Vec3::new(0.0, 0.0, 310.0)),
-        //     Visibility::default(),
-        //     ComputedVisibility::default(),
-        //     // texture_handle.clone(),
-        // ));
 
         commands.spawn_bundle(MaterialMesh2dBundle {
             mesh: Mesh2dHandle(meshes.add(mesh)),

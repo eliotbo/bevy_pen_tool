@@ -1,7 +1,7 @@
 use crate::inputs::{ButtonInteraction, ButtonState, UiButton};
 // use crate::util::materials::*;
 use crate::util::{
-    BezierEndsMat, ButtonMat, ColorButton, Globals, GrandParent, Icon, Maps, OnOffMaterial,
+    BezierEndsMat, BezierGrandParent, ButtonMat, ColorButton, Globals, Icon, Maps, OnOffMaterial,
     UiAction, UiBoard, UiMat,
 };
 
@@ -72,7 +72,7 @@ pub fn spawn_ui(
             material: ui_material,
             ..Default::default()
         })
-        .insert(GrandParent)
+        .insert(BezierGrandParent)
         .insert(UiBoard {
             expanded: true,
             size: button_ui_size,
