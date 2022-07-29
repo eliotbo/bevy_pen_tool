@@ -1,8 +1,8 @@
 use crate::inputs::{Cursor, Latch};
 use crate::util::{
-    compute_lut, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent,
-    BezierMidMat, BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad,
-    Globals, LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
+    Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent, BezierMidMat,
+    BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals,
+    LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
 };
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
@@ -116,9 +116,7 @@ pub fn spawn_bezier(
     globals: &mut ResMut<Globals>,
     maps: &mut ResMut<Maps>,
 ) -> (Entity, Handle<Bezier>) {
-    let curve0 = bezier.to_curve();
-
-    bezier.lut = compute_lut(curve0, 100);
+    bezier.compute_lut_walk(100);
 
     let ends_controls_mesh_handle = maps.mesh_handles["ends_controls"].clone();
     let ends_mesh_handle = maps.mesh_handles["ends"].clone();
@@ -138,6 +136,7 @@ pub fn spawn_bezier(
     //////////////////// Bounding box parameters ////////////////////
     // need to import the whole library in order to use the .min() and .max() methods: file issue?
     use flo_curves::*;
+    let curve0 = bezier.to_curve();
     let bb: Bounds<Coord2> = curve0.bounding_box();
 
     let Coord2(ax, ay) = bb.min();

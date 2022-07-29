@@ -69,6 +69,7 @@ impl Plugin for PenPlugin {
                     .with_system(save.after("recompute_lut"))
                     .with_system(change_ends_and_controls_params.exclusive_system().at_end())
                     .with_system(latchy)
+                    .with_system(update_lut)
                     .with_system(officiate_latch_partnership)
                     .with_system(selection_box_init)
                     .with_system(selection_final)

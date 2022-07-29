@@ -1,14 +1,7 @@
 use crate::inputs::*;
 use crate::util::materials::*;
 
-use bevy::{
-    // ecs::system::{lifetimeless::SRes, SystemParamItem},
-    prelude::*,
-    reflect::TypeUuid,
-
-    sprite::Mesh2dHandle, // sprite::Material2d,
-                          // sprite::{Material2dPipeline, Material2dPlugin, MaterialMesh2dBundle, Mesh2dHandle}
-};
+use bevy::{prelude::*, reflect::TypeUuid, sprite::Mesh2dHandle};
 
 use serde::{Deserialize, Serialize};
 
@@ -20,11 +13,6 @@ use std::collections::HashSet;
 use flo_curves::bezier::BezierCurve;
 use flo_curves::bezier::Curve;
 use flo_curves::*;
-
-// use plotlib::page::Page;
-// use plotlib::repr::Plot;
-// use plotlib::style::LineStyle;
-// use plotlib::view::ContinuousView;
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, Hash)]
 pub enum AnchorEdge {
@@ -200,7 +188,7 @@ pub struct GroupSaveLoad {
 pub struct Group {
     // TODO: rid Group of redundancy
     pub group: HashSet<(Entity, Handle<Bezier>)>,
-    pub handles: HashSet<Handle<Bezier>>,
+    pub bezier_handles: HashSet<Handle<Bezier>>,
     //
     // Attempts to store the start and end points of a group.
     // Fails if curves are not connected
@@ -217,7 +205,7 @@ impl Default for Group {
     fn default() -> Self {
         Group {
             group: HashSet::new(),
-            handles: HashSet::new(),
+            bezier_handles: HashSet::new(),
             lut: Vec::new(),
             ends: None,
             standalone_lut: StandaloneLut {
@@ -253,11 +241,11 @@ impl Group {
         id_handle_map: HashMap<u128, Handle<Bezier>>,
     ) {
         //
-        if self.handles.len() == 0 {
+        if self.bezier_handles.len() == 0 {
             return ();
         };
 
-        let mut handles = self.handles.clone();
+        let mut handles = self.bezier_handles.clone();
         let num_curves = handles.len();
         let handle = handles.iter().next().unwrap().clone();
         handles.remove(&handle);
@@ -333,7 +321,7 @@ impl Group {
                 (handle.clone(), anchor.clone())
             } else {
                 (
-                    self.handles.iter().next().unwrap().clone(),
+                    self.bezier_handles.iter().next().unwrap().clone(),
                     AnchorEdge::Start,
                 )
             };
@@ -381,7 +369,7 @@ impl Group {
 
                     if let Some(next_latch) = bezier_next.latches[&next_edge].get(0) {
                         if self
-                            .handles
+                            .bezier_handles
                             .contains(id_handle_map.get(&next_latch.latched_to_id).unwrap())
                         {
                             latch = next_latch;
@@ -701,6 +689,30 @@ impl Bezier {
             bezier_c0.control_points,
             bezier_c0.end,
         );
+    }
+
+    // Computes a better look-up table using the walking algorithm from flo_curve
+    // pub fn compute_lut_walk(curve: Curve<Coord2>, num_sections: usize) -> LutDistance {
+    pub fn compute_lut_walk(&mut self, num_sections: usize) {
+        let bezier_c = self.to_coord2();
+
+        let curve = flo_curves::bezier::Curve::from_points(
+            bezier_c.start,
+            bezier_c.control_points,
+            bezier_c.end,
+        );
+
+        let whole_distance = curve.estimate_length();
+
+        let mut look_up_table: LutDistance = Vec::new();
+
+        flo_curves::bezier::walk_curve_evenly(&curve, whole_distance / num_sections as f64, 0.001)
+            .for_each(|section| {
+                let (_t_min, t_max) = section.original_curve_t_values();
+                look_up_table.push(t_max);
+            });
+
+        self.lut = look_up_table;
     }
 
     pub fn length(&self) -> f32 {
@@ -1316,137 +1328,6 @@ pub fn adjust_group_attributes(
             }
         }
     }
-}
-
-// TODO: this should be a method under the Bezier struct
-// returns a map from real distance to t-value
-pub fn compute_lut(curve: Curve<Coord2>, num_sections: usize) -> Vec<f64> {
-    let mut section_lengths: Vec<f64> = Vec::new();
-    let whole_distance = curve.estimate_length();
-    for k in 0..(num_sections) {
-        let t_min = k as f64 / (num_sections + 1) as f64;
-        let t_max = (k + 1) as f64 / (num_sections + 1) as f64;
-        section_lengths.push(curve.section(t_min, t_max).estimate_length())
-    }
-
-    let t_range: Vec<f64> = (0..num_sections)
-        .map(|x| (whole_distance * (x) as f64) / (num_sections as f64 - 1.0))
-        .collect();
-
-    // TODO: get rid of redundant length_so_far computations
-    let mut look_up_table: LutDistance = Vec::new();
-    for distance in t_range {
-        let mut length_so_far = 0.0;
-        for (idx, sl) in section_lengths.iter().enumerate() {
-            if distance - 0.0001 <= length_so_far {
-                let t = idx as f64 / num_sections as f64;
-                look_up_table.push(t);
-                break;
-            }
-            length_so_far += sl;
-        }
-    }
-    return look_up_table;
-}
-
-fn derivative(curve: Curve<Coord2>, t: f64, dist: f64) -> f64 {
-    let delta_t = 0.0000001;
-    let d = 2.0
-        * (curve.section(0.0, t).estimate_length() - dist)
-        * (curve.section(0.0, t + delta_t / 2.0).estimate_length()
-            - curve.section(0.0, t - delta_t / 2.0).estimate_length())
-        / delta_t;
-
-    return d;
-}
-
-// Computes a better look-up table using gradient descent with Nesterov acceleration
-pub fn compute_lut_long(
-    curve: Curve<Coord2>,
-    num_sections: usize,
-    mut time: Time,
-) -> Option<LutDistance> {
-    // let time_at_start = time.seconds_since_startup();
-    time.update();
-    let mut total_time = 0.0;
-    // let mut time_now;
-
-    // let section_lengths: Vec<f64> = Vec::new();
-    let whole_distance = curve.estimate_length();
-    // Curved sectioned uniformly
-    let t_range: Vec<f64> = (0..num_sections)
-        .map(|x| (whole_distance * (x) as f64) / (num_sections as f64 - 1.0))
-        .collect();
-
-    // // generate plot
-    // let f1 = Plot::from_function(|x| curve.section(0.0, x).estimate_length(), 0., 1.)
-    //     .line_style(LineStyle::new().colour("burlywood"));
-
-    // let v = ContinuousView::new().add(f1);
-
-    // Page::single(&v).save("function.svg").expect("saving svg");
-
-    let eta0 = 0.00001;
-    let mut eta;
-    let gamma = 0.8;
-    let mut look_up_table: LutDistance = Vec::new();
-    let mut t = 0.0;
-    let mut dist_at_t = 0.0;
-    let mut cost;
-    let mut df;
-    let mut momentum;
-    let target_cost = (0.01 * whole_distance / 100.0).max(0.01);
-
-    let mut rng = thread_rng();
-
-    for distance in t_range.iter() {
-        cost = (dist_at_t - distance) * (dist_at_t - distance);
-        momentum = 0.0;
-        let mut k = 0.0;
-        // println!("{:?}", cost);
-        // t = distance / whole_distance;
-        while cost > target_cost {
-            df = derivative(curve, t - gamma * momentum, distance.clone());
-
-            // put a upper bound on the derivative to avoid an explosion of the t-value
-            if df.abs() > 50.0 {
-                df = 50.0 * df / df.abs();
-            }
-
-            eta = eta0 * (1.0 + (rng.gen::<f64>() + 0.5) * 0.1);
-            momentum = gamma * momentum + eta * df;
-            t = t - momentum;
-
-            // The estimate_length() function for Bezier curves accepts negative t-values,
-            // and we correct this behavior by forcing t to be positive.
-            if t < 0.0 {
-                momentum = -momentum;
-                t = t.abs();
-            }
-
-            dist_at_t = curve.section(0.0, t).estimate_length();
-            cost = (dist_at_t - distance) * (dist_at_t - distance);
-
-            k = k + 1.0;
-
-            let delta_time = time.delta_seconds();
-            total_time += delta_time;
-            // println!("{:?}", total_time);
-            time.update();
-            if total_time > 0.2 {
-                return None;
-            }
-
-            // println!(
-            //     "{:?}, dist: {:?}, t: {:?}, df: {:?}, dist_t: {:?}, cost: {:?}, ",
-            //     idx, distance, t, df, dist_at_t, cost
-            // );
-        }
-
-        look_up_table.push(t);
-    }
-
-    return Some(look_up_table);
 }
 
 pub fn change_ends_and_controls_params(

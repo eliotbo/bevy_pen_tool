@@ -214,7 +214,7 @@ pub fn spawn_group_middle_quads(
 
         let (parent, _handle) = group.group.iter().next().unwrap();
 
-        let first_bezier_handle = group.handles.iter().next().unwrap();
+        let first_bezier_handle = group.bezier_handles.iter().next().unwrap();
         let first_bezier = bezier_curves.get(first_bezier_handle).unwrap();
 
         let color = first_bezier.color.unwrap(); //Color::hex("2e003e").unwrap();

@@ -12,6 +12,8 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 
+use flo_curves::*;
+
 pub fn recompute_lut(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
@@ -29,35 +31,69 @@ pub fn recompute_lut(
         for bezier_handle in query.iter_mut() {
             let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap();
 
-            let bezier_c = bezier.to_coord2();
-
-            // this import is heavy, but from_points() does not work without importing everything
-            use flo_curves::*;
-            let curve = flo_curves::bezier::Curve::from_points(
-                bezier_c.start,
-                bezier_c.control_points,
-                bezier_c.end,
-            );
-
-            let lut_option =
-                compute_lut_long(curve, globals.group_lut_num_points as usize, time.clone());
-            if let Some(lut) = lut_option {
-                bezier.lut = lut;
-            } else {
-                bezier.lut = compute_lut(curve, globals.group_lut_num_points as usize);
-            }
+            bezier.compute_lut_walk(globals.group_lut_num_points as usize);
 
             bezier.do_compute_lut = false;
 
             for group_handle in query_group.iter() {
                 let group = groups.get_mut(group_handle).unwrap();
-                if group.handles.contains(bezier_handle) {
+                if group.bezier_handles.contains(bezier_handle) {
                     let id_handle_map = maps.id_handle_map.clone();
                     group.group_lut(&mut bezier_curves, id_handle_map);
                     group.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
                 }
             }
         }
+    }
+}
+
+pub fn update_lut(
+    mut bezier_assets: ResMut<Assets<Bezier>>,
+    bezier_handles: Query<&Handle<Bezier>>,
+    globals: ResMut<Globals>,
+    mut groups: ResMut<Assets<Group>>,
+    maps: ResMut<Maps>,
+) {
+    let mut groups_to_update = HashSet::new();
+    let mut bezier_to_update = HashSet::new();
+    for b_handle in bezier_handles.iter() {
+        if let Some(bezier) = bezier_assets.get_mut(b_handle) {
+            if bezier.move_quad != Anchor::None {
+                bezier.compute_lut_walk(globals.group_lut_num_points as usize);
+
+                for (_parter_anchor, latches) in bezier.latches.iter() {
+                    // TODO: only update the partner curve that is latched to the moving part
+                    for latch in latches.iter() {
+                        if let Some(handle) = maps.id_handle_map.get(&latch.latched_to_id) {
+                            bezier_to_update.insert(handle);
+                        }
+                    }
+                }
+
+                // if curve is part of a group, recompute the group lut
+                if bezier.grouped {
+                    for (group_handle_id, group) in groups.iter_mut() {
+                        if group.bezier_handles.contains(b_handle) {
+                            groups_to_update.insert(group_handle_id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for handle in bezier_to_update.iter() {
+        if let Some(bezier_partner) = bezier_assets.get_mut(&handle) {
+            bezier_partner.compute_lut_walk(globals.group_lut_num_points as usize);
+            // groups_to_update.insert(handle);
+        }
+    }
+
+    // if the moving anchor is part of a group,
+    for group_id in groups_to_update.iter() {
+        let group_handle = groups.get_handle(*group_id);
+        let group = groups.get_mut(&group_handle).unwrap();
+        group.group_lut(&mut bezier_assets, maps.id_handle_map.clone());
+        group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
     }
 }
 
@@ -259,7 +295,7 @@ pub fn selection_final(
                     for group_handle in group_query.iter() {
                         let group = groups.get(group_handle).unwrap();
                         //
-                        if group.handles.contains(&bezier_handle) {
+                        if group.bezier_handles.contains(&bezier_handle) {
                             selected = group.clone();
                             for mut visible in query_set.p0().iter_mut() {
                                 visible.is_visible = true;
@@ -277,7 +313,7 @@ pub fn selection_final(
                     selected
                         .group
                         .insert((entity.clone(), bezier_handle.clone()));
-                    selected.handles.insert(bezier_handle.clone());
+                    selected.bezier_handles.insert(bezier_handle.clone());
                 }
             }
             selection.selected = selected.clone();
@@ -307,7 +343,7 @@ pub fn unselect(
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Unselect) {
         selection.selected.group = HashSet::new();
-        selection.selected.handles = HashSet::new();
+        selection.selected.bezier_handles = HashSet::new();
         selection.selected.ends = None;
         selection.selected.lut = Vec::new();
 
@@ -375,7 +411,7 @@ pub fn groupy(
 
         // get rid of the middle point quads
         for (entity, bezier_handle) in query.iter() {
-            if selected.handles.contains(bezier_handle) {
+            if selected.bezier_handles.contains(bezier_handle) {
                 commands.entity(entity).despawn();
             }
         }
@@ -383,15 +419,15 @@ pub fn groupy(
         // get rid of the current group before making a new one
         for (entity, group_handle) in group_query.iter() {
             let group = groups.get(group_handle).unwrap();
-            for bezier_handle in group.handles.clone() {
-                if selected.handles.contains(&bezier_handle) {
+            for bezier_handle in group.bezier_handles.clone() {
+                if selected.bezier_handles.contains(&bezier_handle) {
                     commands.entity(entity).despawn();
                     break;
                 }
             }
         }
 
-        for bezier_handle in selected.handles.clone() {
+        for bezier_handle in selected.bezier_handles.clone() {
             let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
             bezier.grouped = true;
         }
@@ -574,7 +610,7 @@ pub fn delete(
     groups: ResMut<Assets<Group>>,
     mut visible_query: Query<&mut Visibility, With<SelectedBoxQuad>>,
     query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
-    query2: Query<(Entity, &Handle<Group>), With<GroupBoxQuad>>,
+    query2: Query<(Entity, &Handle<Group>), With<GroupBoxQuad>>, // TODO: change to GroupParent
     mut action_event_reader: EventReader<Action>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Delete) {
@@ -599,7 +635,7 @@ pub fn delete(
             //
             let group = groups.get(group_handle).unwrap();
             for (_entity_selected, bezier_handle) in selection.selected.group.clone() {
-                if group.handles.contains(&bezier_handle) {
+                if group.bezier_handles.contains(&bezier_handle) {
                     commands.entity(entity).despawn_recursive();
                 }
             }
@@ -629,7 +665,7 @@ pub fn delete(
 
         // reset selection
         selection.selected.group = HashSet::new();
-        selection.selected.handles = HashSet::new();
+        selection.selected.bezier_handles = HashSet::new();
     }
 }
 
@@ -914,7 +950,7 @@ pub fn load(
 
         let mut group = Group {
             group: HashSet::new(),
-            handles: HashSet::new(),
+            bezier_handles: HashSet::new(),
             lut: Vec::new(),
             ends: None,
             standalone_lut: StandaloneLut {
@@ -942,7 +978,7 @@ pub fn load(
                     &mut maps,
                 );
                 group.group.insert((entity.clone(), handle.clone()));
-                group.handles.insert(handle.clone());
+                group.bezier_handles.insert(handle.clone());
                 group.standalone_lut = group_load_save.standalone_lut.clone();
                 group.lut.push((handle.clone(), anchor, t_ends, local_lut));
             }
