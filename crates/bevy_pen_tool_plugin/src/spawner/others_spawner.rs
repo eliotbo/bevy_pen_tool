@@ -1,6 +1,7 @@
 use crate::util::{
-    Bezier, BezierMidMat, FollowBezierAnimation, Globals, Group, GroupBoxQuad, GroupMiddleQuad,
-    Maps, SelectedBoxQuad, SelectingBoxQuad, SelectingMat, SelectionMat, TurnRoundAnimation,
+    Bezier, BezierMidMat, BezierParent, FollowBezierAnimation, Globals, Group, GroupBoxQuad,
+    GroupMiddleQuad, GroupParent, Maps, SelectedBoxQuad, SelectingBoxQuad, SelectingMat,
+    SelectionMat, TurnRoundAnimation,
 };
 
 use crate::inputs::Action;
@@ -51,6 +52,7 @@ pub fn spawn_selection_bounding_box(
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     // mut render_graph: ResMut<RenderGraph>,
     globals: ResMut<Globals>,
+    query: Query<(Entity, &BezierParent)>,
     // maps: ResMut<Maps>,
     mut my_shader_params: ResMut<Assets<SelectionMat>>,
     clearcolor_struct: Res<ClearColor>,
@@ -58,7 +60,7 @@ pub fn spawn_selection_bounding_box(
     // Bounding Box for group
     let bb_group_size = Vec2::new(10.0, 10.0);
     let shader_params_handle_group_bb = my_shader_params.add(SelectionMat {
-        color: Color::DARK_GRAY.into(),
+        color: Color::ALICE_BLUE.into(),
         t: 0.5,
         zoom: 0.15 / globals.scale,
         size: bb_group_size / (globals.scale / 0.15),
@@ -73,11 +75,12 @@ pub fn spawn_selection_bounding_box(
     let mesh_handle_bb_group =
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(bb_group_size))));
 
-    let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, -10.0));
+    let bb_group_transform =
+        Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.selection_box));
 
     // let bb_group_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
 
-    commands
+    let _hild = commands
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_bb_group,
             visibility: visible_bb_group,
@@ -89,7 +92,11 @@ pub fn spawn_selection_bounding_box(
             ..Default::default()
         })
         // .insert(shader_params_handle_group_bb)
-        .insert(SelectedBoxQuad);
+        .insert(SelectedBoxQuad)
+        .id();
+
+    // let
+    // println!("spawn_selection_bounding_box: child: {:?}", child);
 }
 
 pub fn spawn_selecting_bounding_box(
@@ -120,7 +127,8 @@ pub fn spawn_selecting_bounding_box(
     // }));
     let mesh_handle_bb_group =
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(bb_group_size))));
-    let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, 5.0));
+    let bb_group_transform =
+        Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.selecting_box));
     // let bb_group_pipeline_handle = maps.pipeline_handles["selecting"].clone();
 
     commands
@@ -170,7 +178,8 @@ pub fn spawn_group_bounding_box(
         // }));
         let mesh_handle_bb_group =
             bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(bb_group_size))));
-        let bb_group_transform = Transform::from_translation(Vec3::new(0.0, 0.0, 0.0));
+        let bb_group_transform =
+            Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.group_bouding_box));
         // let bb_group_pipeline_handle = maps.pipeline_handles["bounding_box"].clone();
 
         commands
@@ -186,6 +195,7 @@ pub fn spawn_group_bounding_box(
             })
             // .insert(shader_params_handle_group_bb)
             .insert(GroupBoxQuad)
+            .insert(GroupParent)
             .insert(group_handle.clone());
     }
 }
@@ -205,8 +215,6 @@ pub fn spawn_group_middle_quads(
     for group_handle in group_event_reader.iter() {
         let visible = Visibility { is_visible: true };
         let middle_mesh_handle = maps.mesh_handles["middles"].clone();
-
-        let pos_z = -1000.0;
 
         let num_mid_quads = 50;
 
@@ -247,7 +255,7 @@ pub fn spawn_group_middle_quads(
                     mesh: middle_mesh_handle.clone(),
                     visibility: visible.clone(),
                     // render_pipelines: render_piplines.clone(),
-                    transform: Transform::from_xyz(pos.x, pos.y, pos_z),
+                    transform: Transform::from_xyz(pos.x, pos.y, globals.z_pos.group_middles),
                     material: mid_shader_params_handle,
                     ..Default::default()
                 })
@@ -264,6 +272,7 @@ pub fn spawn_group_middle_quads(
 pub fn spawn_heli(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    globals: ResMut<Globals>,
     // mut materials: ResMut<Assets<ColorMaterial>>,
     mut action_event_reader: EventReader<Action>,
     groups: Res<Assets<Group>>,
@@ -275,7 +284,7 @@ pub fn spawn_heli(
                 .mul_quat(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2));
 
             let heli_handle = asset_server.load("textures/heli.png");
-            let size = Vec2::new(25.0, 25.0);
+            let size = Vec2::new(125.0, 125.0);
             let heli_sprite = commands
                 .spawn_bundle(SpriteBundle {
                     sprite: Sprite {
@@ -284,7 +293,7 @@ pub fn spawn_heli(
                     },
                     texture: heli_handle,
                     // mesh: mesh_handle_button.clone(),
-                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, 730.0)),
+                    transform: Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.heli)),
                     // sprite: Sprite::new(size),
                     visibility: Visibility { is_visible: true },
                     ..Default::default()
@@ -303,7 +312,11 @@ pub fn spawn_heli(
                         ..Default::default()
                     },
                     // mesh: mesh_handle_button.clone(),
-                    transform: Transform::from_translation(Vec3::new(3.0, 1.0, 5.0)),
+                    transform: Transform::from_translation(Vec3::new(
+                        3.0,
+                        1.0,
+                        globals.z_pos.heli_top,
+                    )),
                     // sprite: Sprite::new(size),
                     visibility: Visibility { is_visible: true },
                     ..Default::default()

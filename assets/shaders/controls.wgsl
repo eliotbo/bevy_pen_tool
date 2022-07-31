@@ -130,7 +130,7 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
     let p2 = vec2<f32>(-0.4, 0.4);
     var d0 = sdTriangle( uv_original,  p0,  p1,  p2 );
 
-    let zoo = material.zoom / 0.08;
+    let zoo = material.zoom / 0.08 / 5.;
     let w = -0.02 * zoo;
     d0 = smoothstep(-w, w, d0);
 

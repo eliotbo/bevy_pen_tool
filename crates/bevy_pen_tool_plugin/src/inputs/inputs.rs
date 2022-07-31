@@ -179,6 +179,7 @@ pub fn record_mouse_events_system(
     mut windows: ResMut<Windows>,
     cam_transform_query: Query<&Transform, With<OrthographicProjection>>,
     cam_ortho_query: Query<&OrthographicProjection>,
+    globals: Res<Globals>,
 ) {
     for event in cursor_moved_events.iter() {
         let cursor_in_pixels = event.position; // lower left is origin
@@ -187,7 +188,7 @@ pub fn record_mouse_events_system(
             windows.get_primary_mut().unwrap().height(),
         );
 
-        let screen_position = cursor_in_pixels - window_size / 2.0;
+        let screen_position = (cursor_in_pixels - window_size / 2.0);
 
         let cam_transform = cam_transform_query.iter().next().unwrap();
 
@@ -202,8 +203,13 @@ pub fn record_mouse_events_system(
             * screen_position.extend(0.0).extend(1.0 / (scale))
             * scale;
 
+        // println!("{:?}", cam_transform.compute_matrix());
+
+        // let cursor_vec4: Vec4 =
+        //     cam_transform.compute_matrix() * screen_position.extend(0.0).extend(1.0);
+
         let cursor_pos = Vec2::new(cursor_vec4.x, cursor_vec4.y);
-        cursor_res.position = cursor_pos;
+        cursor_res.position = cursor_pos / globals.scale;
         cursor_res.pos_relative_to_click = cursor_res.position - cursor_res.last_click_position;
     }
 
@@ -231,7 +237,7 @@ pub fn check_mouseclick_on_objects(
     mouse_button_input: Res<Input<MouseButton>>,
     mut button_query: Query<(
         &ButtonState,
-        &GlobalTransform,
+        &Transform,
         &Handle<ButtonMat>,
         &mut ButtonInteraction,
         &UiButton,
@@ -244,7 +250,7 @@ pub fn check_mouseclick_on_objects(
     mut action_event_writer: EventWriter<Action>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Left) {
-        let cam_scale = globals.scale * globals.scale;
+        let scale = globals.scale;
 
         // TODO: too much boilerplate to check if a button is on...
         let mut spawn_button_on = false;
@@ -271,6 +277,7 @@ pub fn check_mouseclick_on_objects(
         // check for mouseclick on UI buttons
         //
         // This block is useless other than to return () upon button press (no effects)
+        let (ui_trans, _) = ui_query.single();
         for (_state, button_transform, shader_handle, mut _button_interaction, ui_button) in
             button_query.iter_mut()
         {
@@ -278,9 +285,13 @@ pub fn check_mouseclick_on_objects(
             let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
             //
             if cursor.within_rect(
-                button_transform.translation().truncate(),
-                shader_params.size * 0.95 * cam_scale,
+                button_transform.translation.truncate() / scale,
+                shader_params.size * 0.95,
             ) {
+                // println!(
+                //     "{:?}",
+                //     button_transform.translation.truncate() - cursor.position
+                // );
                 // this sends into nothingness
                 mouse_event_writer.send(MouseClickEvent::OnUiButton(ui_button.clone()));
 
@@ -297,8 +308,8 @@ pub fn check_mouseclick_on_objects(
                 .clone();
 
             if cursor.within_rect(
-                transform.translation().truncate(),
-                shader_params.size * 1.15 * cam_scale,
+                transform.translation().truncate() / scale,
+                shader_params.size * 1.15,
             ) {
                 mouse_event_writer.send(MouseClickEvent::OnColorButton((
                     shader_params.color.clone().into(),
@@ -313,10 +324,7 @@ pub fn check_mouseclick_on_objects(
         for (ui_transform, mut ui_board) in ui_query.iter_mut() {
             if
             // ui_board.action == UiAction::None &&
-            cursor.within_rect(
-                ui_transform.translation.truncate(),
-                ui_board.size * globals.scale,
-            ) {
+            cursor.within_rect(ui_transform.translation.truncate() / scale, ui_board.size) {
                 mouse_event_writer.send(MouseClickEvent::OnUiBoard);
                 ui_board.action = UiAction::MovingUi;
                 return ();
@@ -327,24 +335,22 @@ pub fn check_mouseclick_on_objects(
         // check for mouseclick on anchors (including control points)
         let mut anchor_event: Option<MouseClickEvent> = None;
         if let Some((_distance, anchor, handle)) = get_close_anchor(
-            3.0 * globals.scale,
+            12.0,
             cursor.position,
             &bezier_curves,
             &bezier_query,
-            globals.scale,
+            // globals.scale,
         ) {
+            // println!("global scale: {}", globals.scale);
             anchor_event = Some(MouseClickEvent::OnAnchor((anchor, handle, false)));
         }
 
         //
         // check for mouseclick on anchors (excluding control points)
         let mut anchor_edge_event: Option<MouseClickEvent> = None;
-        if let Some((_dist, anchor_edge, handle)) = get_close_still_anchor(
-            3.0 * globals.scale,
-            cursor.position,
-            &bezier_curves,
-            &bezier_query,
-        ) {
+        if let Some((_dist, anchor_edge, handle)) =
+            get_close_still_anchor(12.0, cursor.position, &bezier_curves, &bezier_query)
+        {
             anchor_edge_event = Some(MouseClickEvent::OnAnchorEdge((anchor_edge, handle)));
         }
 

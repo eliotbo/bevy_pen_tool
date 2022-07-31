@@ -54,6 +54,9 @@ impl Default for UserState {
 #[derive(Component)]
 pub struct BezierParent;
 
+#[derive(Component)]
+pub struct GroupParent;
+
 pub struct Loaded;
 
 #[derive(Component)]
@@ -576,6 +579,56 @@ impl Default for Selection {
 }
 
 #[derive(Clone, Debug)]
+pub struct ZPos {
+    pub bezier_parent: f32,
+    pub anchors: f32,
+    pub controls: f32,
+    pub middles: f32,
+    pub group_parent: f32,
+    pub group_bouding_box: f32,
+    pub group_middles: f32,
+    pub selecting_box: f32,
+    pub selection_box: f32,
+    pub bounding_box: f32,
+    pub road: f32,
+    pub fill: f32,
+    pub heli: f32,
+    pub heli_top: f32,
+    pub ui_board: f32,
+    pub ui_buttons: f32,
+    pub ui_button_icons: f32,
+    pub ui_color_board: f32,
+    pub ui_color_buttons: f32,
+}
+
+impl Default for ZPos {
+    fn default() -> Self {
+        Self {
+            bezier_parent: 0.33,
+
+            anchors: 0.33,
+            controls: 0.33,
+            middles: 0.33,
+            group_parent: 0.33,
+            group_bouding_box: 0.33,
+            group_middles: 0.33,
+            selecting_box: 0.33,
+            selection_box: 0.33,
+            bounding_box: 0.33,
+            road: 0.35,
+            fill: 0.33,
+            heli: 0.4,
+            heli_top: 0.01,
+            ui_board: 0.33,
+            ui_buttons: 0.33,
+            ui_button_icons: 0.33,
+            ui_color_board: 0.33,
+            ui_color_buttons: 0.33,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Globals {
     pub do_hide_anchors: bool,
     pub do_hide_bounding_boxes: bool,
@@ -587,6 +640,7 @@ pub struct Globals {
     pub hide_control_points: bool,
     pub group_lut_num_points: u32,
     pub road_width: f32,
+    pub z_pos: ZPos,
 }
 
 impl Default for Globals {
@@ -602,6 +656,7 @@ impl Default for Globals {
             num_points_on_curve: 25,
             group_lut_num_points: 100,
             road_width: 8.0,
+            z_pos: ZPos::default(),
         }
     }
 }
@@ -773,10 +828,11 @@ impl Bezier {
         !self.latches[&anchor_edge].is_empty()
     }
 
+    // TODO: remove scale arg from this method
     // computes the desired anchor quad positions
     // they should be slighty off the anchor positions, towards the curve center
-    pub fn ends_displacement(&self, scale: f32) -> ((Vec2, Vec2), (Quat, Quat)) {
-        let quad_width = 1.0 * scale;
+    pub fn ends_displacement(&self) -> ((Vec2, Vec2), (Quat, Quat)) {
+        let quad_width = 5.0;
         let mut angles_vec = Vec::new();
 
         for anchor in vec![AnchorEdge::Start, AnchorEdge::End] {
@@ -816,7 +872,9 @@ impl Bezier {
         );
     }
 
-    pub fn update_positions_cursor(&mut self, cursor: &Res<Cursor>) {
+    // compute anchor positions, given cursor position relative to the last clicked position,
+    // taking scale into account
+    pub fn update_positions_cursor(&mut self, cursor: &Res<Cursor>, scale: f32) {
         match self.move_quad {
             Anchor::None => {}
 
@@ -843,6 +901,7 @@ impl Bezier {
         }
     }
 
+    // gives the LatchData of the anchor that is attached to the moving anchor
     pub fn get_mover_latch_info(&self) -> Option<(LatchData, Vec2, Vec2)> {
         match self.move_quad {
             Anchor::Start | Anchor::ControlStart => {
@@ -1029,12 +1088,12 @@ pub fn get_close_anchor(
     bezier_curves: &ResMut<Assets<Bezier>>,
     query: &Query<(&Handle<Bezier>, &BezierParent)>,
     // mut globals: ResMut<Globals>,
-    scale: f32,
+    // scale: f32,
 ) -> Option<(f32, Anchor, Handle<Bezier>)> {
     for (bezier_handle, _) in query.iter() {
         if let Some(bezier) = bezier_curves.get(bezier_handle) {
             let ((start_displacement, end_displacement), (_start_rotation, _end_rotation)) =
-                bezier.ends_displacement(scale);
+                bezier.ends_displacement();
 
             let distance_to_control0 = (bezier.positions.control_start - position).length();
             let distance_to_control1 = (bezier.positions.control_end - position).length();
@@ -1070,7 +1129,7 @@ pub fn get_close_anchor_entity(
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
     query: &Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
-    scale: f32,
+    // scale: f32,
 ) -> Option<(f32, Anchor, Entity, Handle<Bezier>)> {
     //
     for (entity, bezier_handle) in query.iter() {
@@ -1078,7 +1137,7 @@ pub fn get_close_anchor_entity(
         if let Some(bezier) = bezier_curves.get(bezier_handle) {
             //
             let ((start_displacement, end_displacement), (_start_rotation, _end_rotation)) =
-                bezier.ends_displacement(scale);
+                bezier.ends_displacement();
 
             let distance_to_control0 = (bezier.positions.control_start - position).length();
             let distance_to_control1 = (bezier.positions.control_end - position).length();
@@ -1191,8 +1250,8 @@ pub fn adjust_selection_attributes(
         let y_width = (maxy - miny) * up_factor / 2.0;
 
         // send correct width to shader that will adjust the thickness of the box accordingly
-        let scale = globals.scale / 0.5;
-        shader_params.size = Vec2::new(x_width * 2.0 / scale, y_width * 2.0 / scale);
+        // let scale = globals.scale / 0.5;
+        shader_params.size = Vec2::new(x_width, y_width) / 5.0;
 
         let vertex_positions = vec![
             [x_pos - x_width, y_pox - y_width, 0.0],
@@ -1226,8 +1285,9 @@ pub fn adjust_selecting_attributes(
     globals: ResMut<Globals>,
 ) {
     // TODO: make this system run only when necessary
-    if let UserState::Selecting(click_position) = user_state.as_ref() {
-        let mouse_position = cursor.position;
+    if let UserState::Selecting(mut click_position) = user_state.as_ref() {
+        let mouse_position = cursor.position * globals.scale;
+        click_position *= globals.scale;
 
         let (minx, maxx, miny, maxy) = (
             mouse_position.x.min(click_position.x),
@@ -1245,8 +1305,8 @@ pub fn adjust_selecting_attributes(
         let y_width = (maxy - miny) * up_factor / 2.0;
 
         // send correct width to shader that will adjust the thickness of the box accordingly
-        let scale = globals.scale / 0.5;
-        shader_params.size = Vec2::new(x_width * 2.0 / scale, y_width * 2.0 / scale);
+
+        shader_params.size = Vec2::new(x_width, y_width) / 5.0;
 
         let vertex_positions = vec![
             [x_pos - x_width, y_pox - y_width, 0.0],
@@ -1278,6 +1338,7 @@ pub fn adjust_group_attributes(
     group_query: Query<(&Handle<Group>, &Handle<SelectionMat>)>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    // globals: ResMut<Globals>,
 ) {
     // TODO: make this system run only when necessary
     if mouse_button_input.pressed(MouseButton::Left) {
@@ -1293,6 +1354,9 @@ pub fn adjust_group_attributes(
                 let bezier = bezier_curves.get(&selected_handle).unwrap();
 
                 let (bound0, bound1) = bezier.bounding_box();
+                // bound0 *= globals.scale;
+                // bound1 *= globals.scale;
+
                 minx = minx.min(bound0.x);
                 maxx = maxx.max(bound1.x);
                 miny = miny.min(bound0.y);
@@ -1333,6 +1397,7 @@ pub fn adjust_group_attributes(
 pub fn change_ends_and_controls_params(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BezierParent>>,
+    globals: Res<Globals>,
     cursor: Res<Cursor>,
     maps: ResMut<Maps>,
 ) {
@@ -1345,7 +1410,7 @@ pub fn change_ends_and_controls_params(
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
                 //
                 latch_info = bezier.get_mover_latch_info();
-                bezier.update_positions_cursor(&cursor);
+                bezier.update_positions_cursor(&cursor, globals.scale);
 
                 if let Some(_) = latch_info {
                     break;

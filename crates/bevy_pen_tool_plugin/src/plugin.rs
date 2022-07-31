@@ -133,10 +133,10 @@ fn setup(
     // let hundred_millis = time::Duration::from_millis(100);
     // thread::sleep(hundred_millis);
 
-    let color_ui_size = Vec2::new(40.0, 75.0);
-    let button_ui_size = Vec2::new(40.0, 45.0);
+    let color_ui_size = Vec2::new(200.0, 375.0);
+    let button_ui_size = Vec2::new(200.0, 225.0);
 
-    let button_width = 8.0;
+    let button_width = 40.0;
     let button_size = Vec2::new(button_width, button_width);
     let icon_size = Vec2::new(button_width / 4.0, button_width / 2.0);
 
@@ -149,13 +149,13 @@ fn setup(
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(button_size))));
 
     let ends_controls_mesh_handle =
-        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(4.0, 4.0)))));
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(20.0, 20.0)))));
 
     let ends_mesh_handle =
-        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(2.0, 4.0)))));
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(10.0, 20.0)))));
 
     let middle_mesh_handle =
-        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(1.5, 1.5)))));
+        bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(Vec2::new(7.5, 7.5)))));
 
     let mesh_handle_icon =
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(icon_size))));

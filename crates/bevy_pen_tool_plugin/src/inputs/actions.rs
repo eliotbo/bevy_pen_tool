@@ -16,13 +16,13 @@ use flo_curves::*;
 
 pub fn recompute_lut(
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<&Handle<Bezier>, With<BoundingBoxQuad>>,
+    mut query: Query<&Handle<Bezier>, With<BezierParent>>,
     query_group: Query<&Handle<Group>>,
     mut groups: ResMut<Assets<Group>>,
     mut action_event_reader: EventReader<Action>,
     globals: ResMut<Globals>,
     maps: ResMut<Maps>,
-    time: Res<Time>,
+    // time: Res<Time>,
 ) {
     if action_event_reader
         .iter()
@@ -235,13 +235,9 @@ pub fn selection_box_init(
         .iter()
         .any(|x| x == &Action::SelectionBox)
     {
-        if let Some((_distance, _anchor, _entity, _selected_handle)) = get_close_anchor_entity(
-            2.0 * globals.scale,
-            cursor.position,
-            &bezier_curves,
-            &query,
-            globals.scale,
-        ) {
+        if let Some((_distance, _anchor, _entity, _selected_handle)) =
+            get_close_anchor_entity(2.0 * globals.scale, cursor.position, &bezier_curves, &query)
+        {
         } else {
             let us = user_state.as_mut();
             *us = UserState::Selecting(cursor.position);
@@ -267,6 +263,7 @@ pub fn selection_final(
     group_query: Query<&Handle<Group>>,
     query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
     mut action_event_reader: EventReader<Action>,
+    globals: Res<Globals>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Selected) {
         // let mut changed_user_state = false;
@@ -278,8 +275,8 @@ pub fn selection_final(
             // check for anchors inside selection area
             for (entity, bezier_handle) in query.iter() {
                 let bezier = bezier_curves.get(bezier_handle).unwrap();
-                let bs = bezier.positions.start;
-                let be = bezier.positions.end;
+                let bs = bezier.positions.start * globals.scale;
+                let be = bezier.positions.end * globals.scale;
                 if (bs.x < click_position.x.max(release_position.x)
                     && bs.x > click_position.x.min(release_position.x)
                     && bs.y < click_position.y.max(release_position.y)
@@ -993,9 +990,16 @@ pub fn load(
 
 // makes UI and quads bigger or smaller using Ctrl + mousewheel
 pub fn rescale(
-    mut grandparent_query: Query<&mut Transform, With<BezierGrandParent>>,
-    shader_param_query: Query<&Handle<UiMat>>,
-    mut my_shaders: ResMut<Assets<UiMat>>,
+    mut grandparent_query: Query<
+        &mut Transform,
+        Or<(
+            With<BezierGrandParent>,
+            With<GroupParent>,
+            With<SelectedBoxQuad>,
+        )>,
+    >,
+    // shader_param_query: Query<&Handle<UiMat>>,
+    // mut my_shaders: ResMut<Assets<UiMat>>,
     mut globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
 ) {
@@ -1020,12 +1024,12 @@ pub fn rescale(
                 transform.scale = Vec2::new(globals.scale, globals.scale).extend(1.0);
             }
 
-            // update the shader params for the middle quads (animated quads)
-            for shader_handle in shader_param_query.iter() {
-                let shader_param = my_shaders.get_mut(shader_handle).unwrap();
-                shader_param.zoom = 0.15 / globals.scale;
-                shader_param.size *= 1.0 / zoom_factor;
-            }
+            // // update the shader params for the middle quads (animated quads)
+            // for shader_handle in shader_param_query.iter() {
+            //     let shader_param = my_shaders.get_mut(shader_handle).unwrap();
+            //     shader_param.zoom = 0.15 / globals.scale;
+            //     shader_param.size *= 1.0 / zoom_factor;
+            // }
         }
     }
 }

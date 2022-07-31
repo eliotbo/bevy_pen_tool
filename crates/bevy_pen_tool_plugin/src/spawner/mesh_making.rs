@@ -147,10 +147,14 @@ pub fn make_road(
             road_texture: texture_handle.clone(),
         });
 
+        let mut road_transform =
+            Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.road));
+        road_transform.scale = Vec3::new(globals.scale, globals.scale, 1.0);
+
         commands.spawn_bundle(MaterialMesh2dBundle {
             mesh: Mesh2dHandle(meshes.add(mesh)),
             material: mat_handle,
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 310.0)),
+            transform: road_transform,
             ..default()
         });
     }
@@ -270,13 +274,17 @@ pub fn make_mesh(
 
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, mesh_attr_uvs);
 
+        let mut fill_transform =
+            Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.fill));
+        fill_transform.scale = Vec3::new(globals.scale, globals.scale, 1.0);
+
         // We can now spawn the entities for the star and the camera
         commands.spawn_bundle((
             ColoredMesh2d::default(),
             Mesh2dHandle(meshes.add(mesh)),
             // Transform::default(),
             GlobalTransform::default(),
-            Transform::from_translation(Vec3::new(0.0, 0.0, 309.99)),
+            fill_transform,
             Visibility::default(),
             ComputedVisibility::default(),
         ));

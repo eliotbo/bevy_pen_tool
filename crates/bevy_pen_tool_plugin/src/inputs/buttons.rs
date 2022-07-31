@@ -61,10 +61,10 @@ pub fn check_mouse_on_ui(
         let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
 
         // this looks incorrect, but it is due to buttons being children of the UI board
-        let cam_scale = globals.scale * globals.scale;
+        // print!("{:?}", globals.scale);
         if cursor.within_rect(
-            button_transform.translation().truncate(),
-            shader_params.size * 0.95 * cam_scale,
+            button_transform.translation().truncate() / globals.scale,
+            shader_params.size * 0.95,
         ) {
             let bi = button_interaction.deref_mut();
             *bi = ButtonInteraction::Hovered;

@@ -27,6 +27,7 @@ pub fn spawn_bezier_system(
     mut maps: ResMut<Maps>,
     mut latch_event_reader: EventReader<Latch>,
     mut user_state: ResMut<UserState>,
+    cam_query: Query<&Transform, With<OrthographicProjection>>,
 ) {
     if user_state.as_ref() == &UserState::SpawningCurve {
         //
@@ -38,17 +39,19 @@ pub fn spawn_bezier_system(
         let mut rng = thread_rng();
         let mut spawner_id: u128 = rng.gen();
 
+        // let cam_pos = cam_query.single();
+
         let mut start = cursor.position;
 
         // the control points cannot be exactly in the same positions as the anchors
         // because the algorithm for finding position along the curves fail in that case
-        let mut epsilon = 5.01;
+        let mut epsilon = 25.01;
         if globals.hide_control_points {
             epsilon = 0.01;
         }
 
-        let mut control_start: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
-        let control_end: Vec2 = cursor.position + Vec2::new(epsilon, epsilon);
+        let mut control_start: Vec2 = start + Vec2::new(epsilon, epsilon);
+        let control_end: Vec2 = start + Vec2::new(epsilon, epsilon);
 
         let mut latches = HashMap::new();
         latches.insert(AnchorEdge::Start, Vec::new());
@@ -74,7 +77,7 @@ pub fn spawn_bezier_system(
         let mut bezier = Bezier {
             positions: BezierPositions {
                 start,
-                end: cursor.position,
+                end: start,
                 control_start,
                 control_end,
             },
@@ -181,7 +184,7 @@ pub fn spawn_bezier(
     let shader_params_handle_bb = selection_params.add(SelectionMat {
         color: color.into(),
         t: 0.5,
-        zoom: 0.15 / globals.scale,
+        zoom: 1.0 / globals.scale,
         size: bb_size,
         clearcolor: clearcolor.clone().into(),
         ..Default::default()
@@ -191,11 +194,13 @@ pub fn spawn_bezier(
     let mut rng = thread_rng();
     let pos_z = -rng.gen::<f32>() * 5000.0 - 1110.0;
     // let mut init_pos = Transform::from_translation(bb_pos.extend(-20.0));
-    let global_init_pos = GlobalTransform::from_translation(bb_pos.extend(-20.0));
+    let global_init_pos =
+        GlobalTransform::from_translation(bb_pos.extend(globals.z_pos.bezier_parent));
     let mut init_pos = Transform::default();
 
     init_pos.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
+    // TODO: remove BezierGrandParent and replace by BezierParent everywhere
     // This is the parent of every entity belonging to a rendered bezier curve.
     let parent = commands
         .spawn_bundle((
@@ -214,7 +219,7 @@ pub fn spawn_bezier(
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_bb,
             visibility: visible_bb,
-            transform: Transform::from_translation(Vec2::ZERO.extend(-0.01)),
+            transform: Transform::from_translation(Vec2::ZERO.extend(globals.z_pos.bounding_box)),
             material: shader_params_handle_bb,
             ..Default::default()
         })
@@ -235,13 +240,15 @@ pub fn spawn_bezier(
     // Although the interface is two-dimensional, the z position of the quads is important for transparency
 
     let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
-        bezier.ends_displacement(globals.scale);
+        bezier.ends_displacement();
 
     start_pt_pos += start_displacement;
     end_pt_pos += end_displacement;
 
-    let mut start_pt_transform = Transform::from_translation(start_pt_pos.extend(pos_z + 30.0));
-    let mut end_pt_transform = Transform::from_translation(end_pt_pos.extend(pos_z + 40.0));
+    let mut start_pt_transform =
+        Transform::from_translation(start_pt_pos.extend(globals.z_pos.anchors));
+    let mut end_pt_transform =
+        Transform::from_translation(end_pt_pos.extend(globals.z_pos.anchors));
 
     start_pt_transform.rotation = start_rotation;
     end_pt_transform.rotation = end_rotation;
@@ -249,7 +256,7 @@ pub fn spawn_bezier(
     let ends_params_handle = ends_params.add(BezierEndsMat {
         color: color.into(),
         t: 0.5,
-        zoom: 0.15 / globals.scale,
+        zoom: 1.0 / globals.scale,
         size: bb_size,
         clearcolor: clearcolor.clone().into(),
         ..Default::default()
@@ -304,19 +311,21 @@ pub fn spawn_bezier(
     // control points
     for k in 0..2 {
         let z_ctr = pos_z + 50.0 + (k as f32) * 10.0;
-        let mut ctr_pos_transform = Transform::from_translation(ctr0_pos.extend(z_ctr));
+        let mut ctr_pos_transform =
+            Transform::from_translation(ctr0_pos.extend(globals.z_pos.controls));
 
         let mut point = AnchorEdge::Start;
         if k == 1 {
             point = AnchorEdge::End;
-            ctr_pos_transform = Transform::from_translation(ctr1_pos.extend(z_ctr));
+            ctr_pos_transform =
+                Transform::from_translation(ctr1_pos.extend(globals.z_pos.controls));
         }
 
         let controls_params_handle = controls_params.add(BezierControlsMat {
             color: color.into(),
-            t: 0.5,
-            zoom: 0.15 / globals.scale,
-            size: Vec2::new(1.0, 1.0) * globals.scale,
+            t: 2.5,
+            zoom: 1.0 / globals.scale,
+            size: Vec2::new(5.0, 5.0) * globals.scale,
             clearcolor: clearcolor.clone().into(),
             ..Default::default()
         });
@@ -357,7 +366,7 @@ pub fn spawn_bezier(
         let mid_shader_params_handle = mid_params.add(BezierMidMat {
             color: color.into(),
             t: 0.5,
-            zoom: 0.15 / globals.scale,
+            zoom: 1.0 / globals.scale,
             size: Vec2::new(1.0, 1.0) * globals.scale,
             clearcolor: clearcolor.clone().into(),
             ..Default::default()
@@ -371,7 +380,7 @@ pub fn spawn_bezier(
                 mesh: middle_mesh_handle.clone(),
                 visibility: visible.clone(),
                 // render_pipelines: render_piplines.clone(),
-                transform: Transform::from_xyz(0.0, 0.0, pos_z + 100.0 + z),
+                transform: Transform::from_xyz(0.0, 0.0, globals.z_pos.middles),
                 material: mid_shader_params_handle,
                 ..Default::default()
             })

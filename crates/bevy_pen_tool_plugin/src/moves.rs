@@ -28,7 +28,7 @@ pub fn move_middle_quads(
     bezier_curves: ResMut<Assets<Bezier>>,
     mut my_shader_params: ResMut<Assets<BezierMidMat>>,
     mut query: Query<
-        (&mut GlobalTransform, &Handle<Bezier>, &Handle<BezierMidMat>),
+        (&mut Transform, &Handle<Bezier>, &Handle<BezierMidMat>),
         With<MiddlePointQuad>,
     >,
     globals: ResMut<Globals>,
@@ -66,9 +66,9 @@ pub fn move_middle_quads(
                 let t_distance = bezier.compute_real_distance(t_time);
                 let pos = curve.point_at_pos(t_distance);
 
-                let z = transform.translation().z;
+                let z = transform.translation.z;
 
-                *transform.translation_mut() = Vec3A::new(pos.0 as f32, pos.1 as f32, z);
+                transform.translation = Vec3::new(pos.0 as f32, pos.1 as f32, z);
 
                 // transform.translation.x = pos.0 as f32;
                 // transform.translation.y = pos.1 as f32;
@@ -82,7 +82,7 @@ pub fn move_group_middle_quads(
     bezier_curves: ResMut<Assets<Bezier>>,
     mut my_shader_params: ResMut<Assets<BezierMidMat>>,
     mut query: Query<(
-        &mut GlobalTransform,
+        &mut Transform,
         &Handle<Group>,
         &Handle<BezierMidMat>,
         &GroupMiddleQuad,
@@ -115,8 +115,8 @@ pub fn move_group_middle_quads(
             let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
             // let pos = group.compute_position_with_lut(t_time as f32);
 
-            let z = transform.translation().z;
-            *transform.translation_mut() = Vec3A::new(pos.x, pos.y, z);
+            let z = transform.translation.z;
+            transform.translation = Vec3::new(pos.x, pos.y, z);
 
             // transform.translation.x = pos.x;
             // transform.translation.y = pos.y;
@@ -173,7 +173,7 @@ pub fn move_end_quads(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<(&mut Transform, &Handle<Bezier>, &EndpointQuad, &Parent)>,
     q_parent: Query<&GlobalTransform, (With<BezierParent>, Without<EndpointQuad>)>,
-    globals: Res<Globals>,
+    // globals: Res<Globals>,
 ) {
     for (mut transform, bezier_handle, endpoint_quad_id, parent) in query.iter_mut() {
         //
@@ -189,7 +189,7 @@ pub fn move_end_quads(
                 let parent_global_transform = q_parent.get(**parent).unwrap();
 
                 let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
-                    bezier.ends_displacement(globals.scale);
+                    bezier.ends_displacement();
 
                 if *point == AnchorEdge::Start {
                     transform.translation = (bezier.positions.start + start_displacement
@@ -278,6 +278,7 @@ pub fn follow_bezier_group(
     groups: Res<Assets<Group>>,
     curves: ResMut<Assets<Bezier>>,
     time: Res<Time>,
+    mut globals: ResMut<Globals>,
 ) {
     if let Some(group) = groups.iter().next() {
         for mut visible in visible_query.iter_mut() {
@@ -300,8 +301,8 @@ pub fn follow_bezier_group(
                 .normalize();
             pos += normal * road_line_offset;
 
-            transform.translation.x = pos.x;
-            transform.translation.y = pos.y;
+            transform.translation.x = pos.x * globals.scale;
+            transform.translation.y = pos.y * globals.scale;
 
             // the car looks ahead (5% of the curve length) to orient itself
             let further_pos = group

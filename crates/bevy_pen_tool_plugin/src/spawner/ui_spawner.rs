@@ -39,9 +39,9 @@ pub fn spawn_ui(
         .map(|x| x.iter().map(|y| Color::hex(y).unwrap()).collect())
         .collect();
 
-    let color_ui_size = Vec2::new(40.0, 75.0);
-    let button_ui_size = Vec2::new(40.0, 45.0);
-    let button_width = 8.0;
+    let color_ui_size = Vec2::new(200.0, 375.0);
+    let button_ui_size = Vec2::new(200.0, 225.0);
+    let button_width = 40.0;
     let button_size = Vec2::new(button_width, button_width);
     let icon_size = Vec2::new(button_width / 4.0, button_width / 2.0);
 
@@ -56,7 +56,7 @@ pub fn spawn_ui(
 
     /////////////////////// buttons ui ////////////////////////////
 
-    let button_ui_position = Vec3::new(-70.0, 37.5, -550.0);
+    let button_ui_position = Vec3::new(-350.0, 187.5, globals.z_pos.ui_buttons);
     let ui_transform = Transform::from_translation(button_ui_position);
 
     let ui_mat = UiMat::default();
@@ -101,7 +101,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 button_width / 2.0,
                 -button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             material: shader_params_latch,
             ..Default::default()
@@ -122,7 +122,11 @@ pub fn spawn_ui(
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_icon.clone(),
             visibility: visible_ui.clone(),
-            transform: Transform::from_translation(Vec3::new(-button_width / 8.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                -button_width / 8.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             material: shader_params_icon1,
             ..Default::default()
         })
@@ -136,7 +140,11 @@ pub fn spawn_ui(
         size: icon_size,
         ..Default::default()
     });
-    let mut icon2_transform = Transform::from_translation(Vec3::new(button_width / 8.0, 0.0, 20.1));
+    let mut icon2_transform = Transform::from_translation(Vec3::new(
+        button_width / 8.0,
+        0.0,
+        globals.z_pos.ui_button_icons,
+    ));
     icon2_transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
     let icon2 = commands
         .spawn_bundle(MaterialMesh2dBundle {
@@ -166,7 +174,11 @@ pub fn spawn_ui(
     let button = commands
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(button_width / 2.0, 0.0, 400.0)),
+            transform: Transform::from_translation(Vec3::new(
+                button_width / 2.0,
+                0.0,
+                globals.z_pos.ui_buttons,
+            )),
             material: shader_params_button_detach,
             ..Default::default()
         })
@@ -187,7 +199,11 @@ pub fn spawn_ui(
     let icon1 = commands
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_icon.clone(),
-            transform: Transform::from_translation(Vec3::new(-button_width / 5.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                -button_width / 5.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             material: shader_params_icon1.clone(),
             ..Default::default()
         })
@@ -201,7 +217,11 @@ pub fn spawn_ui(
         ..Default::default()
     });
 
-    let mut icon2_transform = Transform::from_translation(Vec3::new(button_width / 5.0, 0.0, 20.1));
+    let mut icon2_transform = Transform::from_translation(Vec3::new(
+        button_width / 5.0,
+        0.0,
+        globals.z_pos.ui_button_icons,
+    ));
     icon2_transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
     let icon2 = commands
         .spawn_bundle(MaterialMesh2dBundle {
@@ -232,7 +252,11 @@ pub fn spawn_ui(
             mesh: mesh_handle_button.clone(),
             material: shader_params_spawn,
 
-            transform: Transform::from_translation(Vec3::new(button_width * 1.5, 0.0, 400.0)),
+            transform: Transform::from_translation(Vec3::new(
+                button_width * 1.5,
+                0.0,
+                globals.z_pos.ui_buttons,
+            )),
             ..Default::default()
         })
         .insert(ButtonInteraction::None)
@@ -243,8 +267,11 @@ pub fn spawn_ui(
 
     commands.entity(main_ui).push_children(&[button]);
 
-    let mut icon1_transform =
-        Transform::from_translation(Vec3::new(-button_width / 5.0, 0.0, 20.1));
+    let mut icon1_transform = Transform::from_translation(Vec3::new(
+        -button_width / 5.0,
+        0.0,
+        globals.z_pos.ui_button_icons,
+    ));
     icon1_transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
     let icon1 = commands
         .spawn_bundle(MaterialMesh2dBundle {
@@ -258,7 +285,11 @@ pub fn spawn_ui(
         .insert(Icon)
         .id();
 
-    let icon2_transform = Transform::from_translation(Vec3::new(button_width / 5.0, 0.0, 20.1));
+    let icon2_transform = Transform::from_translation(Vec3::new(
+        button_width / 5.0,
+        0.0,
+        globals.z_pos.ui_button_icons,
+    ));
     // icon2_transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
     let icon2 = commands
         .spawn_bundle(MaterialMesh2dBundle {
@@ -292,7 +323,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 button_width * 1.5,
                 -1.0 * button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -309,7 +340,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: texture_handle,
 
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -338,7 +373,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 button_width * 1.5,
                 -2.0 * button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             material: shader_params_group,
             ..Default::default()
@@ -355,7 +390,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: texture_handle,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             // sprite: Sprite::new(button_size / 1.3),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
@@ -365,7 +404,11 @@ pub fn spawn_ui(
         })
         .id();
 
-    let icon1_transform = Transform::from_translation(Vec3::new(-button_width / 8.0, 0.0, 20.1));
+    let icon1_transform = Transform::from_translation(Vec3::new(
+        -button_width / 8.0,
+        0.0,
+        globals.z_pos.ui_button_icons + 0.01,
+    ));
     // icon1_transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
     let icon1 = commands
         .spawn_bundle(MaterialMesh2dBundle {
@@ -379,7 +422,11 @@ pub fn spawn_ui(
         .insert(Icon)
         .id();
 
-    let mut icon2_transform = Transform::from_translation(Vec3::new(button_width / 8.0, 0.0, 20.1));
+    let mut icon2_transform = Transform::from_translation(Vec3::new(
+        button_width / 8.0,
+        0.0,
+        globals.z_pos.ui_button_icons + 0.01,
+    ));
     icon2_transform.rotation = Quat::from_rotation_z(std::f32::consts::PI);
     let icon2 = commands
         .spawn_bundle(MaterialMesh2dBundle {
@@ -415,7 +462,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 -button_width * 1.5,
                 button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -431,7 +478,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: texture_handle,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -458,7 +509,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 -button_width * 0.5,
                 button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -474,7 +525,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: texture_handle,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -502,7 +557,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 button_width * 1.5,
                 button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -518,7 +573,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: texture_handle,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -548,7 +607,7 @@ pub fn spawn_ui(
     //         transform: Transform::from_translation(Vec3::new(
     //             -button_width * 1.5,
     //             -button_width,
-    //             400.0,
+    //             globals.z_pos.ui_buttons,
     //         )),
     //         ..Default::default()
     //     })
@@ -564,7 +623,7 @@ pub fn spawn_ui(
     //     .spawn_bundle(SpriteBundle {
     //         material: materials.add(texture_handle.into()),
     //         // mesh: mesh_handle_button.clone(),
-    //         transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+    //         transform: Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.ui_button_icons)),
     //         sprite: Sprite::new(button_size / 1.3),
     //         ..Default::default()
     //     })
@@ -591,7 +650,7 @@ pub fn spawn_ui(
     //         transform: Transform::from_translation(Vec3::new(
     //             -button_width * 0.5,
     //             -button_width,
-    //             400.0,
+    //             globals.z_pos.ui_buttons,
     //         )),
     //         ..Default::default()
     //     })
@@ -607,7 +666,7 @@ pub fn spawn_ui(
     //     .spawn_bundle(SpriteBundle {
     //         material: materials.add(texture_handle.into()),
     //         // mesh: mesh_handle_button.clone(),
-    //         transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+    //         transform: Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.ui_button_icons)),
     //         sprite: Sprite::new(button_size / 1.3),
     //         ..Default::default()
     //     })
@@ -633,7 +692,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 -button_width * 0.5,
                 -button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -649,7 +708,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: on_material_show,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -680,7 +743,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 -button_width * 1.5,
                 -button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -697,7 +760,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: on_material,
 
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -730,7 +797,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 button_width * -1.5,
                 2.0 * button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -746,7 +813,11 @@ pub fn spawn_ui(
     let sound_sprite = commands
         .spawn_bundle(SpriteBundle {
             texture: on_material,
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -774,7 +845,11 @@ pub fn spawn_ui(
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_button.clone(),
             material: shader_params_scale_up,
-            transform: Transform::from_translation(Vec3::new(-button_width * 1.5, 0.0, 400.0)),
+            transform: Transform::from_translation(Vec3::new(
+                -button_width * 1.5,
+                0.0,
+                globals.z_pos.ui_buttons,
+            )),
             ..Default::default()
         })
         .insert(ButtonInteraction::None)
@@ -788,7 +863,11 @@ pub fn spawn_ui(
     let scale_up_sprite = commands
         .spawn_bundle(SpriteBundle {
             texture: scale_up_material,
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -815,7 +894,11 @@ pub fn spawn_ui(
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: mesh_handle_button.clone(),
             material: shader_params_scale_down,
-            transform: Transform::from_translation(Vec3::new(-button_width * 0.5, 0.0, 400.0)),
+            transform: Transform::from_translation(Vec3::new(
+                -button_width * 0.5,
+                0.0,
+                globals.z_pos.ui_buttons,
+            )),
             ..Default::default()
         })
         .insert(ButtonInteraction::None)
@@ -830,7 +913,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: scale_down_material,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -860,7 +947,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 button_width * 0.5,
                 button_width,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -876,7 +963,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: delete_material,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -906,7 +997,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 -button_width * 1.5,
                 -button_width * 2.0,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -922,7 +1013,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: mesh_material,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -950,7 +1045,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 button_width * 0.5,
                 -button_width * 2.0,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -966,7 +1061,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: heli_material,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -994,7 +1093,7 @@ pub fn spawn_ui(
             transform: Transform::from_translation(Vec3::new(
                 button_width * -0.5,
                 -button_width * 2.0,
-                400.0,
+                globals.z_pos.ui_buttons,
             )),
             ..Default::default()
         })
@@ -1010,7 +1109,11 @@ pub fn spawn_ui(
         .spawn_bundle(SpriteBundle {
             texture: road_material,
             // mesh: mesh_handle_button.clone(),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.1)),
+            transform: Transform::from_translation(Vec3::new(
+                0.0,
+                0.0,
+                globals.z_pos.ui_button_icons,
+            )),
             sprite: Sprite {
                 custom_size: Some(button_size / 1.3),
                 ..Default::default()
@@ -1030,7 +1133,7 @@ pub fn spawn_ui(
     //     //
     //     //////////////////////////// color ui /////////////////////////
 
-    let color_ui_position = Vec3::new(0.0, -65.0 * globals.scale, -500.0);
+    let color_ui_position = Vec3::new(0.0, -325.0 * globals.scale, globals.z_pos.ui_color_board);
 
     let shader_params_color_ui = ui_materials.add(UiMat {
         color: Color::hex("131B23").unwrap().into(),
@@ -1057,7 +1160,7 @@ pub fn spawn_ui(
 
     commands.entity(main_ui).push_children(&[parent]);
 
-    let color_button_size = Vec2::new(6. * globals.scale, 6. * globals.scale);
+    let color_button_size = Vec2::new(30. * globals.scale, 30. * globals.scale);
     let mesh_handle_color_button =
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad {
             size: color_button_size,
@@ -1081,9 +1184,9 @@ pub fn spawn_ui(
             });
 
             let button_transform = Transform::from_translation(Vec3::new(
-                (k as f32 - 2.0) * 6.1,
-                (j as f32 + 0.5 - (num_rows as f32) / 2.0) * 7.0,
-                10.0,
+                (k as f32 - 2.0) * 30.5,
+                (j as f32 + 0.5 - (num_rows as f32) / 2.0) * 35.0,
+                globals.z_pos.ui_color_buttons,
             ));
 
             let child = commands
