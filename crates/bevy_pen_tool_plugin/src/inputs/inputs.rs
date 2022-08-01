@@ -83,6 +83,12 @@ pub struct MoveAnchor {
     pub unlatch: bool,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MoveWholeCurve {
+    pub handle: Handle<Bezier>,
+    pub is_latched: bool,
+}
+
 pub fn send_action(
     mut ui_event_reader: EventReader<UiButton>,
     mut action_event_writer: EventWriter<Action>,
@@ -170,6 +176,7 @@ pub fn send_action(
         (false, true, false) if mouse_wheel_down => action_event_writer.send(Action::ScaleDown),
         (false, false, false) if _pressed_delete => action_event_writer.send(Action::Delete),
         (true, false, false) if _pressed_t => action_event_writer.send(Action::ComputeLut),
+
         _ => {}
     }
 }
@@ -229,6 +236,7 @@ pub enum MouseClickEvent {
     OnUiButton(UiButton),
     OnAnchor((Anchor, Handle<Bezier>, IsLatched)), // the bool is for unlatching
     OnAnchorEdge((AnchorEdge, Handle<Bezier>, IsLatched)),
+    OnWholeBezier((Handle<Bezier>, IsLatched)),
     SpawnOnBezier((AnchorEdge, Handle<Bezier>, IsLatched)),
     SpawnOnCanvas,
 }
@@ -241,7 +249,7 @@ pub fn check_mouseclick_on_objects(
     mouse_button_input: Res<Input<MouseButton>>,
     mut button_query: Query<(
         &ButtonState,
-        &Transform,
+        &GlobalTransform,
         &Handle<ButtonMat>,
         &mut ButtonInteraction,
         &UiButton,
@@ -289,7 +297,7 @@ pub fn check_mouseclick_on_objects(
             let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
             //
             if cursor.within_rect(
-                button_transform.translation.truncate() / scale,
+                button_transform.translation().truncate() / scale,
                 shader_params.size * 0.95,
             ) {
                 // println!(
@@ -345,7 +353,6 @@ pub fn check_mouseclick_on_objects(
             &bezier_query,
             // globals.scale,
         ) {
-            println!("get_close_anchor: {:?}", anchor);
             anchor_event = Some(MouseClickEvent::OnAnchor((anchor, handle, false)));
         }
 
@@ -354,7 +361,6 @@ pub fn check_mouseclick_on_objects(
         if let Some((_dist, anchor_edge, handle, latched)) =
             get_close_still_anchor(12.0, cursor.position, &bezier_curves, &bezier_query)
         {
-            println!("get_close_still_anchor: {:?}", anchor_edge);
             anchor_edge_event = Some(MouseClickEvent::OnAnchorEdge((
                 anchor_edge,
                 handle,
@@ -379,6 +385,16 @@ pub fn check_mouseclick_on_objects(
                 if spawn_button_on =>
             {
                 mouse_event_writer.send(MouseClickEvent::SpawnOnBezier(info));
+            }
+
+            // case of clicking on an anchor and moving whole curve (higher priority)
+            (_, Some(MouseClickEvent::OnAnchorEdge(info)), true, true, true)
+                if !globals.do_hide_anchors
+                    && !globals.hide_control_points
+                    && !spawn_button_on
+                    && !unlatch_button_on =>
+            {
+                mouse_event_writer.send(MouseClickEvent::OnAnchor((Anchor::All, info.1, info.2)));
             }
 
             // case of clicking on an anchor (higher priority)
@@ -525,7 +541,8 @@ pub fn spawn_curve_order_on_mouseclick(
 }
 
 pub fn check_mouse_on_canvas(
-    mut move_event_writer: EventWriter<MoveAnchor>,
+    mut move_anchor_event_writer: EventWriter<MoveAnchor>,
+
     mut user_state: ResMut<UserState>,
     mut mouse_event_reader: EventReader<MouseClickEvent>,
 ) {
@@ -540,8 +557,10 @@ pub fn check_mouse_on_canvas(
                 unlatch: *unlatch,
             };
             // passing anchor data to a MoveAnchor event
-            move_event_writer.send(moving_anchor.clone());
+            move_anchor_event_writer.send(moving_anchor.clone());
 
+            // This state needs to be cleaned up.
+            // This is used in the selection attribute update
             let user_state = user_state.as_mut();
             *user_state = UserState::MovingAnchor;
         }

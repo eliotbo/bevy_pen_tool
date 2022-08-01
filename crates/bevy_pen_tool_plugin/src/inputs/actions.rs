@@ -1,9 +1,9 @@
-use super::inputs::{Action, Cursor, MoveAnchor};
+use super::inputs::{Action, Cursor, MoveAnchor, MoveWholeCurve};
 use crate::spawner::spawn_bezier;
 use crate::util::*;
 use crate::{GroupMiddleQuad, StandaloneLut};
 
-use bevy::prelude::*;
+use bevy::{asset::HandleId, prelude::*};
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -97,7 +97,8 @@ pub fn update_lut(
     }
 }
 
-// unlatch is part of this function
+// Moves either an anchor or the whole curve.
+// The unlatch functionality is part of this function as well.
 pub fn begin_move_on_mouseclick(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     globals: ResMut<Globals>,
@@ -106,6 +107,13 @@ pub fn begin_move_on_mouseclick(
     audio: Res<Audio>,
 ) {
     let mut latch_partner: Option<LatchData> = None;
+
+    let mut latched_chain_whole_curve: Vec<Handle<Bezier>> = Vec::new();
+
+    let bezier_curve_hack = bezier_curves
+        .iter()
+        .map(|(s, x)| (s.clone(), x.clone()))
+        .collect::<HashMap<HandleId, Bezier>>();
 
     if let Some(move_anchor) = move_event_reader.iter().next() {
         let mut bezier = bezier_curves.get_mut(&move_anchor.handle.clone()).unwrap();
@@ -119,6 +127,11 @@ pub fn begin_move_on_mouseclick(
             bezier.move_quad = move_anchor.anchor;
 
             bezier.update_previous_pos();
+
+            if move_anchor.anchor == Anchor::All {
+                latched_chain_whole_curve =
+                    bezier.find_connected_curves(bezier_curve_hack, &maps.id_handle_map);
+            }
         }
 
         // unlatch mechanism
@@ -137,6 +150,14 @@ pub fn begin_move_on_mouseclick(
                 }
             }
         }
+    }
+
+    // Move the whole chain is Anchor::All is sent
+    for handle in latched_chain_whole_curve.iter() {
+        let bezier = bezier_curves.get_mut(handle).unwrap();
+        bezier.move_quad = Anchor::All;
+
+        bezier.update_previous_pos();
     }
 
     // unlatch partner
@@ -496,8 +517,6 @@ pub fn latchy(
                     return;
                 }
 
-                println!("latching");
-
                 potential_partner = Some((
                     partner_bezier.id,
                     mover_edge,
@@ -571,9 +590,8 @@ pub fn officiate_latch_partnership(
     for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
         let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
         bezier.set_latch(latch.clone());
-        println!("latches: {:?}", bezier.latches);
+
         // bezier.has_just_latched = true;
-        println!("officiated");
 
         if globals.sound_on {
             if let Some(sound) = maps.sounds.get("latch") {

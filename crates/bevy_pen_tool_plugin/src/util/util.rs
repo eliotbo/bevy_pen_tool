@@ -43,6 +43,7 @@ pub enum UserState {
     Selected(Group),
     SpawningCurve,
     MovingAnchor,
+    MovingWholeCurve,
 }
 
 impl Default for UserState {
@@ -119,6 +120,7 @@ pub enum Anchor {
     End,
     ControlStart,
     ControlEnd,
+    All, // used to move the whole curve
     None,
 }
 
@@ -193,7 +195,7 @@ pub struct Group {
     pub bezier_handles: HashSet<Handle<Bezier>>,
     //
     // Attempts to store the start and end points of a group.
-    // Fails if curves are not connected
+    // Fails if curves are not connected or if the curves form a loop
     pub ends: Option<Vec<(Handle<Bezier>, AnchorEdge)>>,
     //
     // vec of each curve's look-up table
@@ -911,6 +913,15 @@ impl Bezier {
                 self.positions.control_end =
                     self.previous_positions.control_end + cursor.pos_relative_to_click;
             }
+
+            Anchor::All => {
+                self.positions.start = self.previous_positions.start + cursor.pos_relative_to_click;
+                self.positions.end = self.previous_positions.end + cursor.pos_relative_to_click;
+                self.positions.control_start =
+                    self.previous_positions.control_start + cursor.pos_relative_to_click;
+                self.positions.control_end =
+                    self.previous_positions.control_end + cursor.pos_relative_to_click;
+            }
         }
     }
 
@@ -1026,6 +1037,62 @@ impl Bezier {
         let rem = (idx_f64 - 1.0) % 1.0;
         let t_distance = interpolate(p1, p2, rem);
         return t_distance;
+    }
+
+    pub fn find_connected_curves(
+        &mut self,
+        bezier_curves: HashMap<HandleId, Bezier>,
+        id_handle_map: &HashMap<u128, Handle<Bezier>>,
+    ) -> Vec<Handle<Bezier>> {
+        //
+        let mut connected_curves: Vec<Handle<Bezier>> = Vec::new();
+
+        if self.latches.is_empty() {
+            return connected_curves;
+        };
+
+        // TODO: is this really a good way of clone assets?
+        let bezier_curve_hack = bezier_curves
+            .iter()
+            .map(|(s, x)| (s.clone(), x.clone()))
+            .collect::<HashMap<HandleId, Bezier>>();
+
+        let anchors_temp = vec![AnchorEdge::Start, AnchorEdge::End];
+        let anchors = anchors_temp
+            .iter()
+            .filter(|anchor| self.quad_is_latched(anchor))
+            .collect::<Vec<&AnchorEdge>>();
+
+        let initial_bezier = self.id;
+
+        // for both ends of the curve, find the other curves that are latched to it
+        for anchor in anchors.clone() {
+            let mut latch = self.latches.get(&anchor).unwrap().clone();
+
+            //
+            loop {
+                //
+                // let (partner_id, partners_edge) = (latch.latched_to_id, );
+                let next_edge = latch.partners_edge.other();
+
+                let next_curve_handle = id_handle_map.get(&latch.latched_to_id).unwrap().clone();
+
+                let bezier_next = bezier_curve_hack.get(&next_curve_handle.id).unwrap();
+                connected_curves.push(next_curve_handle);
+
+                if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
+                    latch = next_latch.clone();
+                    if latch.latched_to_id == initial_bezier {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            // }
+        }
+
+        return connected_curves;
     }
 }
 
@@ -1267,7 +1334,6 @@ pub fn adjust_selection_attributes(
     let us = user_state.as_ref();
     if let UserState::Selected(_) = us {
         do_adjust = true;
-        // println!("slected state");
     }
 
     if do_adjust {
@@ -1514,7 +1580,7 @@ pub fn open_file_dialog(save_name: &str, folder: &str, extension: &str) -> Optio
         .set_file_name(&default_name)
         .set_directory(&default_path)
         .save_file();
-    println!("The user choose: {:#?}", &res);
+    println!("The user chose: {:#?}", &res);
 
     return res;
 }
