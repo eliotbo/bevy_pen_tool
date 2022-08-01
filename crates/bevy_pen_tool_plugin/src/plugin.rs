@@ -80,6 +80,7 @@ impl Plugin for PenPlugin {
                     .with_system(make_mesh)
                     .with_system(make_road)
                     .with_system(unselect)
+                    .with_system(debug)
                     .label("model")
                     .after("controller"),
             )
@@ -110,6 +111,20 @@ impl Plugin for PenPlugin {
                     .label("view")
                     .after("model"),
             );
+    }
+}
+
+fn debug(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut query: Query<&Handle<Bezier>, With<BezierParent>>,
+    mut bezier_curves: ResMut<Assets<Bezier>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::B) {
+        // println!("'B' currently pressed");
+        for handle in query.iter() {
+            let bezier = bezier_curves.get_mut(handle).unwrap();
+            println!("latches: {:?}", bezier.latches);
+        }
     }
 }
 

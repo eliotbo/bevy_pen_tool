@@ -1,7 +1,7 @@
 use crate::inputs::*;
 use crate::util::materials::*;
 
-use bevy::{prelude::*, reflect::TypeUuid, sprite::Mesh2dHandle};
+use bevy::{asset::HandleId, prelude::*, reflect::TypeUuid, sprite::Mesh2dHandle};
 
 use serde::{Deserialize, Serialize};
 
@@ -122,18 +122,17 @@ pub enum Anchor {
     None,
 }
 
-// impl Anchor {
-//     pub fn to_edge(&self) -> AnchorEdge {
-//         match self {
-//             Self::Start => AnchorEdge::Start,
-//             Self::End => AnchorEdge::End,
-//             _ => {
-//                 println!("Failure to convert Anchor to AnchorEdge!");
-//                 return AnchorEdge::Start;
-//             }
-//         }
-//     }
-// }
+impl Anchor {
+    pub fn to_edge(&self) -> AnchorEdge {
+        match self {
+            Self::Start => AnchorEdge::Start,
+            Self::End => AnchorEdge::End,
+            _ => {
+                panic!("Failure to convert Anchor to AnchorEdge!");
+            }
+        }
+    }
+}
 
 #[derive(Component)]
 pub struct UiBoard {
@@ -253,12 +252,18 @@ impl Group {
         let handle = handles.iter().next().unwrap().clone();
         handles.remove(&handle);
 
-        let initial_bezier = bezier_curves.get(&handle.clone()).unwrap();
+        // TODO: is this really a good way of clone assets?
+        let bezier_curve_hack = bezier_curves
+            .iter()
+            .map(|(s, x)| (s.clone(), x.clone()))
+            .collect::<HashMap<HandleId, Bezier>>();
+
+        let initial_bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
 
         let anchors_temp = vec![AnchorEdge::Start, AnchorEdge::End];
         let anchors = anchors_temp
             .iter()
-            .filter(|anchor| initial_bezier.latches[anchor].get(0).is_some())
+            .filter(|anchor| initial_bezier.quad_is_latched(anchor))
             .collect::<Vec<&AnchorEdge>>();
 
         let mut ends: Vec<(Handle<Bezier>, AnchorEdge)> = Vec::new();
@@ -288,7 +293,9 @@ impl Group {
         // TODO: only consider curves that are selected
         for anchor in anchors.clone() {
             num_con += 1;
-            let mut latch = initial_bezier.latches[&anchor].get(0).unwrap();
+            // let mut latch = initial_bezier.latches[&anchor].get(0).unwrap();
+            let mut latch = initial_bezier.latches.get(&anchor).unwrap().clone();
+            // if let Some(latch) = initial_bezier.latches.get_mut(&anchor) {
             //
             while num_con <= num_curves {
                 //
@@ -297,15 +304,17 @@ impl Group {
 
                 let next_curve_handle = id_handle_map.get(&latch.latched_to_id).unwrap().clone();
 
-                let bezier_next = bezier_curves.get(&next_curve_handle.clone()).unwrap();
-                if let Some(next_latch) = bezier_next.latches[&next_edge].get(0) {
-                    latch = next_latch;
+                let bezier_next = bezier_curve_hack.get(&next_curve_handle.id).unwrap();
+
+                if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
+                    latch = next_latch.clone();
                     num_con += 1;
                 } else {
                     ends.push((next_curve_handle, next_edge));
                     break;
                 }
             }
+            // }
         }
 
         if num_con + 2 > num_curves {
@@ -342,7 +351,7 @@ impl Group {
                 starting_handle.clone(),
             ));
 
-            if let Some(mut latch) = initial_bezier.latches[&starting_anchor.other()].get(0) {
+            if let Some(mut latch) = initial_bezier.latches.get(&starting_anchor.other()) {
                 //
                 let mut found_connection = true;
 
@@ -370,7 +379,7 @@ impl Group {
                         next_curve_handle.clone(),
                     ));
 
-                    if let Some(next_latch) = bezier_next.latches[&next_edge].get(0) {
+                    if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
                         if self
                             .bezier_handles
                             .contains(id_handle_map.get(&next_latch.latched_to_id).unwrap())
@@ -640,6 +649,7 @@ pub struct Globals {
     pub hide_control_points: bool,
     pub group_lut_num_points: u32,
     pub road_width: f32,
+    pub anchor_clicking_dist: f32,
     pub z_pos: ZPos,
 }
 
@@ -656,6 +666,7 @@ impl Default for Globals {
             num_points_on_curve: 25,
             group_lut_num_points: 100,
             road_width: 8.0,
+            anchor_clicking_dist: 12.0,
             z_pos: ZPos::default(),
         }
     }
@@ -688,7 +699,7 @@ pub struct Bezier {
     pub do_compute_lut: bool,
     pub lut: LutDistance,
     pub id: u128,
-    pub latches: HashMap<AnchorEdge, Vec<LatchData>>,
+    pub latches: HashMap<AnchorEdge, LatchData>,
     pub potential_latch: Option<LatchData>,
     pub grouped: bool,
 }
@@ -696,9 +707,9 @@ pub struct Bezier {
 impl Default for Bezier {
     fn default() -> Self {
         let mut rng = thread_rng();
-        let mut latches = HashMap::new();
-        latches.insert(AnchorEdge::Start, Vec::new());
-        latches.insert(AnchorEdge::End, Vec::new());
+        let latches = HashMap::new();
+        // latches.insert(AnchorEdge::Start, Vec::new());
+        // latches.insert(AnchorEdge::End, Vec::new());
 
         Bezier {
             positions: BezierPositions::default(),
@@ -819,13 +830,15 @@ impl Bezier {
 
     pub fn set_latch(&mut self, latch: LatchData) {
         // self.latches[&latch.self_edge] = vec![latch.clone()];
-        if let Some(latch_local) = self.latches.get_mut(&latch.self_edge) {
-            *latch_local = vec![latch.clone()];
-        }
+        // if let Some(latch_local) = self.latches.get_mut(&latch.self_edge) {
+        //     *latch_local = latch.clone();
+        // }
+        self.latches.insert(latch.self_edge, latch.clone());
     }
 
-    pub fn quad_is_latched(&self, anchor_edge: AnchorEdge) -> bool {
-        !self.latches[&anchor_edge].is_empty()
+    pub fn quad_is_latched(&self, anchor_edge: &AnchorEdge) -> bool {
+        // !self.latches[&anchor_edge].is_empty()
+        self.latches.contains_key(&anchor_edge)
     }
 
     // TODO: remove scale arg from this method
@@ -905,9 +918,7 @@ impl Bezier {
     pub fn get_mover_latch_info(&self) -> Option<(LatchData, Vec2, Vec2)> {
         match self.move_quad {
             Anchor::Start | Anchor::ControlStart => {
-                if let Some(latch_start) =
-                    self.latches.get(&AnchorEdge::Start).unwrap().clone().get(0)
-                {
+                if let Some(latch_start) = self.latches.get(&AnchorEdge::Start) {
                     let latch_partner_id = latch_start.clone();
                     let partner_position = self.positions.start;
 
@@ -919,8 +930,7 @@ impl Bezier {
                 return None;
             }
             Anchor::End | Anchor::ControlEnd => {
-                if let Some(latch_end) = self.latches.get(&AnchorEdge::End).unwrap().clone().get(0)
-                {
+                if let Some(latch_end) = self.latches.get(&AnchorEdge::End) {
                     let latch_partner_id = latch_end.clone();
                     let partner_position = self.positions.end;
 
@@ -958,19 +968,17 @@ impl Bezier {
         anchor_edge: AnchorEdge,
         event_writer: &mut EventWriter<Latch>,
     ) {
-        // pub fn send_latch_on_spawn(&mut self, anchor_edge: AnchorEdge, cursor: &mut ResMut<Cursor>) {
         let latch = self.generate_start_latch_on_spawn(anchor_edge);
-        if let Some(latch_start) = self.latches.get_mut(&anchor_edge) {
-            *latch_start = vec![LatchData {
-                latched_to_id: latch.latcher_id,
-                self_edge: anchor_edge,
-                partners_edge: AnchorEdge::Start,
-            }];
 
-            // TODO: replace this by an event
-            event_writer.send(latch);
-            // cursor.latch = vec![latch];
-        }
+        let latch_start = LatchData {
+            latched_to_id: latch.latcher_id,
+            self_edge: anchor_edge,
+            partners_edge: AnchorEdge::Start,
+        };
+
+        self.latches.insert(anchor_edge, latch_start);
+
+        event_writer.send(latch);
     }
 
     pub fn update_latched_position(
@@ -1180,7 +1188,7 @@ pub fn get_close_anchor_entity(
     return None;
 }
 
-pub fn get_close_still_anchor(
+pub fn get_close_still_unlatched_anchor(
     max_dist: f32,
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
@@ -1191,10 +1199,47 @@ pub fn get_close_still_anchor(
             let distance_to_start = (bezier.positions.start - position).length();
             let distance_to_endpoint = (bezier.positions.end - position).length();
 
-            if distance_to_start < max_dist && (bezier.move_quad != Anchor::Start) {
+            if distance_to_start < max_dist
+                && (bezier.move_quad != Anchor::Start)
+                && !bezier.quad_is_latched(&AnchorEdge::Start)
+            {
                 return Some((distance_to_start, AnchorEdge::Start, bezier_handle.clone()));
-            } else if distance_to_endpoint < max_dist && (bezier.move_quad != Anchor::End) {
+            } else if distance_to_endpoint < max_dist
+                && (bezier.move_quad != Anchor::End)
+                && !bezier.quad_is_latched(&AnchorEdge::End)
+            {
                 return Some((distance_to_endpoint, AnchorEdge::End, bezier_handle.clone()));
+            }
+        }
+    }
+    return None;
+}
+
+pub fn get_close_still_anchor(
+    max_dist: f32,
+    position: Vec2,
+    bezier_curves: &ResMut<Assets<Bezier>>,
+    query: &Query<(&Handle<Bezier>, &BezierParent)>,
+) -> Option<(f32, AnchorEdge, Handle<Bezier>, bool)> {
+    for (bezier_handle, _bb) in query.iter() {
+        if let Some(bezier) = bezier_curves.get(bezier_handle) {
+            let distance_to_start = (bezier.positions.start - position).length();
+            let distance_to_endpoint = (bezier.positions.end - position).length();
+
+            if distance_to_start < max_dist && (bezier.move_quad != Anchor::Start) {
+                return Some((
+                    distance_to_start,
+                    AnchorEdge::Start,
+                    bezier_handle.clone(),
+                    bezier.quad_is_latched(&AnchorEdge::Start),
+                ));
+            } else if distance_to_endpoint < max_dist && (bezier.move_quad != Anchor::End) {
+                return Some((
+                    distance_to_endpoint,
+                    AnchorEdge::End,
+                    bezier_handle.clone(),
+                    bezier.quad_is_latched(&AnchorEdge::End),
+                ));
             }
         }
     }
@@ -1209,7 +1254,7 @@ pub fn adjust_selection_attributes(
     shader_query: Query<&Handle<SelectionMat>, With<SelectedBoxQuad>>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    globals: ResMut<Globals>,
+    // globals: ResMut<Globals>,
     selection: ResMut<Selection>,
     user_state: Res<UserState>,
 ) {

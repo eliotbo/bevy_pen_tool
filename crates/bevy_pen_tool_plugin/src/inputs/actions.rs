@@ -61,13 +61,13 @@ pub fn update_lut(
             if bezier.move_quad != Anchor::None {
                 bezier.compute_lut_walk(globals.group_lut_num_points as usize);
 
-                for (_parter_anchor, latches) in bezier.latches.iter() {
+                for (_parter_anchor, latch) in bezier.latches.iter() {
                     // TODO: only update the partner curve that is latched to the moving part
-                    for latch in latches.iter() {
-                        if let Some(handle) = maps.id_handle_map.get(&latch.latched_to_id) {
-                            bezier_to_update.insert(handle);
-                        }
+                    // for latch in latches.iter() {
+                    if let Some(handle) = maps.id_handle_map.get(&latch.latched_to_id) {
+                        bezier_to_update.insert(handle);
                     }
+                    // }
                 }
 
                 // if curve is part of a group, recompute the group lut
@@ -105,7 +105,7 @@ pub fn begin_move_on_mouseclick(
     mut move_event_reader: EventReader<MoveAnchor>,
     audio: Res<Audio>,
 ) {
-    let mut latch_partners: Vec<LatchData> = Vec::new();
+    let mut latch_partner: Option<LatchData> = None;
 
     if let Some(move_anchor) = move_event_reader.iter().next() {
         let mut bezier = bezier_curves.get_mut(&move_anchor.handle.clone()).unwrap();
@@ -125,20 +125,14 @@ pub fn begin_move_on_mouseclick(
         if move_anchor.unlatch {
             if !bezier.grouped {
                 match move_anchor.anchor {
-                    Anchor::Start => {
-                        // keep the latch information in memory to unlatch the anchor's partner below
-                        latch_partners = bezier.latches[&AnchorEdge::Start].clone();
-                        if let Some(latch) = bezier.latches.get_mut(&AnchorEdge::Start) {
-                            *latch = Vec::new();
+                    anchor @ (Anchor::Start | Anchor::End) => {
+                        if let Some(temp_latch) = bezier.latches.get(&anchor.to_edge()) {
+                            // keep the latch information in memory to unlatch the anchor's partner below
+                            latch_partner = Some(temp_latch.clone());
                         }
+                        bezier.latches.remove(&anchor.to_edge());
                     }
-                    Anchor::End => {
-                        latch_partners = bezier.latches[&AnchorEdge::End].clone();
-                        // bezier.latches[&AnchorEdge::End] = Vec::new();
-                        if let Some(latch) = bezier.latches.get_mut(&AnchorEdge::End) {
-                            *latch = Vec::new();
-                        }
-                    }
+
                     _ => {}
                 }
             }
@@ -146,14 +140,15 @@ pub fn begin_move_on_mouseclick(
     }
 
     // unlatch partner
-    if let Some(latch) = latch_partners.get(0) {
+    if let Some(latch) = latch_partner {
         //
         if let Some(handle) = maps.id_handle_map.get(&latch.latched_to_id) {
             //
             let bezier = bezier_curves.get_mut(handle).unwrap();
             //
-            if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
-                *latch_local = Vec::new();
+            // if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
+            if let Some(_) = bezier.latches.remove(&latch.partners_edge) {
+                // *latch_local = Vec::new();
                 if globals.sound_on {
                     if let Some(sound) = maps.sounds.get("unlatch") {
                         audio.play(sound.clone());
@@ -440,15 +435,14 @@ pub fn groupy(
 pub fn latchy(
     cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: ParamSet<(
-        Query<(&Handle<Bezier>, &BezierParent)>,
-        Query<(&Handle<Bezier>, &BezierParent)>,
-    )>,
+    mut query: Query<(&Handle<Bezier>, &BezierParent)>,
+
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
+    maps: Res<Maps>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Latch) {
-        let latching_distance = 5.0;
+        // let latching_distance = globals.anchor_clicking_dist;
 
         let mut potential_mover: Option<(Vec2, u128, AnchorEdge, Handle<Bezier>)> = None;
         let mut potential_partner: Option<(
@@ -462,14 +456,14 @@ pub fn latchy(
         // find moving quad and store its parameters
 
         // TODO: insert a Moving component to a moving anchor
-        for (bezier_handle, _bb) in query.p0().iter() {
+        for (bezier_handle, _bb) in query.iter() {
             let mut bezier = bezier_curves.get(bezier_handle).unwrap().clone();
             bezier.potential_latch = None;
             if bezier.edge_is_moving() {
                 // a latched point does not latch to an additional point
                 let moving_anchor = bezier.get_mover_edge();
-                if bezier.quad_is_latched(moving_anchor) {
-                    return ();
+                if bezier.quad_is_latched(&moving_anchor) {
+                    return (); // TODO: find out if this introduces a bug
                 }
 
                 let mover_pos = cursor.position;
@@ -487,18 +481,22 @@ pub fn latchy(
         // find quad within latching_distance. Upon success, setup a latch and store the
         // paramters of the latchee (partner)
         if let Some((pos, id, mover_edge, mover_handle)) = potential_mover {
-            if let Some((_dist, anchor_edge, partner_handle)) = get_close_still_anchor(
-                latching_distance * globals.scale,
+            if let Some((_dist, anchor_edge, partner_handle)) = get_close_still_unlatched_anchor(
+                // latching_distance * globals.scale,
+                globals.anchor_clicking_dist,
                 pos,
                 &bezier_curves,
-                &query.p0(),
+                &query,
             ) {
                 let partner_bezier = bezier_curves.get_mut(&partner_handle.clone()).unwrap();
 
                 // if the potential partner is free, continue
-                if partner_bezier.quad_is_latched(anchor_edge) {
+                if partner_bezier.quad_is_latched(&anchor_edge) {
+                    println!("Cannot latch. Partner is latched");
                     return;
                 }
+
+                println!("latching");
 
                 potential_partner = Some((
                     partner_bezier.id,
@@ -517,6 +515,19 @@ pub fn latchy(
                 partner_bezier.potential_latch = Some(partner_latch_data);
 
                 // event_writer.send(OfficialLatch(partner_latch_data, partner_handle.clone()));
+            } else {
+                let bezier = bezier_curves.get(&mover_handle).unwrap().clone();
+
+                if let Some(potential_latch) = bezier.potential_latch {
+                    if let Some(partner_handle) =
+                        maps.id_handle_map.get(&potential_latch.latched_to_id)
+                    {
+                        let partner_bezier = bezier_curves.get_mut(&partner_handle).unwrap();
+                        (*partner_bezier).potential_latch = None;
+                    }
+                }
+                let bezier = bezier_curves.get_mut(&mover_handle).unwrap();
+                (*bezier).potential_latch = None;
             }
         }
 
@@ -560,7 +571,9 @@ pub fn officiate_latch_partnership(
     for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
         let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
         bezier.set_latch(latch.clone());
+        println!("latches: {:?}", bezier.latches);
         // bezier.has_just_latched = true;
+        println!("officiated");
 
         if globals.sound_on {
             if let Some(sound) = maps.sounds.get("latch") {
@@ -612,15 +625,22 @@ pub fn delete(
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Delete) {
         // list of partners that need to be unlatched
-        let mut latched_partners: Vec<Vec<LatchData>> = Vec::new();
+        let mut latched_partners: Vec<LatchData> = Vec::new();
         for (entity, bezier_handle) in query.iter() {
             //
             for (_entity_selected, handle) in selection.selected.group.clone() {
                 //
                 let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
 
-                latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
-                latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
+                // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
+                if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
+                    latched_partners.push(latched_anchor.clone());
+                }
+
+                // latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
+                if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::End) {
+                    latched_partners.push(latched_anchor.clone());
+                }
 
                 if &handle == bezier_handle {
                     commands.entity(entity).despawn_recursive();
@@ -639,20 +659,22 @@ pub fn delete(
         }
 
         // unlatch partners of deleted curves
-        for latch_vec in latched_partners {
+        for latch_data in latched_partners {
             //
-            if let Some(latch) = latch_vec.get(0) {
+            // if let Some(latch) = latch_vec {
+            //
+            if let Some(handle) = maps.id_handle_map.get(&latch_data.latched_to_id) {
                 //
-                if let Some(handle) = maps.id_handle_map.get(&latch.latched_to_id) {
-                    //
-                    let bezier = bezier_curves.get_mut(handle).unwrap();
+                let bezier = bezier_curves.get_mut(handle).unwrap();
 
-                    if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
-                        // println!("selectd: {:?}", &latch_local);
-                        *latch_local = Vec::new();
-                    }
-                }
+                bezier.latches.remove(&latch_data.partners_edge);
+
+                // if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
+                //     // println!("selectd: {:?}", &latch_local);
+                //     *latch_local = Vec::new();
+                // }
             }
+            // }
         }
 
         // make the group box quad invisible

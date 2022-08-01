@@ -1,9 +1,9 @@
 use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
-    get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BezierGrandParent,
-    BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, OfficialLatch, UiAction,
-    UiBoard, UserState,
+    get_close_anchor, get_close_still_anchor, get_close_still_unlatched_anchor, Anchor, AnchorEdge,
+    Bezier, BezierGrandParent, BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals,
+    OfficialLatch, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -122,6 +122,8 @@ pub fn send_action(
     }
 
     let mouse_pressed = mouse_button_input.pressed(MouseButton::Left);
+    // let mouse_just_released = mouse_button_input.just_released(MouseButton::Left);
+
     let mut mouse_wheel_up = false;
     let mut mouse_wheel_down = false;
     if let Some(mouse_wheel) = mouse_wheel_events.iter().next() {
@@ -219,13 +221,15 @@ pub fn record_mouse_events_system(
     }
 }
 
+type IsLatched = bool;
+
 pub enum MouseClickEvent {
     OnUiBoard,
     OnColorButton((Color, Handle<ButtonMat>)),
     OnUiButton(UiButton),
-    OnAnchor((Anchor, Handle<Bezier>, bool)), // the bool is for unlatching
-    OnAnchorEdge((AnchorEdge, Handle<Bezier>)),
-    SpawnOnBezier((AnchorEdge, Handle<Bezier>)),
+    OnAnchor((Anchor, Handle<Bezier>, IsLatched)), // the bool is for unlatching
+    OnAnchorEdge((AnchorEdge, Handle<Bezier>, IsLatched)),
+    SpawnOnBezier((AnchorEdge, Handle<Bezier>, IsLatched)),
     SpawnOnCanvas,
 }
 
@@ -335,23 +339,27 @@ pub fn check_mouseclick_on_objects(
         // check for mouseclick on anchors (including control points)
         let mut anchor_event: Option<MouseClickEvent> = None;
         if let Some((_distance, anchor, handle)) = get_close_anchor(
-            12.0,
+            globals.anchor_clicking_dist,
             cursor.position,
             &bezier_curves,
             &bezier_query,
             // globals.scale,
         ) {
-            // println!("global scale: {}", globals.scale);
+            println!("get_close_anchor: {:?}", anchor);
             anchor_event = Some(MouseClickEvent::OnAnchor((anchor, handle, false)));
         }
 
-        //
         // check for mouseclick on anchors (excluding control points)
         let mut anchor_edge_event: Option<MouseClickEvent> = None;
-        if let Some((_dist, anchor_edge, handle)) =
+        if let Some((_dist, anchor_edge, handle, latched)) =
             get_close_still_anchor(12.0, cursor.position, &bezier_curves, &bezier_query)
         {
-            anchor_edge_event = Some(MouseClickEvent::OnAnchorEdge((anchor_edge, handle)));
+            println!("get_close_still_anchor: {:?}", anchor_edge);
+            anchor_edge_event = Some(MouseClickEvent::OnAnchorEdge((
+                anchor_edge,
+                handle,
+                latched,
+            )));
         }
 
         match (
@@ -390,7 +398,7 @@ pub fn check_mouseclick_on_objects(
                 mouse_event_writer.send(MouseClickEvent::OnAnchor((
                     info.0.to_anchor(),
                     info.1,
-                    false,
+                    info.2,
                 )));
             }
 
@@ -401,7 +409,7 @@ pub fn check_mouseclick_on_objects(
                 mouse_event_writer.send(MouseClickEvent::OnAnchor((
                     info.0.to_anchor(),
                     info.1,
-                    true,
+                    info.2,
                 )));
             }
 
@@ -412,7 +420,7 @@ pub fn check_mouseclick_on_objects(
                 mouse_event_writer.send(MouseClickEvent::OnAnchor((
                     info.0.to_anchor(),
                     info.1,
-                    true,
+                    info.2,
                 )));
             }
 
@@ -494,14 +502,18 @@ pub fn spawn_curve_order_on_mouseclick(
     let click_event = mouse_event_reader.iter().next();
 
     match click_event {
-        Some(MouseClickEvent::SpawnOnBezier((anchor_edge, handle))) => {
+        Some(MouseClickEvent::SpawnOnBezier((anchor_edge, handle, is_latched))) => {
             // this is too stateful, be more functional please. events please.
             let us = user_state.as_mut();
             *us = UserState::SpawningCurve;
             //
-            if let Some(bezier) = bezier_curves.get_mut(handle) {
-                //
-                bezier.send_latch_on_spawn(*anchor_edge, &mut event_writer);
+            if !is_latched {
+                if let Some(bezier) = bezier_curves.get_mut(handle) {
+                    //
+                    // println!("Spawning curve on anchor edge ");
+
+                    bezier.send_latch_on_spawn(*anchor_edge, &mut event_writer);
+                }
             }
         }
         Some(MouseClickEvent::SpawnOnCanvas) => {
@@ -521,6 +533,7 @@ pub fn check_mouse_on_canvas(
 
     match click_event {
         Some(MouseClickEvent::OnAnchor((anchor, handle, unlatch))) => {
+            // println!("On anchor unlatch: {:?}", unlatch);
             let moving_anchor = MoveAnchor {
                 handle: handle.clone(),
                 anchor: anchor.clone(),

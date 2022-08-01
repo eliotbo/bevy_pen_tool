@@ -288,7 +288,7 @@ pub fn follow_bezier_group(
         for (mut transform, bezier_animation) in query.iter_mut() {
             let path_length = group.1.standalone_lut.path_length as f64;
 
-            let multiplier: f64 = 500.0 / path_length;
+            let multiplier: f64 = 1500.0 / path_length;
             let t_time = (bezier_animation.animation_offset
                 + time.seconds_since_startup() * (0.1 * multiplier))
                 % 1.0;

@@ -27,7 +27,7 @@ pub fn spawn_bezier_system(
     mut maps: ResMut<Maps>,
     mut latch_event_reader: EventReader<Latch>,
     mut user_state: ResMut<UserState>,
-    cam_query: Query<&Transform, With<OrthographicProjection>>,
+    // cam_query: Query<&Transform, With<OrthographicProjection>>,
 ) {
     if user_state.as_ref() == &UserState::SpawningCurve {
         //
@@ -53,9 +53,9 @@ pub fn spawn_bezier_system(
         let mut control_start: Vec2 = start + Vec2::new(epsilon, epsilon);
         let control_end: Vec2 = start + Vec2::new(epsilon, epsilon);
 
-        let mut latches = HashMap::new();
-        latches.insert(AnchorEdge::Start, Vec::new());
-        latches.insert(AnchorEdge::End, Vec::new());
+        let mut latches: HashMap<AnchorEdge, LatchData> = HashMap::new();
+        // latches.insert(AnchorEdge::Start, Vec::new());
+        // latches.insert(AnchorEdge::End, Vec::new());
 
         for latch_received in latch_event_reader.iter() {
             //
@@ -63,13 +63,21 @@ pub fn spawn_bezier_system(
             control_start = latch_received.control_point;
             spawner_id = latch_received.latcher_id;
 
-            if let Some(latch_local) = latches.get_mut(&AnchorEdge::Start) {
-                *latch_local = vec![LatchData {
-                    latched_to_id: latch_received.latchee_id,
-                    self_edge: AnchorEdge::Start,
-                    partners_edge: latch_received.latchee_edge,
-                }];
-            }
+            let latch_local = LatchData {
+                latched_to_id: latch_received.latchee_id,
+                self_edge: AnchorEdge::Start,
+                partners_edge: latch_received.latchee_edge,
+            };
+
+            latches.insert(AnchorEdge::Start, latch_local);
+
+            // if let Some(latch_local) = latches.get_mut(&AnchorEdge::Start) {
+            //     *latch_local = LatchData {
+            //         latched_to_id: latch_received.latchee_id,
+            //         self_edge: AnchorEdge::Start,
+            //         partners_edge: latch_received.latchee_edge,
+            //     };
+            // }
         }
 
         cursor.latch = Vec::new();
