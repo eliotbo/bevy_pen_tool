@@ -71,8 +71,9 @@ pub fn update_lut(
                 }
 
                 // if curve is part of a group, recompute the group lut
-                if bezier.grouped {
+                if let Some(_id) = bezier.group {
                     for (group_handle_id, group) in groups.iter_mut() {
+                        // if _id == group_handle_id.id {
                         if group.bezier_handles.contains(b_handle) {
                             groups_to_update.insert(group_handle_id);
                         }
@@ -136,7 +137,8 @@ pub fn begin_move_on_mouseclick(
 
         // unlatch mechanism
         if move_anchor.unlatch {
-            if !bezier.grouped {
+            // if curve does not belong to a group
+            if let None = bezier.group {
                 match move_anchor.anchor {
                     anchor @ (Anchor::Start | Anchor::End) => {
                         if let Some(temp_latch) = bezier.latches.get(&anchor.to_edge()) {
@@ -375,10 +377,10 @@ pub fn groupy(
     mut groups: ResMut<Assets<Group>>,
     globals: ResMut<Globals>,
     selection: ResMut<Selection>,
-    maps: ResMut<Maps>,
+    mut maps: ResMut<Maps>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
-    group_query: Query<(Entity, &Handle<Group>), Or<(With<GroupBoxQuad>, With<GroupMiddleQuad>)>>,
+    group_query: Query<(Entity, &Handle<Group>), With<GroupParent>>,
     mut event_writer: EventWriter<Handle<Group>>,
     mut action_event_reader: EventReader<Action>,
     mut loaded_event_reader: EventReader<Loaded>,
@@ -429,23 +431,28 @@ pub fn groupy(
             }
         }
 
-        // get rid of the current group before making a new one
-        for (entity, group_handle) in group_query.iter() {
-            let group = groups.get(group_handle).unwrap();
-            for bezier_handle in group.bezier_handles.clone() {
-                if selected.bezier_handles.contains(&bezier_handle) {
-                    commands.entity(entity).despawn();
-                    break;
-                }
-            }
-        }
+        // // HEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+        // // TODO: we must get rid of this to have more than one group allowed
+        // // get rid of the current group before making a new one
+        // for (entity, group_handle) in group_query.iter() {
+        //     let group = groups.get(group_handle).unwrap();
+        //     for bezier_handle in group.bezier_handles.clone() {
+        //         if selected.bezier_handles.contains(&bezier_handle) {
+        //             commands.entity(entity).despawn();
+        //             break;
+        //         }
+        //     }
+        // }
 
         for bezier_handle in selected.bezier_handles.clone() {
             let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
-            bezier.grouped = true;
+            bezier.group = Some(selected.group_id);
         }
 
-        let group_handle = groups.add(selected);
+        let group_handle = groups.add(selected.clone());
+
+        maps.id_group_handle
+            .insert(selected.group_id, group_handle.clone());
 
         // spawn the middle quads and the bounding box
 
@@ -601,44 +608,126 @@ pub fn officiate_latch_partnership(
     }
 }
 
-// pub fn ungroup(
-//     mut commands: Commands,
-//     mut groups: ResMut<Assets<Group>>,
-//     globals: ResMut<Globals>,
-//     keyboard_input: Res<Input<KeyCode>>,
-//     mut bezier_curves: ResMut<Assets<Bezier>>,
-//     query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
-//     mut ui_event_reader: EventReader<UiButton>,
-//     mut group_event_reader: EventReader<Group>,
-//     mut event_writer: EventWriter<Handle<Group>>,
-//     audio: Res<Audio>,
-// ) {
-//     if !globals.selected.group.is_empty()
-//         && (keyboard_input.pressed(KeyCode::LControl)
-//             && keyboard_input.just_pressed(KeyCode::G)
-//             && keyboard_input.pressed(KeyCode::LShift)
-//             && !keyboard_input.pressed(KeyCode::Space))
-//     {
-//         let mut selected = globals.selected.clone();
-//         for bezier_handle in selected.handles {
-//             for (idx, group) in groups.clone().iter().enumerate() {
-//                 for handle_in_group in group.handles {
+pub fn ungroup(
+    mut commands: Commands,
+    mut groups: ResMut<Assets<Group>>,
+    selection: ResMut<Selection>,
+    globals: ResMut<Globals>,
+    query: Query<(Entity, &Handle<Group>), With<GroupParent>>,
+    bezier_query: Query<(Entity, &Handle<Bezier>, &Parent)>,
+    mut maps: ResMut<Maps>,
+    mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut action_event_reader: EventReader<Action>,
+    mut spawn_mids_event_writer: EventWriter<SpawnMids>,
+) {
+    if action_event_reader.iter().any(|x| x == &Action::Ungroup) {
+        // let group = &selection.selected;
+        let group_beziers = selection.selected.bezier_handles.clone();
 
-//                 }
-//             }
-//         }
-//     }
-// }
+        if group_beziers.is_empty() {
+            println!("Cannot ungroup. No curves selected");
+            return;
+        }
+
+        let bezier_curve_hack = bezier_curves
+            .iter()
+            .map(|(s, x)| (s.clone(), x.clone()))
+            .collect::<HashMap<HandleId, Bezier>>();
+
+        let bezier_handles = group_beziers
+            .iter()
+            .cloned()
+            .collect::<Vec<Handle<Bezier>>>();
+
+        // Check if the handles are all connected
+        // bezier_handles is never empty at this point
+        let first_bezier_handle = bezier_handles.iter().next().unwrap();
+
+        let first_bezier = bezier_curves.get(first_bezier_handle).unwrap();
+
+        let mut bezier_chain =
+            first_bezier.find_connected_curves(bezier_curve_hack, &maps.id_handle_map);
+
+        bezier_chain.push(first_bezier_handle.clone());
+
+        let bezier_chain_hashset = bezier_chain
+            .iter()
+            .cloned()
+            .collect::<HashSet<Handle<Bezier>>>();
+
+        // check if all curves are part of the same group
+        for handle in bezier_chain.iter() {
+            let bezier = bezier_curves.get(handle).unwrap();
+            if let Some(group_id) = bezier.group {
+                if group_id != selection.selected.group_id {
+                    println!("Cannot ungroup. Not all curves are part of the same group");
+                    return;
+                }
+            }
+        }
+
+        // TODO: this is not needed right?
+        if group_beziers != bezier_chain_hashset {
+            println!("Cannot ungroup. Curves are not part of the same chain");
+            return;
+        }
+
+        if let Some(id) = first_bezier.group {
+            // println!("id: {:?}", id);
+            // println!("maps.id_group_handle: {:?}", maps.id_group_handle.keys());
+            if let Some(group_handle) = maps.id_group_handle.get(&id) {
+                // remove With
+                let _what = groups.remove(group_handle);
+
+                for (entity, queried_group_handle) in query.iter() {
+                    if queried_group_handle == group_handle {
+                        // SPAWN BEZIER MIDDLE QUADS FOR EACH BEZIER
+                        commands.entity(entity).despawn_recursive();
+                        println!("Removed group");
+                    }
+                }
+            } else {
+                info!("Cannot delete group: wrong group id.")
+            }
+            maps.id_group_handle.remove(&id);
+        }
+
+        for bezier_handle in bezier_chain_hashset {
+            let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
+
+            bezier.group = None;
+
+            for (_bez_entity, bez_handle, parent) in bezier_query.iter() {
+                if let Some(chain_bezier_handle) = maps.id_handle_map.get(&bezier.id) {
+                    if bez_handle == chain_bezier_handle {
+                        // spawn mid quads
+                        let spawn_mids = SpawnMids {
+                            color: bezier
+                                .color
+                                .unwrap_or(globals.picked_color.unwrap_or(Color::WHITE)),
+                            bezier_handle: bez_handle.clone(),
+                            parent_entity: **parent,
+                        };
+
+                        spawn_mids_event_writer.send(spawn_mids);
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
 
 pub fn delete(
     mut commands: Commands,
     mut selection: ResMut<Selection>,
-    maps: ResMut<Maps>,
+    mut maps: ResMut<Maps>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
     mut visible_query: Query<&mut Visibility, With<SelectedBoxQuad>>,
     query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
-    query2: Query<(Entity, &Handle<Group>), With<GroupBoxQuad>>, // TODO: change to GroupParent
+    query2: Query<(Entity, &Handle<Group>), With<GroupParent>>, // TODO: change to GroupParent
     mut action_event_reader: EventReader<Action>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Delete) {
@@ -662,6 +751,7 @@ pub fn delete(
 
                 if &handle == bezier_handle {
                     commands.entity(entity).despawn_recursive();
+                    maps.id_handle_map.remove(&bezier.id);
                 }
             }
         }
@@ -692,6 +782,8 @@ pub fn delete(
                 //     *latch_local = Vec::new();
                 // }
             }
+
+            // maps.id_handle_map.remove(&latch_data.latched_to_id);
             // }
         }
 
@@ -847,7 +939,7 @@ pub fn hide_control_points(
 
 pub fn save(
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    group_query: Query<&Handle<Group>, With<GroupBoxQuad>>,
+    group_query: Query<&Handle<Group>, With<GroupParent>>,
     mesh_query: Query<(&Handle<Mesh>, &GroupMesh)>,
     road_mesh_query: Query<(&Handle<Mesh>, &RoadMesh)>,
     mut groups: ResMut<Assets<Group>>,
@@ -929,8 +1021,9 @@ pub fn save(
 // only loads groups
 
 pub fn load(
-    query: Query<Entity, Or<(With<BezierParent>, With<GroupBoxQuad>)>>,
+    query: Query<Entity, Or<(With<BezierParent>, With<GroupParent>)>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
+    // mut groups: ResMut<Assets<Group>>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     // mut my_shader_params: ResMut<Assets<BezierMat>>,
@@ -985,6 +1078,10 @@ pub fn load(
 
         let loaded_groups_vec: Vec<GroupSaveLoad> = serde_json::from_str(&contents).unwrap();
 
+        use rand::prelude::*;
+        let mut rng = thread_rng();
+        let id: u128 = rng.gen();
+
         let mut group = Group {
             group: HashSet::new(),
             bezier_handles: HashSet::new(),
@@ -994,6 +1091,7 @@ pub fn load(
                 path_length: 0.0,
                 lut: Vec::new(),
             },
+            group_id: id,
         };
 
         for group_load_save in loaded_groups_vec {

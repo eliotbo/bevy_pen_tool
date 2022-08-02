@@ -21,6 +21,7 @@ impl Plugin for PenPlugin {
             .add_event::<Action>()
             .add_event::<UiButton>()
             .add_event::<Handle<Group>>()
+            .add_event::<SpawnMids>()
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(ColoredMesh2dPlugin) // mesh making
             .add_plugin(RoadMesh2dPlugin) // mesh making
@@ -54,6 +55,7 @@ impl Plugin for PenPlugin {
                     .with_system(pick_color)
                     .with_system(check_mouse_on_canvas)
                     .with_system(spawn_curve_order_on_mouseclick)
+                    .with_system(spawn_middle_quads)
                     .with_system(button_system)
                     .with_system(toggle_ui_button)
                     .with_system(send_action.exclusive_system().at_end())
@@ -81,6 +83,7 @@ impl Plugin for PenPlugin {
                     .with_system(make_road)
                     .with_system(unselect)
                     .with_system(debug)
+                    .with_system(ungroup)
                     .label("model")
                     .after("controller"),
             )
@@ -106,8 +109,8 @@ impl Plugin for PenPlugin {
                     .with_system(adjust_selecting_attributes)
                     .with_system(adjust_group_attributes)
                     .with_system(spawn_bezier_system)
-                    .with_system(spawn_group_middle_quads)
-                    .with_system(spawn_group_bounding_box)
+                    // .with_system(spawn_group_middle_quads)
+                    .with_system(spawn_group_entities)
                     .label("view")
                     .after("model"),
             );
@@ -174,14 +177,17 @@ fn debug(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut groups: ResMut<Assets<Group>>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::B) {
+    if keyboard_input.just_pressed(KeyCode::B)
+        && !keyboard_input.pressed(KeyCode::LShift)
+        && !keyboard_input.pressed(KeyCode::LControl)
+    {
         // println!("'B' currently pressed");
         for handle in query.iter() {
             let bezier = bezier_curves.get_mut(handle).unwrap();
 
-            println!("bezier: {:?}", bezier.id);
-            println!("latches: {:#?}", BezierPrint::from_bezier(bezier));
-            println!("");
+            // println!("group id: {:?}", bezier.group);
+            // println!("latches: {:#?}", BezierPrint::from_bezier(bezier));
+            // println!("");
         }
     }
 
@@ -190,8 +196,8 @@ fn debug(
         for (_, group) in groups.iter() {
             // let bezier = bezier_curves.get_mut(handle).unwrap();
 
-            println!("group: {:#?}", GroupPrint::from_group(group));
-            println!("");
+            // println!("group: {:#?}", GroupPrint::from_group(group));
+            // println!("");
         }
     }
 }

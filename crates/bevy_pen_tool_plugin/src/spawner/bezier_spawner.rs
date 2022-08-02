@@ -2,7 +2,7 @@ use crate::inputs::{Cursor, Latch};
 use crate::util::{
     Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent, BezierMidMat,
     BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals,
-    LatchData, Maps, MiddlePointQuad, SelectionMat, UserState,
+    LatchData, Maps, MiddlePointQuad, SelectionMat, SpawnMids, UserState,
 };
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
@@ -401,4 +401,58 @@ pub fn spawn_bezier(
     }
 
     return (parent, bezier_handle);
+}
+
+pub fn spawn_middle_quads(
+    mut commands: Commands,
+    globals: Res<Globals>,
+    mut mid_params: ResMut<Assets<BezierMidMat>>,
+    clearcolor: Res<ClearColor>,
+    maps: Res<Maps>,
+    mut spawn_mids_event: EventReader<SpawnMids>,
+) {
+    for spawn_mids in spawn_mids_event.iter() {
+        let middle_mesh_handle = maps.mesh_handles["middles"].clone();
+        let num_mid_quads = globals.num_points_on_curve;
+
+        let visible = Visibility { is_visible: true };
+
+        let vrange: Vec<f32> = (0..num_mid_quads)
+            .map(|x| ((x as f32) / (num_mid_quads as f32 - 1.0) - 0.5) * 2.0 * 50.0)
+            .collect();
+
+        let mut z = 0.0;
+        let mut x = -20.0;
+        for _t in vrange {
+            let mid_shader_params_handle = mid_params.add(BezierMidMat {
+                color: spawn_mids.color.into(),
+                t: 0.5,
+                zoom: 1.0 / globals.scale,
+                size: Vec2::new(1.0, 1.0) * globals.scale,
+                clearcolor: clearcolor.0.clone().into(),
+                ..Default::default()
+            });
+
+            x = x + 2.0;
+            z = z + 10.0;
+            let child = commands
+                // // left
+                .spawn_bundle(MaterialMesh2dBundle {
+                    mesh: middle_mesh_handle.clone(),
+                    visibility: visible.clone(),
+                    // render_pipelines: render_piplines.clone(),
+                    transform: Transform::from_xyz(0.0, 0.0, globals.z_pos.middles),
+                    material: mid_shader_params_handle,
+                    ..Default::default()
+                })
+                .insert(MiddlePointQuad)
+                .insert(spawn_mids.bezier_handle.clone())
+                // .insert(mid_shader_params_handle.clone())
+                .id();
+
+            commands
+                .entity(spawn_mids.parent_entity)
+                .push_children(&[child]);
+        }
+    }
 }

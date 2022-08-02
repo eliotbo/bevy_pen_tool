@@ -104,6 +104,13 @@ pub struct GroupBoxQuad;
 #[derive(Debug)]
 pub struct OfficialLatch(pub LatchData, pub Handle<Bezier>);
 
+#[derive(Debug)]
+pub struct SpawnMids {
+    pub color: Color,
+    pub bezier_handle: Handle<Bezier>,
+    pub parent_entity: Entity,
+}
+
 // helicopter animation
 #[derive(Component)]
 pub struct TurnRoundAnimation;
@@ -203,10 +210,12 @@ pub struct Group {
     // the curve
     pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), LutDistance)>,
     pub standalone_lut: StandaloneLut,
+    pub group_id: GroupId,
 }
 
 impl Default for Group {
     fn default() -> Self {
+        let mut rng = thread_rng();
         Group {
             group: HashSet::new(),
             bezier_handles: HashSet::new(),
@@ -216,6 +225,7 @@ impl Default for Group {
                 path_length: 0.0,
                 lut: Vec::new(),
             },
+            group_id: rng.gen(),
         }
     }
 }
@@ -557,6 +567,7 @@ pub struct Maps {
     pub mesh_handles: HashMap<&'static str, Mesh2dHandle>,
     // pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
     pub id_handle_map: HashMap<u128, Handle<Bezier>>,
+    pub id_group_handle: HashMap<u128, Handle<Group>>,
     pub sounds: HashMap<&'static str, Handle<AudioSource>>,
     pub textures: HashMap<&'static str, Handle<Image>>,
 }
@@ -567,6 +578,7 @@ impl Default for Maps {
             mesh_handles: HashMap::new(),
             // pipeline_handles: HashMap::new(),
             id_handle_map: HashMap::new(),
+            id_group_handle: HashMap::new(),
             sounds: HashMap::new(),
             textures: HashMap::new(),
         }
@@ -690,6 +702,8 @@ pub struct BezierCoord2 {
     // control_end: Coord2,
 }
 
+type GroupId = u128;
+
 // #[derive(RenderResources, Default, TypeUuid, Debug, Clone)]
 #[derive(Debug, Clone, TypeUuid, Serialize, Deserialize)]
 #[uuid = "8cb22c5d-5ab0-4912-8833-ab46062b7d38"]
@@ -703,7 +717,7 @@ pub struct Bezier {
     pub id: u128,
     pub latches: HashMap<AnchorEdge, LatchData>,
     pub potential_latch: Option<LatchData>,
-    pub grouped: bool,
+    pub group: Option<GroupId>,
 }
 
 impl Default for Bezier {
@@ -722,7 +736,7 @@ impl Default for Bezier {
             lut: Vec::new(), // look-up table for linearizing the distance on a Bezier curve as a function of the t-value
             id: rng.gen(),
             latches,
-            grouped: false,
+            group: None,
             potential_latch: None,
         }
     }
@@ -1040,7 +1054,7 @@ impl Bezier {
     }
 
     pub fn find_connected_curves(
-        &mut self,
+        &self,
         bezier_curves: HashMap<HandleId, Bezier>,
         id_handle_map: &HashMap<u128, Handle<Bezier>>,
     ) -> Vec<Handle<Bezier>> {
@@ -1052,10 +1066,10 @@ impl Bezier {
         };
 
         // TODO: is this really a good way of clone assets?
-        let bezier_curve_hack = bezier_curves
-            .iter()
-            .map(|(s, x)| (s.clone(), x.clone()))
-            .collect::<HashMap<HandleId, Bezier>>();
+        let bezier_curve_hack = bezier_curves;
+        // .iter()
+        // .map(|(s, x)| (s.clone(), x.clone()))
+        // .collect::<HashMap<HandleId, Bezier>>();
 
         let anchors_temp = vec![AnchorEdge::Start, AnchorEdge::End];
         let anchors = anchors_temp
@@ -1068,9 +1082,12 @@ impl Bezier {
         // for both ends of the curve, find the other curves that are latched to it
         for anchor in anchors.clone() {
             let mut latch = self.latches.get(&anchor).unwrap().clone();
+            let mut num = 0;
 
             //
             loop {
+                num += 1;
+                println!("loop: {}", num);
                 //
                 // let (partner_id, partners_edge) = (latch.latched_to_id, );
                 let next_edge = latch.partners_edge.other();

@@ -57,6 +57,7 @@ pub enum Action {
     Load,
     Save,
     Group,
+    Ungroup,
     Select,
     Unselect,
     Detach,
@@ -166,6 +167,7 @@ pub fn send_action(
         //     action_event_writer.send(Action::SelectionBox);
         // }
         (false, true, false) if _pressed_g => action_event_writer.send(Action::Group),
+        (true, true, false) if _pressed_g => action_event_writer.send(Action::Ungroup),
         (false, true, false) if _pressed_h => action_event_writer.send(Action::HideAnchors),
         (true, true, false) if _pressed_h => action_event_writer.send(Action::HideControls),
         (false, true, false) if _pressed_s => action_event_writer.send(Action::Save),

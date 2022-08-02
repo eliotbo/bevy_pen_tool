@@ -106,6 +106,9 @@ pub fn move_group_middle_quads(
             let mut shader_params = my_shader_params.get_mut(shader_params_handle).unwrap();
 
             // println!("groups handle: {:?}", group_handle);
+
+            // TODO: this unwrap produces an error when two groups have been spawned and
+            // one gets despawned (ungrouped)
             let group = groups.get(group_handle).unwrap();
 
             let t_time = (t as f64 + time.seconds_since_startup() * 0.02) % 1.0;
