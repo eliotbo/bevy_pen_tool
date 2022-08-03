@@ -903,7 +903,7 @@ impl Bezier {
 
     // compute anchor positions, given cursor position relative to the last clicked position,
     // taking scale into account
-    pub fn update_positions_cursor(&mut self, cursor: &Res<Cursor>, scale: f32) {
+    pub fn update_positions_cursor(&mut self, cursor: &Res<Cursor>, _scale: f32) {
         match self.move_quad {
             Anchor::None => {}
 
