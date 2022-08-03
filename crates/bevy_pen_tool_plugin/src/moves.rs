@@ -281,7 +281,7 @@ pub fn follow_bezier_group(
     groups: Res<Assets<Group>>,
     curves: ResMut<Assets<Bezier>>,
     time: Res<Time>,
-    mut globals: ResMut<Globals>,
+    globals: ResMut<Globals>,
 ) {
     if let Some(group) = groups.iter().next() {
         for mut visible in visible_query.iter_mut() {

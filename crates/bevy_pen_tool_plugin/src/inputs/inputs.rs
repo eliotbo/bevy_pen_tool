@@ -1,9 +1,9 @@
 use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
-    get_close_anchor, get_close_still_anchor, get_close_still_unlatched_anchor, Anchor, AnchorEdge,
-    Bezier, BezierGrandParent, BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals,
-    OfficialLatch, UiAction, UiBoard, UserState,
+    get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BezierGrandParent,
+    BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, OfficialLatch, UiAction,
+    UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -199,7 +199,7 @@ pub fn record_mouse_events_system(
             windows.get_primary_mut().unwrap().height(),
         );
 
-        let screen_position = (cursor_in_pixels - window_size / 2.0);
+        let screen_position = cursor_in_pixels - window_size / 2.0;
 
         let cam_transform = cam_transform_query.iter().next().unwrap();
 
@@ -291,7 +291,7 @@ pub fn check_mouseclick_on_objects(
         // check for mouseclick on UI buttons
         //
         // This block is useless other than to return () upon button press (no effects)
-        let (ui_trans, _) = ui_query.single();
+        // let (ui_trans, _) = ui_query.single();
         for (_state, button_transform, shader_handle, mut _button_interaction, ui_button) in
             button_query.iter_mut()
         {

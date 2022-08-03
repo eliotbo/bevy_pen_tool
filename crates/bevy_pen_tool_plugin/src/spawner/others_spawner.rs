@@ -1,49 +1,12 @@
 use crate::util::{
-    Bezier, BezierMidMat, BezierParent, FollowBezierAnimation, Globals, Group, GroupBoxQuad,
-    GroupMiddleQuad, GroupParent, Maps, SelectedBoxQuad, SelectingBoxQuad, SelectingMat,
-    SelectionMat, TurnRoundAnimation,
+    Bezier, BezierMidMat, FollowBezierAnimation, Globals, Group, GroupBoxQuad, GroupMiddleQuad,
+    GroupParent, Maps, SelectedBoxQuad, SelectingBoxQuad, SelectingMat, SelectionMat,
+    TurnRoundAnimation,
 };
 
 use crate::inputs::Action;
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
-
-// There is culling between two transparent quads at the same distance from the camera.
-// Is this normal behavior?
-// To avoid culling, the quads that can intercept each other in the xy plane need
-// to have different z-values
-//
-//
-///////////////////////////////////////////// z positions
-// spawn_group_middle_quads:        -1000.0
-// car:  -720.0
-// helicopter: -715.0
-// heli rotor blades: -710.0
-// spawn_group_bounding_box:        0.0
-// spawn_selecting_bounding_box:    5.0
-// spawn_selection_bounding_box:    -10.0
-
-// button_ui: -550.0
-// color_ui:  -500.0
-// buttons:   -400.0
-// icon:        10.1
-// icon2:       20.1
-
-// pos_z in bezier_spawner: -5110.0 to -1110.0
-// bezier_bounding_box: -20.0
-// start anchor: 30.0 + pos_z
-// end anchor: 40.0 + pos_z
-// ctrl start: 50 + pos_z
-// ctrl end: 60 + pos_z
-// middle quads: 110 + pos_z + 10 per quad
-
-// road: -725.0
-// light: -700.0
-// mesh: -730.0
-// helicopter: -715.0
-// heli rotor blades: -710.0
-// car:  -720.0
-///////////////////////////////////////////// z positions
 
 pub fn spawn_selection_bounding_box(
     mut commands: Commands,
@@ -52,7 +15,7 @@ pub fn spawn_selection_bounding_box(
     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
     // mut render_graph: ResMut<RenderGraph>,
     globals: ResMut<Globals>,
-    query: Query<(Entity, &BezierParent)>,
+    // query: Query<(Entity, &BezierParent)>,
     // maps: ResMut<Maps>,
     mut my_shader_params: ResMut<Assets<SelectionMat>>,
     clearcolor_struct: Res<ClearColor>,

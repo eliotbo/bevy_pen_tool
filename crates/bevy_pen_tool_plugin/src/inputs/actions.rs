@@ -1,7 +1,7 @@
-use super::inputs::{Action, Cursor, MoveAnchor, MoveWholeCurve};
+use super::inputs::{Action, Cursor, MoveAnchor};
 use crate::spawner::spawn_bezier;
 use crate::util::*;
-use crate::{GroupMiddleQuad, StandaloneLut};
+use crate::StandaloneLut;
 
 use bevy::{asset::HandleId, prelude::*};
 
@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 
-use flo_curves::*;
+// use flo_curves::*;
 
 pub fn recompute_lut(
     mut bezier_curves: ResMut<Assets<Bezier>>,
@@ -380,7 +380,7 @@ pub fn groupy(
     mut maps: ResMut<Maps>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
-    group_query: Query<(Entity, &Handle<Group>), With<GroupParent>>,
+    // group_query: Query<(Entity, &Handle<Group>), With<GroupParent>>,
     mut event_writer: EventWriter<Handle<Group>>,
     mut action_event_reader: EventReader<Action>,
     mut loaded_event_reader: EventReader<Loaded>,
@@ -463,7 +463,7 @@ pub fn groupy(
 pub fn latchy(
     cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<(&Handle<Bezier>, &BezierParent)>,
+    query: Query<(&Handle<Bezier>, &BezierParent)>,
 
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,

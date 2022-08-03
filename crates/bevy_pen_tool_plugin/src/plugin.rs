@@ -120,6 +120,7 @@ impl Plugin for PenPlugin {
 //////////////////////////// Debugging ////////////////////////////
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct BezierPrint {
     pub positions: BezierPositions,
@@ -134,6 +135,7 @@ struct BezierPrint {
 }
 
 impl BezierPrint {
+    #[allow(dead_code)]
     pub fn from_bezier(bezier: &Bezier) -> Self {
         Self {
             positions: bezier.positions.clone(),
@@ -151,6 +153,7 @@ impl BezierPrint {
 
 use std::collections::HashSet;
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 struct GroupPrint {
     // TODO: rid Group of redundancy
     pub group: HashSet<(Entity, Handle<Bezier>)>,
@@ -162,6 +165,7 @@ struct GroupPrint {
 }
 
 impl GroupPrint {
+    #[allow(dead_code)]
     pub fn from_group(group: &Group) -> Self {
         Self {
             group: group.group.clone(),
@@ -173,9 +177,9 @@ impl GroupPrint {
 
 fn debug(
     keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<&Handle<Bezier>, With<BezierParent>>,
+    query: Query<&Handle<Bezier>, With<BezierParent>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut groups: ResMut<Assets<Group>>,
+    groups: Res<Assets<Group>>,
 ) {
     if keyboard_input.just_pressed(KeyCode::B)
         && !keyboard_input.pressed(KeyCode::LShift)
@@ -183,7 +187,7 @@ fn debug(
     {
         // println!("'B' currently pressed");
         for handle in query.iter() {
-            let bezier = bezier_curves.get_mut(handle).unwrap();
+            let _bezier = bezier_curves.get_mut(handle).unwrap();
 
             // println!("group id: {:?}", bezier.group);
             // println!("latches: {:#?}", BezierPrint::from_bezier(bezier));
@@ -193,7 +197,7 @@ fn debug(
 
     if keyboard_input.just_pressed(KeyCode::G) {
         // println!("'B' currently pressed");
-        for (_, group) in groups.iter() {
+        for (_, _group) in groups.iter() {
             // let bezier = bezier_curves.get_mut(handle).unwrap();
 
             // println!("group: {:#?}", GroupPrint::from_group(group));

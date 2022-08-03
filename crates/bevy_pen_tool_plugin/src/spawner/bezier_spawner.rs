@@ -198,10 +198,6 @@ pub fn spawn_bezier(
         ..Default::default()
     });
 
-    // TODO: make the depth deterministic
-    let mut rng = thread_rng();
-    let pos_z = -rng.gen::<f32>() * 5000.0 - 1110.0;
-    // let mut init_pos = Transform::from_translation(bb_pos.extend(-20.0));
     let global_init_pos =
         GlobalTransform::from_translation(bb_pos.extend(globals.z_pos.bezier_parent));
     let mut init_pos = Transform::default();
@@ -318,7 +314,7 @@ pub fn spawn_bezier(
 
     // control points
     for k in 0..2 {
-        let z_ctr = pos_z + 50.0 + (k as f32) * 10.0;
+        // let z_ctr = pos_z + 50.0 + (k as f32) * 10.0;
         let mut ctr_pos_transform =
             Transform::from_translation(ctr0_pos.extend(globals.z_pos.controls));
 
