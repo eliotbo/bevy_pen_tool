@@ -144,6 +144,7 @@ impl Anchor {
 }
 
 #[derive(Component)]
+//
 pub struct UiBoard {
     pub expanded: bool,
     pub size: Vec2,

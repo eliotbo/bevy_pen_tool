@@ -1,7 +1,6 @@
-use super::inputs::{Action, Cursor, MoveAnchor};
-use crate::spawner::spawn_bezier;
-use crate::util::*;
-use crate::StandaloneLut;
+use bevy_pen_tool_spawner::inputs::{Action, Cursor, MoveAnchor};
+use bevy_pen_tool_spawner::spawn_bezier;
+use bevy_pen_tool_spawner::util::*;
 
 use bevy::{asset::HandleId, prelude::*};
 

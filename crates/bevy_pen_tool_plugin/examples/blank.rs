@@ -1,5 +1,5 @@
-use bevy_pen_tool_plugin::UiBoard;
 use bevy_pen_tool_plugin::{Bezier, Globals, PenPlugin};
+use bevy_pen_tool_spawner::util::UiBoard;
 
 use bevy::{prelude::*, render::camera::OrthographicProjection};
 

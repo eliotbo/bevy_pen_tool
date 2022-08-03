@@ -1,5 +1,5 @@
-use crate::inputs::Cursor;
-use crate::util::{
+use bevy_pen_tool_spawner::inputs::Cursor;
+use bevy_pen_tool_spawner::util::{
     AnchorEdge, Bezier, BezierGrandParent, BezierMidMat, BezierParent, BoundingBoxQuad,
     ControlPointQuad, EndpointQuad, FollowBezierAnimation, Globals, Group, GroupMiddleQuad,
     MiddlePointQuad, SelectionMat, TurnRoundAnimation, UiAction, UiBoard,
