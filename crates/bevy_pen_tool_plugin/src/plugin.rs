@@ -6,6 +6,11 @@ use bevy::prelude::*;
 
 pub struct PenPlugin;
 
+// TODO
+// 1) fix bug with visibility of bounding boxes
+// 2) allow for multiple groups
+// 3) undo/redo
+
 impl Plugin for PenPlugin {
     fn build(&self, app: &mut App) {
         app
@@ -127,24 +132,30 @@ fn debug(
     query: Query<&Handle<Bezier>, With<BezierParent>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: Res<Assets<Group>>,
+    mids_groups: Query<&GroupMiddleQuad>,
+    maps: Res<Maps>,
 ) {
     if keyboard_input.just_pressed(KeyCode::B)
         && !keyboard_input.pressed(KeyCode::LShift)
         && !keyboard_input.pressed(KeyCode::LControl)
     {
+        println!("group_handles: {:?}", maps.id_group_handle);
         // println!("'B' currently pressed");
         for handle in query.iter() {
             let _bezier = bezier_curves.get_mut(handle).unwrap();
 
             // println!("group id: {:?}", bezier.group);
             // println!("latches: {:#?}", BezierPrint::from_bezier(bezier));
-            // println!("");
         }
+
+        println!("mids: {:?}", mids_groups.iter().count());
+        println!("");
     }
 
     if keyboard_input.just_pressed(KeyCode::G) {
         // println!("'B' currently pressed");
-        for (_, _group) in groups.iter() {
+        println!("groups: {:#?}", groups.iter().count());
+        for (_, group) in groups.iter() {
             // let bezier = bezier_curves.get_mut(handle).unwrap();
 
             // println!("group: {:#?}", GroupPrint::from_group(group));

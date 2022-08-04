@@ -1088,7 +1088,6 @@ impl Bezier {
             //
             loop {
                 num += 1;
-                println!("loop: {}", num);
                 //
                 // let (partner_id, partners_edge) = (latch.latched_to_id, );
                 let next_edge = latch.partners_edge.other();

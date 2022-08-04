@@ -378,8 +378,8 @@ pub fn groupy(
     selection: ResMut<Selection>,
     mut maps: ResMut<Maps>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
-    // group_query: Query<(Entity, &Handle<Group>), With<GroupParent>>,
+    mid_bezier_query: Query<(Entity, &Handle<Bezier>), With<MiddlePointQuad>>,
+    group_query: Query<(Entity, &Handle<Group>), With<GroupParent>>,
     mut event_writer: EventWriter<Handle<Group>>,
     mut action_event_reader: EventReader<Action>,
     mut loaded_event_reader: EventReader<Loaded>,
@@ -412,9 +412,19 @@ pub fn groupy(
             return;
         }
 
-        if globals.sound_on {
-            if let Some(sound) = maps.sounds.get("group") {
-                audio.play(sound.clone());
+        // if the selected curves are already in a group, abort
+        for bez_handle in selected.bezier_handles.iter() {
+            let bez = bezier_curves.get(bez_handle).unwrap();
+            if bez.group.is_some() {
+                println!("Cannot group. Selected curves are already in a group");
+                return;
+            }
+        }
+
+        // get rid of the middle point quads
+        for (entity, bezier_handle) in mid_bezier_query.iter() {
+            if selected.bezier_handles.contains(bezier_handle) {
+                commands.entity(entity).despawn();
             }
         }
 
@@ -423,25 +433,23 @@ pub fn groupy(
             selected.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
         }
 
-        // get rid of the middle point quads
-        for (entity, bezier_handle) in query.iter() {
-            if selected.bezier_handles.contains(bezier_handle) {
-                commands.entity(entity).despawn();
+        if globals.sound_on {
+            if let Some(sound) = maps.sounds.get("group") {
+                audio.play(sound.clone());
             }
         }
 
-        // // HEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-        // // TODO: we must get rid of this to have more than one group allowed
-        // // get rid of the current group before making a new one
-        // for (entity, group_handle) in group_query.iter() {
-        //     let group = groups.get(group_handle).unwrap();
-        //     for bezier_handle in group.bezier_handles.clone() {
-        //         if selected.bezier_handles.contains(&bezier_handle) {
-        //             commands.entity(entity).despawn();
-        //             break;
-        //         }
-        //     }
-        // }
+        // TODO: we must get rid of this to have more than one group allowed.
+        // get rid of the current group before making a new one
+        for (entity, group_handle) in group_query.iter() {
+            let group = groups.get(group_handle).unwrap();
+            for bezier_handle in group.bezier_handles.clone() {
+                if selected.bezier_handles.contains(&bezier_handle) {
+                    commands.entity(entity).despawn();
+                    break;
+                }
+            }
+        }
 
         for bezier_handle in selected.bezier_handles.clone() {
             let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
@@ -680,7 +688,6 @@ pub fn ungroup(
 
                 for (entity, queried_group_handle) in query.iter() {
                     if queried_group_handle == group_handle {
-                        // SPAWN BEZIER MIDDLE QUADS FOR EACH BEZIER
                         commands.entity(entity).despawn_recursive();
                         println!("Removed group");
                     }
@@ -707,7 +714,7 @@ pub fn ungroup(
                             bezier_handle: bez_handle.clone(),
                             parent_entity: **parent,
                         };
-
+                        // spawn bezier middle quads for each bezier
                         spawn_mids_event_writer.send(spawn_mids);
 
                         break;
@@ -751,6 +758,9 @@ pub fn delete(
                 if &handle == bezier_handle {
                     commands.entity(entity).despawn_recursive();
                     maps.id_handle_map.remove(&bezier.id);
+                    if let Some(group_id) = bezier.group {
+                        maps.id_group_handle.remove(&group_id);
+                    }
                 }
             }
         }
