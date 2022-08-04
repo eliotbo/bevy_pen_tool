@@ -120,9 +120,9 @@ pub fn spawn_group_entities(
     mut mids_shader_params: ResMut<Assets<BezierMidMat>>,
     clearcolor_struct: Res<ClearColor>,
     mut group_event_reader: EventReader<Handle<Group>>,
-    bezier_curves: ResMut<Assets<Bezier>>,
+    mut bezier_curves: ResMut<Assets<Bezier>>,
     maps: ResMut<Maps>,
-    groups: ResMut<Assets<Group>>,
+    mut groups: ResMut<Assets<Group>>,
     // maps: ResMut<Maps>,
     // group: &Group,
 ) {
@@ -195,7 +195,8 @@ pub fn spawn_group_entities(
 
         let num_mid_quads = 50;
 
-        let group = groups.get(&group_handle.clone()).unwrap();
+        let group = groups.get_mut(&group_handle.clone()).unwrap();
+        group.group_lut(&mut bezier_curves, maps.id_handle_map.clone());
 
         // let (parent, _handle) = group.group.iter().next().unwrap();
 

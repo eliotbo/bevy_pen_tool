@@ -1,4 +1,4 @@
-use bevy_pen_tool_spawner::inputs::Cursor;
+use bevy_pen_tool_spawner::inputs::{Action, Cursor};
 use bevy_pen_tool_spawner::util::{
     AnchorEdge, Bezier, BezierGrandParent, BezierMidMat, BezierParent, BoundingBoxQuad,
     ControlPointQuad, EndpointQuad, FollowBezierAnimation, Globals, Group, GroupMiddleQuad,
@@ -89,40 +89,45 @@ pub fn move_group_middle_quads(
     )>,
     // globals: ResMut<Globals>,
     groups: ResMut<Assets<Group>>,
+    mut action_event_reader: EventReader<Action>,
 ) {
     let mut t = 0.0;
-    // println!("START:");
-    if let Some(last_handle_tuple) = groups.iter().next() {
-        let mut last_handle_id = last_handle_tuple.0;
-        for (mut transform, group_handle, shader_params_handle, GroupMiddleQuad(num_quads)) in
-            query.iter_mut()
-        {
-            if group_handle.id != last_handle_id {
-                t = 0.0;
-                last_handle_id = group_handle.id;
+    // During the exact frame where the ungroup action takes places, the middle quads
+    // do not have time to be despawned before this system runs
+    if !action_event_reader.iter().any(|x| x == &Action::Ungroup) {
+        if let Some(last_handle_tuple) = groups.iter().next() {
+            let mut last_handle_id = last_handle_tuple.0;
+            println!("mids: {:?}", query.iter().count());
+            for (mut transform, group_handle, shader_params_handle, GroupMiddleQuad(num_quads)) in
+                query.iter_mut()
+            {
+                if group_handle.id != last_handle_id {
+                    t = 0.0;
+                    last_handle_id = group_handle.id;
+                }
+                t = t + 1.0 / (num_quads.clone() as f32);
+
+                let mut shader_params = my_shader_params.get_mut(shader_params_handle).unwrap();
+
+                // println!("groups handle: {:?}", group_handle);
+
+                // TODO: this unwrap produces an error when two groups have been spawned and
+                // one gets despawned (ungrouped)
+                let group = groups.get(group_handle).unwrap();
+
+                let t_time = (t as f64 + time.seconds_since_startup() * 0.02) % 1.0;
+                shader_params.t = t_time as f32;
+                // println!("time: {:?}", t_time);
+
+                let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
+                // let pos = group.compute_position_with_lut(t_time as f32);
+
+                let z = transform.translation.z;
+                transform.translation = Vec3::new(pos.x, pos.y, z);
+
+                // transform.translation.x = pos.x;
+                // transform.translation.y = pos.y;
             }
-            t = t + 1.0 / (num_quads.clone() as f32);
-
-            let mut shader_params = my_shader_params.get_mut(shader_params_handle).unwrap();
-
-            // println!("groups handle: {:?}", group_handle);
-
-            // TODO: this unwrap produces an error when two groups have been spawned and
-            // one gets despawned (ungrouped)
-            let group = groups.get(group_handle).unwrap();
-
-            let t_time = (t as f64 + time.seconds_since_startup() * 0.02) % 1.0;
-            shader_params.t = t_time as f32;
-            // println!("time: {:?}", t_time);
-
-            let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
-            // let pos = group.compute_position_with_lut(t_time as f32);
-
-            let z = transform.translation.z;
-            transform.translation = Vec3::new(pos.x, pos.y, z);
-
-            // transform.translation.x = pos.x;
-            // transform.translation.y = pos.y;
         }
     }
 }
