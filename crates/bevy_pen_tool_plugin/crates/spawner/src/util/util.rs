@@ -860,7 +860,6 @@ impl Bezier {
         self.latches.contains_key(&anchor_edge)
     }
 
-    // TODO: remove scale arg from this method
     // computes the desired anchor quad positions
     // they should be slighty off the anchor positions, towards the curve center
     pub fn ends_displacement(&self) -> ((Vec2, Vec2), (Quat, Quat)) {
@@ -1543,8 +1542,9 @@ pub fn change_ends_and_controls_params(
             //
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
                 //
-                latch_info = bezier.get_mover_latch_info();
+
                 bezier.update_positions_cursor(&cursor, globals.scale);
+                latch_info = bezier.get_mover_latch_info();
 
                 if let Some(_) = latch_info {
                     break;
