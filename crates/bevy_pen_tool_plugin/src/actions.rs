@@ -97,9 +97,72 @@ pub fn update_lut(
     }
 }
 
-// Moves either an anchor or the whole curve.
+pub fn update_anchors(
+    mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut query: Query<&Handle<Bezier>, With<BezierParent>>,
+    // globals: Res<Globals>,
+    cursor: Res<Cursor>,
+    maps: ResMut<Maps>,
+    mut history: ResMut<History>,
+    mut add_to_history_event_reader: EventReader<HistoryAction>,
+) {
+    // TODO: remove dependency on Cursor
+    if cursor.latch.is_empty() {
+        let mut latch_info: Option<(LatchData, Vec2, Vec2)> = None;
+
+        // TODO: use an event here instead of scanning for a moving quad
+        for bezier_handle in query.iter_mut() {
+            //
+            if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
+                //
+
+                bezier.update_positions_cursor(&cursor);
+
+                // for hist_event in add_to_history_event_reader.iter() {
+                //     println!("hist event: {:?}", hist_event);
+
+                //     history.actions.push(HistoryAction::MovedAnchor {
+                //         bezier_handle: bezier_handle.clone(),
+                //         anchor: hist_event.anchor,
+                //         new_position: bezier.get_position(hist_event.anchor),
+                //         previous_position: bezier.get_previous_position(hist_event.anchor),
+                //     });
+                // }
+
+                latch_info = bezier.get_mover_latch_info();
+
+                if let Some(_) = latch_info {
+                    break;
+                }
+            }
+        }
+
+        // change the control point of a latched point
+        if let Some((partner_latch, mover_position, opposite_control)) = latch_info {
+            //
+            if let Some(bezier_handle) = maps.id_handle_map.get(&partner_latch.latched_to_id) {
+                //
+                let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
+                bezier.update_latched_position(
+                    partner_latch.partners_edge,
+                    opposite_control,
+                    mover_position,
+                );
+            } else {
+                // Problems with non-existing ids may occur when using undo, redo and delete
+                // TODO: Delete latched anchors that no longer have a partner
+                println!(
+                    "Warning: Could not retrieve handle for Bezier id: {}",
+                    &partner_latch.latched_to_id
+                );
+            }
+        }
+    }
+}
+
+// Orders to move either an anchor or the whole curve.
 // The unlatch functionality is part of this function as well.
-pub fn begin_move_on_mouseclick(
+pub fn bezier_anchor_order(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     globals: ResMut<Globals>,
     maps: ResMut<Maps>,
@@ -820,112 +883,6 @@ pub fn delete(
     }
 }
 
-// pub fn undo(
-//     keyboard_input: Res<Input<KeyCode>>,
-//     mut commands: Commands,
-//     mut globals: ResMut<Globals>,
-//     mut bezier_curves: ResMut<Assets<Bezier>>,
-//     mut event_reader: EventReader<UiButton>,
-//     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
-// ) {
-//     let mut pressed_undo_button = false;
-//     for ui_button in event_reader.iter() {
-//         pressed_undo_button = ui_button == &UiButton::Undo;
-//         break;
-//     }
-
-//     if pressed_undo_button
-//         || (keyboard_input.pressed(KeyCode::LControl)
-//             && keyboard_input.just_pressed(KeyCode::Z)
-//             && !keyboard_input.pressed(KeyCode::LShift))
-//     {
-//         // let mut latched_start: Vec<LatchData> = Vec::new();
-//         // let mut latched_end: Vec<LatchData> = Vec::new();
-//         let mut latches: Vec<Vec<LatchData>> = Vec::new();
-
-//         if let Some((entity, bezier_handle)) = query.iter().last() {
-//             globals.history.push(bezier_handle.clone());
-
-//             let bezier = bezier_curves.get(bezier_handle).unwrap();
-//             latches.push(bezier.latches[&AnchorEdge::Start].clone());
-//             latches.push(bezier.latches[&AnchorEdge::End].clone());
-
-//             commands.entity(entity).despawn_recursive();
-//         }
-
-//         // This piece of code is shared with delete()
-//         // unlatch partners of deleted curves
-//         for latch_vec in latches {
-//             //
-//             if let Some(latch) = latch_vec.get(0) {
-//                 //
-//                 if let Some(handle) = globals.id_handle_map.get(&latch.latched_to_id) {
-//                     //
-//                     let bezier_partner = bezier_curves.get_mut(handle).unwrap();
-//                     //
-//                     if let Some(latch_local) = bezier_partner.latches.get_mut(&latch.partners_edge)
-//                     {
-//                         *latch_local = Vec::new();
-//                         println!("deleted partner's latch {:?}", latch.partners_edge);
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
-
-// // Warning: undo followed by redo does not preserve the latch data
-// // spawn_bezier() does not allow the end point to be latched
-// pub fn redo(
-//     keyboard_input: Res<Input<KeyCode>>,
-//     mut bezier_curves: ResMut<Assets<Bezier>>,
-//     mut commands: Commands,
-//     mut meshes: ResMut<Assets<Mesh>>,
-//     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
-//     mut my_shader_params: ResMut<Assets<MyShader>>,
-//     clearcolor_struct: Res<ClearColor>,
-//     mut globals: ResMut<Globals>,
-//     mut event_reader: EventReader<UiButton>,
-// ) {
-//     let mut pressed_redo_button = false;
-//     for ui_button in event_reader.iter() {
-//         pressed_redo_button = ui_button == &UiButton::Redo;
-//         break;
-//     }
-
-//     if pressed_redo_button
-//         || (keyboard_input.pressed(KeyCode::LControl)
-//             && keyboard_input.just_pressed(KeyCode::Z)
-//             && keyboard_input.pressed(KeyCode::LShift))
-//     {
-//         let clearcolor = clearcolor_struct.0;
-//         let length = globals.history.len();
-//         let mut should_remove_last_from_history = false;
-//         if let Some(bezier_handle) = globals.history.last() {
-//             should_remove_last_from_history = true;
-//             let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap().clone();
-//             bezier_curves.remove(bezier_handle);
-//             globals.do_spawn_curve = false;
-//             // println!("{:?}", bezier.color);
-
-//             spawn_bezier(
-//                 &mut bezier,
-//                 &mut bezier_curves,
-//                 &mut commands,
-//                 &mut meshes,
-//                 // &mut pipelines,
-//                 &mut my_shader_params,
-//                 clearcolor,
-//                 &mut globals,
-//             );
-//         }
-
-//         if should_remove_last_from_history {
-//             globals.history.swap_remove(length - 1);
-//         }
-//     }
-// }
-
 pub fn hide_anchors(
     mut globals: ResMut<Globals>,
     mut query: Query<&mut Visibility, Or<(With<ControlPointQuad>, With<EndpointQuad>)>>,
@@ -1059,6 +1016,7 @@ pub fn load(
     mut controls_params: ResMut<Assets<BezierControlsMat>>,
     mut ends_params: ResMut<Assets<BezierEndsMat>>,
     mut mid_params: ResMut<Assets<BezierMidMat>>,
+    mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Load) {
         let mut default_path = std::env::current_dir().unwrap();
@@ -1133,6 +1091,7 @@ pub fn load(
                     clearcolor,
                     &mut globals,
                     &mut maps,
+                    &mut add_to_history_event_writer,
                 );
                 group.group.insert((entity.clone(), handle.clone()));
                 group.bezier_handles.insert(handle.clone());

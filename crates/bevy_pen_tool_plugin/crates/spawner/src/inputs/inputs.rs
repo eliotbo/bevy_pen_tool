@@ -2,8 +2,8 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
     get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BezierGrandParent,
-    BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, OfficialLatch, UiAction,
-    UiBoard, UserState,
+    BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, HistoryAction, OfficialLatch,
+    UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -522,7 +522,7 @@ pub fn spawn_curve_order_on_mouseclick(
         Some(MouseClickEvent::SpawnOnBezier((anchor_edge, handle, is_latched))) => {
             // this is too stateful, be more functional please. events please.
             let us = user_state.as_mut();
-            *us = UserState::SpawningCurve;
+            *us = UserState::SpawningCurve { bezier_hist: None };
             //
             if !is_latched {
                 if let Some(bezier) = bezier_curves.get_mut(handle) {
@@ -535,7 +535,7 @@ pub fn spawn_curve_order_on_mouseclick(
         }
         Some(MouseClickEvent::SpawnOnCanvas) => {
             let us = user_state.as_mut();
-            *us = UserState::SpawningCurve;
+            *us = UserState::SpawningCurve { bezier_hist: None };
         }
         _ => {}
     }
@@ -579,6 +579,7 @@ pub fn mouse_release_actions(
     mut cursor: ResMut<Cursor>,
     mut action_event_writer: EventWriter<Action>,
     mut latch_event_writer: EventWriter<OfficialLatch>,
+    mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         cursor.latch = Vec::new();
@@ -599,6 +600,20 @@ pub fn mouse_release_actions(
                 if let Some(potential_latch) = bezier.potential_latch.clone() {
                     latch_event_writer.send(OfficialLatch(potential_latch, bezier_handle.clone()));
                 }
+
+                // Anchor Position History
+                //
+                // On mouse release, if an achor
+                let anchor = bezier.move_quad;
+                if bezier.move_quad != Anchor::None {
+                    add_to_history_event_writer.send(HistoryAction::MovedAnchor {
+                        anchor,
+                        bezier_handle: bezier_handle.clone(),
+                        previous_position: bezier.get_position(anchor),
+                        new_position: bezier.get_previous_position(anchor),
+                    });
+                }
+
                 bezier.potential_latch = None;
                 bezier.move_quad = Anchor::None;
             }

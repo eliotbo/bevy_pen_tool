@@ -14,6 +14,98 @@ use flo_curves::bezier::BezierCurve;
 use flo_curves::bezier::Curve;
 use flo_curves::*;
 
+#[derive(Debug, Clone)]
+pub struct BezierHist {
+    pub positions: BezierPositions,
+    pub color: Option<Color>,
+    pub latches: HashMap<AnchorEdge, LatchData>,
+}
+
+impl From<&Bezier> for BezierHist {
+    fn from(bezier: &Bezier) -> Self {
+        Self {
+            positions: bezier.positions.clone(),
+            color: None,
+            latches: bezier.latches.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupHist {
+    pub bezier_handles: HashSet<Handle<Bezier>>,
+    pub ends: Option<Vec<(Handle<Bezier>, AnchorEdge)>>,
+}
+
+impl From<&Group> for GroupHist {
+    fn from(group: &Group) -> Self {
+        Self {
+            bezier_handles: group.bezier_handles.clone(),
+            ends: group.ends.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum HistoryAction {
+    MovedAnchor {
+        bezier_handle: Handle<Bezier>,
+        previous_position: Vec2,
+        new_position: Vec2,
+        anchor: Anchor,
+    },
+    MovedGroup {
+        group_handle: Handle<Group>,
+        previous_position: Vec2,
+        new_position: Vec2,
+    },
+    SpawnedCurve {
+        bezier_handle: Handle<Bezier>,
+        bezier_hist: BezierHist,
+        entity: Entity,
+    },
+    DeletedCurve {
+        bezier: BezierHist,
+    },
+    DeletedGroup {
+        group: GroupHist,
+        bezier_hists: Vec<BezierHist>,
+    },
+    Grouped {
+        group_handle: Handle<Group>,
+    },
+    UnGrouped {
+        bezier_handles: Vec<Handle<Bezier>>,
+    },
+    Latched {
+        bezier_handle_1: Handle<Bezier>,
+        bezier_handle_2: Handle<Bezier>,
+        anchor_1: Anchor,
+        anchor_2: Anchor,
+    },
+    Unlatched {
+        bezier_handle_1: Handle<Bezier>,
+        bezier_handle_2: Handle<Bezier>,
+        anchor_1: Anchor,
+        anchor_2: Anchor,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct History {
+    pub actions: Vec<HistoryAction>,
+    pub index: i32,
+}
+
+impl Default for History {
+    fn default() -> Self {
+        Self {
+            actions: vec![],
+            index: -1,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, Hash)]
 pub enum AnchorEdge {
     Start,
@@ -36,12 +128,12 @@ impl AnchorEdge {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum UserState {
     Idle,
     Selecting(Vec2),
     Selected(Group),
-    SpawningCurve,
+    SpawningCurve { bezier_hist: Option<BezierHist> },
     MovingAnchor,
     MovingWholeCurve,
 }
@@ -822,6 +914,56 @@ impl Bezier {
         }
     }
 
+    pub fn set_position(&mut self, anchor: Anchor, pos: Vec2) {
+        match anchor {
+            Anchor::Start => {
+                let delta = self.positions.control_start - self.positions.start;
+                self.positions.start = pos;
+                self.positions.control_start = pos + delta;
+            }
+            Anchor::End => {
+                let delta = self.positions.control_end - self.positions.end;
+                self.positions.end = pos;
+                self.positions.control_end = pos + delta;
+            }
+            Anchor::ControlEnd => {
+                self.positions.control_end = pos;
+            }
+            Anchor::ControlStart => {
+                self.positions.control_start = pos;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn set_previous_pos(&mut self, anchor: Anchor, pos: Vec2) {
+        match anchor {
+            Anchor::Start => {
+                self.previous_positions.start = pos;
+            }
+            Anchor::End => {
+                self.previous_positions.end = pos;
+            }
+            Anchor::ControlEnd => {
+                self.previous_positions.control_end = pos;
+            }
+            Anchor::ControlStart => {
+                self.previous_positions.control_start = pos;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn get_previous_position(&self, anchor: Anchor) -> Vec2 {
+        match anchor {
+            Anchor::Start => self.previous_positions.start,
+            Anchor::End => self.previous_positions.end,
+            Anchor::ControlEnd => self.previous_positions.control_end,
+            Anchor::ControlStart => self.previous_positions.control_start,
+            _ => Vec2::new(0.0, 0.0),
+        }
+    }
+
     pub fn get_opposite_control(&self, anchor: AnchorEdge) -> Vec2 {
         match anchor {
             AnchorEdge::Start => 2.0 * self.positions.start - self.positions.control_start,
@@ -905,7 +1047,7 @@ impl Bezier {
 
     // compute anchor positions, given cursor position relative to the last clicked position,
     // taking scale into account
-    pub fn update_positions_cursor(&mut self, cursor: &Res<Cursor>, _scale: f32) {
+    pub fn update_positions_cursor(&mut self, cursor: &Res<Cursor>) {
         match self.move_quad {
             Anchor::None => {}
 
@@ -1084,11 +1226,9 @@ impl Bezier {
         // for both ends of the curve, find the other curves that are latched to it
         for anchor in anchors.clone() {
             let mut latch = self.latches.get(&anchor).unwrap().clone();
-            let mut num = 0;
 
             //
             loop {
-                num += 1;
                 //
                 // let (partner_id, partners_edge) = (latch.latched_to_id, );
                 let next_edge = latch.partners_edge.other();
@@ -1522,54 +1662,6 @@ pub fn adjust_group_attributes(
                         vertex_positions.clone(),
                     );
                 }
-            }
-        }
-    }
-}
-
-pub fn change_ends_and_controls_params(
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<&Handle<Bezier>, With<BezierParent>>,
-    globals: Res<Globals>,
-    cursor: Res<Cursor>,
-    maps: ResMut<Maps>,
-) {
-    if cursor.latch.is_empty() {
-        let mut latch_info: Option<(LatchData, Vec2, Vec2)> = None;
-
-        // TODO: use an event here instead of scanning for a moving quad
-        for bezier_handle in query.iter_mut() {
-            //
-            if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
-                //
-
-                bezier.update_positions_cursor(&cursor, globals.scale);
-                latch_info = bezier.get_mover_latch_info();
-
-                if let Some(_) = latch_info {
-                    break;
-                }
-            }
-        }
-
-        // change the control point of a latched point
-        if let Some((partner_latch, mover_position, opposite_control)) = latch_info {
-            //
-            if let Some(bezier_handle) = maps.id_handle_map.get(&partner_latch.latched_to_id) {
-                //
-                let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
-                bezier.update_latched_position(
-                    partner_latch.partners_edge,
-                    opposite_control,
-                    mover_position,
-                );
-            } else {
-                // Problems with non-existing ids may occur when using undo, redo and delete
-                // TODO: Delete latched anchors that no longer have a partner
-                println!(
-                    "Warning: Could not retrieve handle for Bezier id: {}",
-                    &partner_latch.latched_to_id
-                );
             }
         }
     }

@@ -32,6 +32,7 @@ impl Plugin for SpawnerPlugin {
             .add_event::<UiButton>()
             .add_event::<Handle<Group>>()
             .add_event::<SpawnMids>()
+            .add_event::<HistoryAction>()
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(ColoredMesh2dPlugin) // mesh making
             .add_plugin(RoadMesh2dPlugin) // mesh making
@@ -74,7 +75,6 @@ impl Plugin for SpawnerPlugin {
             // Update model
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
-                    .with_system(change_ends_and_controls_params.exclusive_system().at_end())
                     .with_system(spawn_heli)
                     .with_system(make_mesh)
                     .with_system(make_road)

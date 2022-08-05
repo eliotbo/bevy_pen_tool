@@ -1,9 +1,9 @@
 use crate::inputs::{Cursor, Latch};
 
 use crate::util::{
-    Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent, BezierMidMat,
-    BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals,
-    LatchData, Maps, MiddlePointQuad, SelectionMat, SpawnMids, UserState,
+    Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent, BezierHist,
+    BezierMidMat, BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad,
+    Globals, HistoryAction, LatchData, Maps, MiddlePointQuad, SelectionMat, SpawnMids, UserState,
 };
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
@@ -28,12 +28,16 @@ pub fn spawn_bezier_system(
     mut maps: ResMut<Maps>,
     mut latch_event_reader: EventReader<Latch>,
     mut user_state: ResMut<UserState>,
+    mut add_to_history_event_writer: EventWriter<HistoryAction>,
     // cam_query: Query<&Transform, With<OrthographicProjection>>,
 ) {
-    if user_state.as_ref() == &UserState::SpawningCurve {
+    let mut do_move_anchor = false;
+    let mut do_nothing = false;
+    if let UserState::SpawningCurve {
+        bezier_hist: maybe_bezier_hist,
+    } = &*user_state
+    {
         //
-        let us = user_state.as_mut();
-        *us = UserState::MovingAnchor;
 
         let clearcolor = clearcolor_struct.0;
 
@@ -83,6 +87,10 @@ pub fn spawn_bezier_system(
 
         cursor.latch = Vec::new();
 
+        // pub positions: BezierPositions,
+        // pub color: Option<Color>,
+        // pub latches: HashMap<AnchorEdge, LatchData>,
+
         let mut bezier = Bezier {
             positions: BezierPositions {
                 start,
@@ -96,6 +104,18 @@ pub fn spawn_bezier_system(
             latches,
             ..Default::default()
         };
+
+        if let Some(bezier_hist) = maybe_bezier_hist {
+            bezier.positions = bezier_hist.positions.clone();
+            bezier.latches = bezier_hist.latches.clone();
+            bezier.color = bezier_hist.color.clone();
+            bezier.move_quad = Anchor::None;
+
+            do_nothing = true;
+        } else {
+            do_move_anchor = true;
+        }
+
         bezier.update_previous_pos();
 
         spawn_bezier(
@@ -111,7 +131,15 @@ pub fn spawn_bezier_system(
             clearcolor,
             &mut globals,
             &mut maps,
+            &mut add_to_history_event_writer,
         );
+    }
+
+    let us = user_state.as_mut();
+    if do_move_anchor {
+        *us = UserState::MovingAnchor;
+    } else if do_nothing {
+        *us = UserState::Idle;
     }
 }
 
@@ -127,6 +155,7 @@ pub fn spawn_bezier(
     clearcolor: Color,
     globals: &mut ResMut<Globals>,
     maps: &mut ResMut<Maps>,
+    add_to_history_event_writer: &mut EventWriter<HistoryAction>,
 ) -> (Entity, Handle<Bezier>) {
     bezier.compute_lut_walk(100);
 
@@ -218,6 +247,12 @@ pub fn spawn_bezier(
             ComputedVisibility::not_visible(), // the parent entity is not a rendered object
         ))
         .id();
+
+    add_to_history_event_writer.send(HistoryAction::SpawnedCurve {
+        bezier_handle: bezier_handle.clone(),
+        bezier_hist: BezierHist::from(&bezier.clone()),
+        entity: parent,
+    });
 
     let bbquad_entity = commands
         // let parent = commands

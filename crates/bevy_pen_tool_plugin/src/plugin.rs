@@ -1,4 +1,6 @@
 use crate::actions::*;
+use crate::undo::*;
+
 use crate::moves::*;
 use bevy_pen_tool_spawner::*;
 
@@ -7,8 +9,12 @@ use bevy::prelude::*;
 pub struct PenPlugin;
 
 // TODO
-// 1) fix bug with visibility of bounding boxes
-// 3) undo/redo
+// 0) change to bevy 0.8
+// 1) undo/redo
+// History of actions
+// on mouseclick, if moving, remember initial position (preivous_position in Cursor)
+// on mouse release, add action to history
+// moved anchor
 
 impl Plugin for PenPlugin {
     fn build(&self, app: &mut App) {
@@ -16,6 +22,8 @@ impl Plugin for PenPlugin {
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(SpawnerPlugin)
             .add_event::<GroupBoxEvent>()
+            .insert_resource(History::default())
+            .add_startup_system(set_window_position)
             //
             // Update controller
             .add_system_set(
@@ -42,8 +50,12 @@ impl Plugin for PenPlugin {
                     .with_system(unselect)
                     .with_system(debug)
                     .with_system(ungroup)
+                    .with_system(undo)
+                    .with_system(redo)
+                    .with_system(add_to_history)
                     .label("model")
-                    .after("controller"),
+                    .after("controller")
+                    .with_system(update_anchors.exclusive_system().at_end()),
             )
             //
             // Update view
@@ -53,7 +65,7 @@ impl Plugin for PenPlugin {
                     // mouse_release_actions should be in the controller,
                     // but there is a bug with the position of new latches when it's there
                     //
-                    .with_system(begin_move_on_mouseclick)
+                    .with_system(bezier_anchor_order)
                     .with_system(move_end_quads)
                     .with_system(move_middle_quads)
                     .with_system(move_group_middle_quads)
@@ -66,6 +78,12 @@ impl Plugin for PenPlugin {
                     .label("view")
                     .after("model"),
             );
+    }
+}
+
+fn set_window_position(mut windows: ResMut<Windows>) {
+    for window in windows.iter_mut() {
+        window.set_position(IVec2::new(0, 0));
     }
 }
 
@@ -134,12 +152,13 @@ fn debug(
     groups: Res<Assets<Group>>,
     mids_groups: Query<&GroupMiddleQuad>,
     maps: Res<Maps>,
+    history: Res<History>,
 ) {
     if keyboard_input.just_pressed(KeyCode::B)
         && !keyboard_input.pressed(KeyCode::LShift)
         && !keyboard_input.pressed(KeyCode::LControl)
     {
-        println!("group_handles: {:?}", maps.id_group_handle);
+        // println!("group_handles: {:?}", maps.id_group_handle);
         // println!("'B' currently pressed");
         for handle in query.iter() {
             let _bezier = bezier_curves.get_mut(handle).unwrap();
@@ -148,14 +167,16 @@ fn debug(
             // println!("latches: {:#?}", BezierPrint::from_bezier(bezier));
         }
 
-        println!("mids: {:?}", mids_groups.iter().count());
+        // println!("mids: {:?}", mids_groups.iter().count());
+        println!("history actions: {:?}", history.actions);
+        println!("history index: {:?}", history.index);
         println!("");
     }
 
     if keyboard_input.just_pressed(KeyCode::G) {
         // println!("'B' currently pressed");
         println!("groups: {:#?}", groups.iter().count());
-        for (_, group) in groups.iter() {
+        for (_, _group) in groups.iter() {
             // let bezier = bezier_curves.get_mut(handle).unwrap();
 
             // println!("group: {:#?}", GroupPrint::from_group(group));
