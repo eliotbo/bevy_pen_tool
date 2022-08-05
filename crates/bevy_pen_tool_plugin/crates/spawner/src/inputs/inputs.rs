@@ -129,7 +129,6 @@ pub fn send_action(
     }
 
     let mouse_pressed = mouse_button_input.pressed(MouseButton::Left);
-    // let mouse_just_released = mouse_button_input.just_released(MouseButton::Left);
 
     let mut mouse_wheel_up = false;
     let mut mouse_wheel_down = false;

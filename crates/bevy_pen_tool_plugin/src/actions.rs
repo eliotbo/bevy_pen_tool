@@ -276,11 +276,13 @@ pub fn selection_final(
     mut query_set: ParamSet<(
         Query<&mut Visibility, With<SelectingBoxQuad>>,
         Query<&mut Visibility, With<SelectedBoxQuad>>,
+        Query<&mut Visibility, With<GroupBoxQuad>>,
     )>,
     group_query: Query<&Handle<Group>>,
     query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
     mut action_event_reader: EventReader<Action>,
     globals: Res<Globals>,
+    mut group_box_event_writer: EventWriter<GroupBoxEvent>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Selected) {
         // let mut changed_user_state = false;
@@ -311,7 +313,13 @@ pub fn selection_final(
                         //
                         if group.bezier_handles.contains(&bezier_handle) {
                             selected = group.clone();
-                            for mut visible in query_set.p0().iter_mut() {
+
+                            for mut visible in query_set.p1().iter_mut() {
+                                visible.is_visible = true;
+                                // println!("visible!!!");
+                            }
+
+                            for mut visible in query_set.p2().iter_mut() {
                                 visible.is_visible = true;
                             }
                             for mut visible_selecting in query_set.p0().iter_mut() {
@@ -320,6 +328,10 @@ pub fn selection_final(
                             selection.selected = selected;
                             let us = user_state.as_mut();
                             *us = UserState::Idle;
+
+                            // send event to adjust_selection_attributes(..) so that the group selection
+                            // box is updated and shows on screen.
+                            group_box_event_writer.send(GroupBoxEvent);
                             return ();
                         }
                     }
@@ -604,6 +616,7 @@ pub fn officiate_latch_partnership(
     for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
         let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
         bezier.set_latch(latch.clone());
+        bezier.compute_lut_walk(100);
 
         // bezier.has_just_latched = true;
 

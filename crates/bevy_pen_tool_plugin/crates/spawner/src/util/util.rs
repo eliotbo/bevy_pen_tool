@@ -104,6 +104,8 @@ pub struct GroupBoxQuad;
 #[derive(Debug)]
 pub struct OfficialLatch(pub LatchData, pub Handle<Bezier>);
 
+pub struct GroupBoxEvent;
+
 #[derive(Debug)]
 pub struct SpawnMids {
     pub color: Color,
@@ -1341,6 +1343,7 @@ pub fn adjust_selection_attributes(
     // globals: ResMut<Globals>,
     selection: ResMut<Selection>,
     user_state: Res<UserState>,
+    mut group_box_event_reader: EventReader<GroupBoxEvent>,
 ) {
     let mut do_adjust = false;
 
@@ -1353,7 +1356,8 @@ pub fn adjust_selection_attributes(
         do_adjust = true;
     }
 
-    if do_adjust {
+    if do_adjust || group_box_event_reader.iter().next().is_some() {
+        // println!("adjusting selection!!!");
         let (mut minx, mut maxx, mut miny, mut maxy) =
             (1000000.0f32, -1000000.0f32, 1000000.0f32, -1000000.0f32);
 
@@ -1466,9 +1470,11 @@ pub fn adjust_group_attributes(
     group_query: Query<(&Handle<Group>, &Handle<SelectionMat>)>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    // mut group_box_event_reader: EventReader<GroupBoxEvent>,
     // globals: ResMut<Globals>,
 ) {
     // TODO: make this system run only when necessary
+
     if mouse_button_input.pressed(MouseButton::Left) {
         for (group_handle, shader_handle) in group_query.iter() {
             let group = groups.get(group_handle).unwrap();

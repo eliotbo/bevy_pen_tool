@@ -8,7 +8,6 @@ pub struct PenPlugin;
 
 // TODO
 // 1) fix bug with visibility of bounding boxes
-// 2) allow for multiple groups
 // 3) undo/redo
 
 impl Plugin for PenPlugin {
@@ -16,6 +15,7 @@ impl Plugin for PenPlugin {
         app
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(SpawnerPlugin)
+            .add_event::<GroupBoxEvent>()
             //
             // Update controller
             .add_system_set(

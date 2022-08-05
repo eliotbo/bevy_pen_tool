@@ -97,7 +97,7 @@ pub fn move_group_middle_quads(
     if !action_event_reader.iter().any(|x| x == &Action::Ungroup) {
         if let Some(last_handle_tuple) = groups.iter().next() {
             let mut last_handle_id = last_handle_tuple.0;
-            println!("mids: {:?}", query.iter().count());
+            // println!("mids: {:?}", query.iter().count());
             for (mut transform, group_handle, shader_params_handle, GroupMiddleQuad(num_quads)) in
                 query.iter_mut()
             {
