@@ -7,6 +7,7 @@ use bevy_pen_tool_spawner::*;
 use bevy::prelude::*;
 
 pub struct PenPlugin;
+use bevy_inspector_egui::{Inspectable, InspectorPlugin};
 
 // TODO
 // 0) change to bevy 0.8
@@ -22,6 +23,7 @@ impl Plugin for PenPlugin {
         app
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(SpawnerPlugin)
+            .add_plugin(InspectorPlugin::<History>::new())
             .add_event::<GroupBoxEvent>()
             .insert_resource(History::default())
             .add_startup_system(set_window_position)
@@ -53,7 +55,7 @@ impl Plugin for PenPlugin {
                     .with_system(ungroup)
                     .with_system(undo)
                     .with_system(redo)
-                    .with_system(compute_lut_sender)
+                    .with_system(history_effects)
                     .with_system(add_to_history)
                     .label("model")
                     .after("controller")
@@ -100,7 +102,7 @@ struct BezierPrint {
     pub move_quad: Anchor,
     pub color: Option<Color>,
     pub do_compute_lut: bool,
-    pub id: u128,
+    pub id: BezierId,
     pub latches: HashMap<AnchorEdge, LatchData>,
     pub potential_latch: Option<LatchData>,
     pub grouped: bool,

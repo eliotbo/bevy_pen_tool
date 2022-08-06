@@ -1,9 +1,10 @@
 use crate::inputs::{Cursor, Latch};
 
 use crate::util::{
-    Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent, BezierHist,
-    BezierMidMat, BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, EndpointQuad,
-    Globals, HistoryAction, LatchData, Maps, MiddlePointQuad, SelectionMat, SpawnMids, UserState,
+    Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent,
+    BezierHandleEntity, BezierHist, BezierMidMat, BezierParent, BezierPositions, BoundingBoxQuad,
+    ControlPointQuad, EndpointQuad, Globals, HistoryAction, LatchData, Maps, MiddlePointQuad,
+    SelectionMat, SpawnMids, UserState,
 };
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
@@ -31,6 +32,7 @@ pub fn spawn_bezier_system(
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
     // cam_query: Query<&Transform, With<OrthographicProjection>>,
 ) {
+    let mut do_send_to_history = true;
     let mut do_move_anchor = false;
     let mut do_nothing = false;
     if let UserState::SpawningCurve {
@@ -43,7 +45,7 @@ pub fn spawn_bezier_system(
         let clearcolor = clearcolor_struct.0;
 
         let mut rng = thread_rng();
-        let mut spawner_id: u128 = rng.gen();
+        let mut spawner_id: u64 = rng.gen();
 
         // let cam_pos = cam_query.single();
 
@@ -107,6 +109,7 @@ pub fn spawn_bezier_system(
         };
 
         if let Some(bezier_hist) = maybe_bezier_hist {
+            do_send_to_history = false;
             bezier.positions = bezier_hist.positions.clone();
             bezier.latches = bezier_hist.latches.clone();
             bezier.color = bezier_hist.color.clone();
@@ -138,6 +141,7 @@ pub fn spawn_bezier_system(
             &mut maps,
             &mut add_to_history_event_writer,
             &maybe_bezier_handle,
+            do_send_to_history,
         );
     }
 
@@ -163,6 +167,7 @@ pub fn spawn_bezier(
     maps: &mut ResMut<Maps>,
     add_to_history_event_writer: &mut EventWriter<HistoryAction>,
     maybe_bezier_handle: &Option<Handle<Bezier>>,
+    do_send_to_history: bool,
 ) -> (Entity, Handle<Bezier>) {
     bezier.compute_lut_walk(100);
 
@@ -219,7 +224,6 @@ pub fn spawn_bezier(
         bezier_curves.add(bezier.clone())
     };
 
-    maps.id_handle_map.insert(bezier.id, bezier_handle.clone());
     //////////////////// Bounding box ////////////////////
 
     let visible_bb = Visibility {
@@ -260,12 +264,23 @@ pub fn spawn_bezier(
         ))
         .id();
 
-    add_to_history_event_writer.send(HistoryAction::SpawnedCurve {
-        bezier_handle: bezier_handle.clone(),
-        bezier_hist: BezierHist::from(&bezier.clone()),
-        entity: parent,
-        id: bezier.id,
-    });
+    maps.bezier_map.insert(
+        bezier.id,
+        BezierHandleEntity {
+            handle: bezier_handle.clone(),
+            entity: Some(parent),
+        },
+    );
+
+    if do_send_to_history {
+        add_to_history_event_writer.send(HistoryAction::SpawnedCurve {
+            // bezier_handle: bezier_handle.clone(),
+            bezier_id: bezier.id,
+            bezier_hist: BezierHist::from(&bezier.clone()),
+            // entity: parent,
+            id: bezier.id,
+        });
+    }
 
     let bbquad_entity = commands
         // let parent = commands

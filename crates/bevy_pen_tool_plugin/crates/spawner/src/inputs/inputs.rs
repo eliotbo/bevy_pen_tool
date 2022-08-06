@@ -31,8 +31,8 @@ impl Default for Cursor {
 pub struct Latch {
     pub position: Vec2,
     pub control_point: Vec2,
-    pub latchee_id: u128,
-    pub latcher_id: u128,
+    pub latchee_id: u64,
+    pub latcher_id: u64,
     pub latchee_edge: AnchorEdge,
 }
 
@@ -615,7 +615,8 @@ pub fn mouse_release_actions(
                 if bezier.move_quad != Anchor::None {
                     add_to_history_event_writer.send(HistoryAction::MovedAnchor {
                         anchor,
-                        bezier_handle: bezier_handle.clone(),
+                        // bezier_handle: bezier_handle.clone(),
+                        bezier_id: bezier.id,
                         previous_position: bezier.get_previous_position(anchor),
                         new_position: bezier.get_position(anchor),
                     });

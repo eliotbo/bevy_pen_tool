@@ -196,7 +196,7 @@ pub fn spawn_group_entities(
         let num_mid_quads = 50;
 
         let group = groups.get_mut(&group_handle.clone()).unwrap();
-        group.group_lut(&mut bezier_curves, maps.id_handle_map.clone());
+        group.group_lut(&mut bezier_curves, maps.bezier_map.clone());
 
         // let (parent, _handle) = group.group.iter().next().unwrap();
 
