@@ -69,7 +69,7 @@ pub fn undo(
             }
             HistoryAction::DeletedCurve { bezier, bezier_id } => {
                 println!("undo DeletedCurve, so spawning with id: {:?}", bezier_id);
-                info!("maps before undo delete: {:?}", maps.bezier_map);
+                maps.print_bezier_map();
                 // let handle_entity = maps.bezier_map[&bezier_id].clone();
                 *user_state = UserState::SpawningCurve {
                     bezier_hist: Some(bezier),

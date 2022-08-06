@@ -177,7 +177,7 @@ fn debug(
         // println!("history actions: {:#?}", history.actions);
         println!("history actions len: {:#?}", history.actions.len());
         println!("history index: {:?}", history.index);
-        println!("map: {:?}", maps.bezier_map);
+        println!("map: {:?}", maps.print_bezier_map());
         println!("");
     }
 

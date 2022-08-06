@@ -731,6 +731,28 @@ pub struct Maps {
     pub textures: HashMap<&'static str, Handle<Image>>,
 }
 
+impl Maps {
+    pub fn print_bezier_map(&self) {
+        info!(
+            "bezier maps: {:?}",
+            self.bezier_map
+                .iter()
+                .map(|(key, val)| {
+                    if let HandleId::Id(_, id) = val.handle.id {
+                        if let HandleId::Id(_, id2) = key.0 {
+                            (id2, id)
+                        } else {
+                            panic!("no id 1")
+                        }
+                    } else {
+                        panic!("no id 2")
+                    }
+                })
+                .collect::<Vec<(u64, u64)>>()
+        )
+    }
+}
+
 impl Default for Maps {
     fn default() -> Self {
         Maps {

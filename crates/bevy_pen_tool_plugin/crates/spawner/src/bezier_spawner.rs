@@ -45,6 +45,10 @@ pub fn spawn_bezier_system(
         // actually generates a random HandleId
         let mut default_spawner_id = BezierId::default();
 
+        if let Some(bezier_hist) = maybe_bezier_hist {
+            default_spawner_id = bezier_hist.id.into();
+        }
+
         let mut start = cursor.position;
 
         // the control points cannot be exactly in the same positions as the anchors
@@ -63,7 +67,9 @@ pub fn spawn_bezier_system(
             //
             start = latch_received.position;
             control_start = latch_received.control_point;
-            default_spawner_id = latch_received.latcher_id;
+
+            // TODO: huh?
+            // default_spawner_id = latch_received.latcher_id;
 
             let latch_local = LatchData {
                 latched_to_id: latch_received.latchee_id,
@@ -106,6 +112,7 @@ pub fn spawn_bezier_system(
             bezier.move_quad = Anchor::None;
             bezier.id = bezier_hist.id.into();
             bezier.do_compute_lut = true;
+            // the id part is done above
 
             do_nothing = true;
         } else {
@@ -210,7 +217,9 @@ pub fn spawn_bezier(
         // let handle_entity = maps.bezier_map.get(b_id).unwrap().clone();
         bezier_curves.set(b_id.0, bezier.clone())
     } else {
-        bezier_curves.add(bezier.clone())
+        // bezier_curves.add(bezier.clone())
+        let handle_id: HandleId = bezier.id.0.into();
+        bezier_curves.set(handle_id, bezier.clone())
     };
 
     // assign the bezier handle id to the bezier id
