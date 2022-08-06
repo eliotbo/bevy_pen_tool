@@ -2,8 +2,8 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
     get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BezierGrandParent,
-    BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, History, HistoryAction,
-    OfficialLatch, UiAction, UiBoard, UserState,
+    BezierId, BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, History,
+    HistoryAction, OfficialLatch, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -31,8 +31,8 @@ impl Default for Cursor {
 pub struct Latch {
     pub position: Vec2,
     pub control_point: Vec2,
-    pub latchee_id: u64,
-    pub latcher_id: u64,
+    pub latchee_id: BezierId,
+    pub latcher_id: BezierId,
     pub latchee_edge: AnchorEdge,
 }
 
@@ -524,7 +524,7 @@ pub fn spawn_curve_order_on_mouseclick(
             let us = user_state.as_mut();
             *us = UserState::SpawningCurve {
                 bezier_hist: None,
-                maybe_bezier_handle: None,
+                maybe_bezier_id: None,
             };
             //
             if !is_latched {
@@ -540,7 +540,7 @@ pub fn spawn_curve_order_on_mouseclick(
             let us = user_state.as_mut();
             *us = UserState::SpawningCurve {
                 bezier_hist: None,
-                maybe_bezier_handle: None,
+                maybe_bezier_id: None,
             };
         }
         _ => {}
@@ -616,7 +616,7 @@ pub fn mouse_release_actions(
                     add_to_history_event_writer.send(HistoryAction::MovedAnchor {
                         anchor,
                         // bezier_handle: bezier_handle.clone(),
-                        bezier_id: bezier.id,
+                        bezier_id: bezier.id.into(),
                         previous_position: bezier.get_previous_position(anchor),
                         new_position: bezier.get_position(anchor),
                     });

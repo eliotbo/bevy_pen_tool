@@ -1,7 +1,7 @@
 use crate::inputs::*;
 use crate::util::materials::*;
 
-use bevy::{asset::HandleId, prelude::*, reflect::TypeUuid, sprite::Mesh2dHandle};
+use bevy::{asset::HandleId, prelude::*, reflect::TypeUuid, sprite::Mesh2dHandle, utils::Uuid};
 
 use serde::{Deserialize, Serialize};
 
@@ -16,13 +16,26 @@ use flo_curves::*;
 
 use bevy_inspector_egui::{Inspectable, InspectorPlugin};
 
+type BezierHistId = u64;
+
 #[derive(Debug, Clone, Default, Inspectable)]
 pub struct BezierHist {
     pub positions: BezierPositions,
     pub color: Option<Color>,
     pub latches: HashMap<AnchorEdge, LatchData>,
-    pub id: BezierId,
+    pub id: BezierHistId,
 }
+
+// impl Default for BezierHist {
+//     fn default() -> Self {
+//         Self {
+//             positions: BezierPositions::default(),
+//             color: None,
+//             latches: HashMap::new(),
+//             id: BezierId::default(),
+//         }
+//     }
+// }
 
 impl From<&Bezier> for BezierHist {
     fn from(bezier: &Bezier) -> Self {
@@ -30,7 +43,7 @@ impl From<&Bezier> for BezierHist {
             positions: bezier.positions.clone(),
             color: None,
             latches: bezier.latches.clone(),
-            id: bezier.id,
+            id: bezier.id.into(),
         }
     }
 }
@@ -59,27 +72,27 @@ impl From<&Group> for GroupHist {
 pub enum HistoryAction {
     MovedAnchor {
         // bezier_handle: Handle<Bezier>,
-        bezier_id: BezierId,
+        bezier_id: BezierHistId,
         previous_position: Vec2,
         new_position: Vec2,
         anchor: Anchor,
     },
-    MovedGroup {
-        // group_handle: Handle<Group>,
-        group_id: GroupId,
-        previous_position: Vec2,
-        new_position: Vec2,
-    },
+    // MovedGroup {
+    //     // group_handle: Handle<Group>,
+    //     group_id: GroupId,
+    //     previous_position: Vec2,
+    //     new_position: Vec2,
+    // },
     SpawnedCurve {
         // bezier_handle: Handle<Bezier>,
-        bezier_id: BezierId,
+        bezier_id: BezierHistId,
         bezier_hist: BezierHist,
         // entity: Entity,
-        id: u64,
+        // id: u64,
     },
     DeletedCurve {
         bezier: BezierHist,
-        bezier_id: BezierId,
+        bezier_id: BezierHistId,
         // bezier_handle: Handle<Bezier>,
     },
     // DeletedGroup {
@@ -163,7 +176,7 @@ pub enum UserState {
     Selected(Group),
     SpawningCurve {
         bezier_hist: Option<BezierHist>,
-        maybe_bezier_handle: Option<Handle<Bezier>>,
+        maybe_bezier_id: Option<BezierId>,
     },
     MovingAnchor,
     MovingWholeCurve,
@@ -327,7 +340,7 @@ pub struct GroupSaveLoad {
 }
 
 #[derive(Debug, Clone, TypeUuid, PartialEq)]
-#[uuid = "b16f31ff-a594-4fca-a0e3-85e626d3d01a"]
+#[uuid = "b16f31ff-a594-4fca-a0e3-85e626d3d01a"] // do not change this uuid without changing the Default impl for GroupId
 pub struct Group {
     // TODO: rid Group of redundancy
     pub group: HashSet<(Entity, Handle<Bezier>)>,
@@ -347,7 +360,7 @@ pub struct Group {
 
 impl Default for Group {
     fn default() -> Self {
-        let mut rng = thread_rng();
+        // let mut rng = thread_rng();
         Group {
             group: HashSet::new(),
             bezier_handles: HashSet::new(),
@@ -357,7 +370,8 @@ impl Default for Group {
                 path_length: 0.0,
                 lut: Vec::new(),
             },
-            group_id: rng.gen(),
+            group_id: GroupId::default(),
+            // ..Default::default() // group_id: HandleId::default(),
         }
     }
 }
@@ -384,7 +398,7 @@ impl Group {
     pub fn find_connected_ends(
         &mut self,
         bezier_curves: &mut ResMut<Assets<Bezier>>,
-        id_handle_map: HashMap<u64, BezierHandleEntity>,
+        id_handle_map: HashMap<BezierId, BezierHandleEntity>,
     ) {
         //
         if self.bezier_handles.len() == 0 {
@@ -446,7 +460,10 @@ impl Group {
                 // let (partner_id, partners_edge) = (latch.latched_to_id, );
                 let next_edge = latch.partners_edge.other();
 
-                let next_curve_handle = id_handle_map.get(&latch.latched_to_id).unwrap().clone();
+                let next_curve_handle = id_handle_map
+                    .get(&latch.latched_to_id.into())
+                    .unwrap()
+                    .clone();
 
                 let bezier_next = bezier_curve_hack.get(&next_curve_handle.handle.id).unwrap();
 
@@ -469,7 +486,7 @@ impl Group {
     pub fn group_lut(
         &mut self,
         bezier_curves: &mut ResMut<Assets<Bezier>>,
-        id_handle_map: HashMap<u64, BezierHandleEntity>,
+        id_handle_map: HashMap<BezierId, BezierHandleEntity>,
     ) {
         // if the group is connected with latches, then go ahead and group
         if let Some(ends) = self.ends.clone() {
@@ -698,12 +715,13 @@ impl Group {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BezierHandleEntity {
     pub handle: Handle<Bezier>,
     pub entity: Option<Entity>,
 }
 
+#[derive(Debug)]
 pub struct Maps {
     pub mesh_handles: HashMap<&'static str, Mesh2dHandle>,
     // pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
@@ -827,13 +845,24 @@ impl Default for Globals {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Inspectable)]
+#[derive(Debug, Clone, Serialize, Deserialize, Inspectable)]
 pub struct LatchData {
-    #[inspectable(min = 0, max = 999999999999999999)]
-    pub latched_to_id: u64,
+    // #[inspectable(min = 0, max = 999999999999999999)]
+    pub latched_to_id: BezierId,
     pub self_edge: AnchorEdge,
     pub partners_edge: AnchorEdge,
     // pub latch_position: Vec2,
+}
+
+impl Default for LatchData {
+    fn default() -> Self {
+        Self {
+            latched_to_id: BezierId::default(),
+            self_edge: AnchorEdge::default(),
+            partners_edge: AnchorEdge::default(),
+            // latch_position: Vec2::default(),
+        }
+    }
 }
 
 pub struct BezierCoord2 {
@@ -844,12 +873,82 @@ pub struct BezierCoord2 {
     // control_end: Coord2,
 }
 
-pub type GroupId = u64;
-pub type BezierId = u64;
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Hash, Eq, Inspectable)]
+pub struct GroupId(HandleId);
+impl From<HandleId> for GroupId {
+    fn from(id: HandleId) -> Self {
+        Self(id)
+    }
+}
+
+impl Default for GroupId {
+    fn default() -> Self {
+        let mut rng = thread_rng();
+        let uuid = Uuid::parse_str("b16f31ff-a594-4fca-a0e3-85e626d3d01a").unwrap();
+        Self(HandleId::new(uuid, rng.gen()))
+    }
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize, PartialEq, Hash, Eq, Inspectable)]
+pub struct BezierId(pub HandleId);
+
+impl From<HandleId> for BezierId {
+    fn from(id: HandleId) -> Self {
+        Self(id)
+    }
+}
+
+impl From<BezierHistId> for BezierId {
+    fn from(id: BezierHistId) -> Self {
+        let uuid = Uuid::parse_str("8cb22c5d-5ab0-4912-8833-ab46062b7d38").unwrap();
+        Self(HandleId::new(uuid, id))
+    }
+}
+
+impl Into<BezierHistId> for BezierId {
+    fn into(self) -> BezierHistId {
+        if let HandleId::Id(_, id) = self.0 {
+            id
+        } else {
+            panic!("BezierId is not an Id");
+        }
+    }
+}
+
+impl Default for BezierId {
+    fn default() -> Self {
+        let mut rng = thread_rng();
+        let uuid = Uuid::parse_str("8cb22c5d-5ab0-4912-8833-ab46062b7d38").unwrap();
+        Self(HandleId::new(uuid, rng.gen()))
+    }
+}
+
+use core::fmt::Debug;
+impl Debug for BezierId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let HandleId::Id(_, id) = self.0 {
+            write!(f, "BezierId({})", id)
+        } else {
+            write!(f, "none")
+        }
+    }
+}
+
+use core::fmt;
+
+impl fmt::Display for BezierId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        if let HandleId::Id(_, id) = self.0 {
+            write!(f, "BezierId({})", id)
+        } else {
+            write!(f, "none")
+        }
+    }
+}
 
 // #[derive(RenderResources, Default, TypeUuid, Debug, Clone)]
 #[derive(Debug, Clone, TypeUuid, Serialize, Deserialize)]
-#[uuid = "8cb22c5d-5ab0-4912-8833-ab46062b7d38"]
+#[uuid = "8cb22c5d-5ab0-4912-8833-ab46062b7d38"] // do not change this uuid without changing the Default impl for BezierId
 pub struct Bezier {
     pub positions: BezierPositions,
     pub previous_positions: BezierPositions, // was useful for an undo functionality
@@ -865,22 +964,23 @@ pub struct Bezier {
 
 impl Default for Bezier {
     fn default() -> Self {
-        let mut rng = thread_rng();
-        let latches = HashMap::new();
+        // let mut rng = thread_rng();
+        // let latches = HashMap::new();
         // latches.insert(AnchorEdge::Start, Vec::new());
         // latches.insert(AnchorEdge::End, Vec::new());
 
         Bezier {
+            do_compute_lut: true,
+            latches: HashMap::new(),
+            id: BezierId::default(),
             positions: BezierPositions::default(),
             previous_positions: BezierPositions::default(),
-            move_quad: Anchor::None,
+            move_quad: Anchor::default(),
             color: None,
-            do_compute_lut: true,
-            lut: Vec::new(), // look-up table for linearizing the distance on a Bezier curve as a function of the t-value
-            id: rng.gen(),
-            latches,
-            group: None,
+            lut: LutDistance::default(),
             potential_latch: None,
+            group: None,
+            // ..Default::default()
         }
     }
 }
@@ -1167,14 +1267,14 @@ impl Bezier {
                 position: self.positions.start,
                 control_point: 2.0 * self.positions.start - self.positions.control_start,
                 latchee_id: self.id,
-                latcher_id: rng.gen(),
+                latcher_id: BezierId::default(),
                 latchee_edge: AnchorEdge::Start,
             },
             AnchorEdge::End => Latch {
                 position: self.positions.end,
                 control_point: 2.0 * self.positions.end - self.positions.control_end,
                 latchee_id: self.id,
-                latcher_id: rng.gen(),
+                latcher_id: BezierId::default(),
                 latchee_edge: AnchorEdge::End,
             },
         }

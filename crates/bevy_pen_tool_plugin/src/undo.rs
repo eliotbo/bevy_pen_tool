@@ -45,7 +45,7 @@ pub fn undo(
                 anchor,
             } => {
                 // println!("undo: MovedAnchor");
-                let handle_entity = maps.bezier_map[&bezier_id].clone();
+                let handle_entity = maps.bezier_map[&bezier_id.into()].clone();
                 let bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
                 // let mut new_bezier = bezier.clone();
                 // bezier.set_position(anchor, previous_position);
@@ -55,13 +55,13 @@ pub fn undo(
                 bezier.do_compute_lut = true;
             }
             HistoryAction::SpawnedCurve {
-                bezier_id: _,
+                bezier_id,
                 bezier_hist: _,
                 // entity: _,
-                id,
+                // id,
             } => {
                 // println!("undo: SpawnedCurve");
-                if let Some(handle_entity) = maps.bezier_map.get(&id) {
+                if let Some(handle_entity) = maps.bezier_map.get(&bezier_id.into()) {
                     if let Some(entity) = handle_entity.entity {
                         commands.entity(entity).despawn_recursive();
                     }
@@ -69,10 +69,11 @@ pub fn undo(
             }
             HistoryAction::DeletedCurve { bezier, bezier_id } => {
                 println!("undo DeletedCurve, so spawning with id: {:?}", bezier_id);
-                let handle_entity = maps.bezier_map[&bezier_id].clone();
+                info!("maps before undo delete: {:?}", maps.bezier_map);
+                // let handle_entity = maps.bezier_map[&bezier_id].clone();
                 *user_state = UserState::SpawningCurve {
                     bezier_hist: Some(bezier),
-                    maybe_bezier_handle: Some(handle_entity.handle),
+                    maybe_bezier_id: Some(bezier_id.into()),
                 };
             }
 
@@ -101,12 +102,12 @@ pub fn add_to_history(
             }
 
             x @ HistoryAction::SpawnedCurve {
-                id: xid,
+                // bezier_id: xid,
                 // entity: xentity,
                 ..
             } => {
                 // replace history element if it's a redo. Else, push
-                let index = history.index as usize;
+                // let index = history.index as usize;
 
                 // if let Some(HistoryAction::SpawnedCurve { id, .. }) = history.actions.get_mut(index)
                 // {
@@ -212,7 +213,7 @@ pub fn redo(
                 previous_position: _,
             } => {
                 // info!("redoing moving");
-                let handle_entity = maps.bezier_map[&bezier_id].clone();
+                let handle_entity = maps.bezier_map[&bezier_id.into()].clone();
                 let bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
                 // let mut new_bezier = bezier.clone();
                 // bezier.set_position(anchor, previous_position);
@@ -226,24 +227,29 @@ pub fn redo(
                 bezier_id,
                 bezier_hist,
                 // entity: _,
-                id: _,
+                // id,
             } => {
                 // println!("redo!@#@!#$#%$%^^:",);
-                let handle_entity = maps.bezier_map[&bezier_id].clone();
+                // let handle_entity = maps.bezier_map[&bezier_id].clone();
                 *user_state = UserState::SpawningCurve {
                     bezier_hist: Some(bezier_hist),
-                    maybe_bezier_handle: Some(handle_entity.handle),
+                    maybe_bezier_id: Some(bezier_id.into()),
                 };
             }
-            HistoryAction::DeletedCurve { bezier, bezier_id } => {
-                println!("redoing delete with id: {}", bezier_id);
+            HistoryAction::DeletedCurve {
+                bezier: _,
+                bezier_id,
+            } => {
+                println!("redoing delete with id: {:?}", bezier_id);
                 // selection.selected.group.clear();
                 // if let Some(handle_entity) = maps.id_handle_map.get(&bezier.id) {
                 // selection
                 //     .selected
                 //     .group
                 //     .insert((handle_entity.entity.unwrap(), bezier_handle));
-                delete_curve_event_writer.send(DeleteCurve { bezier_id });
+                delete_curve_event_writer.send(DeleteCurve {
+                    bezier_id: bezier_id.into(),
+                });
                 //     return;
                 // } else {
                 //     info!("redo: could not find entity curve to delete");

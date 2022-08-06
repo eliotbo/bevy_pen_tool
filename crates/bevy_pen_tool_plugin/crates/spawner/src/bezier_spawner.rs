@@ -2,12 +2,12 @@ use crate::inputs::{Cursor, Latch};
 
 use crate::util::{
     Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent,
-    BezierHandleEntity, BezierHist, BezierMidMat, BezierParent, BezierPositions, BoundingBoxQuad,
-    ControlPointQuad, EndpointQuad, Globals, HistoryAction, LatchData, Maps, MiddlePointQuad,
-    SelectionMat, SpawnMids, UserState,
+    BezierHandleEntity, BezierHist, BezierId, BezierMidMat, BezierParent, BezierPositions,
+    BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, HistoryAction, LatchData, Maps,
+    MiddlePointQuad, SelectionMat, SpawnMids, UserState,
 };
 
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
+use bevy::{asset::HandleId, prelude::*, sprite::MaterialMesh2dBundle};
 
 use std::collections::HashMap;
 
@@ -37,17 +37,13 @@ pub fn spawn_bezier_system(
     let mut do_nothing = false;
     if let UserState::SpawningCurve {
         bezier_hist: maybe_bezier_hist,
-        maybe_bezier_handle,
+        maybe_bezier_id,
     } = &*user_state
     {
-        //
-
         let clearcolor = clearcolor_struct.0;
 
-        let mut rng = thread_rng();
-        let mut spawner_id: u64 = rng.gen();
-
-        // let cam_pos = cam_query.single();
+        // actually generates a random HandleId
+        let mut default_spawner_id = BezierId::default();
 
         let mut start = cursor.position;
 
@@ -62,14 +58,12 @@ pub fn spawn_bezier_system(
         let control_end: Vec2 = start + Vec2::new(epsilon, epsilon);
 
         let mut latches: HashMap<AnchorEdge, LatchData> = HashMap::new();
-        // latches.insert(AnchorEdge::Start, Vec::new());
-        // latches.insert(AnchorEdge::End, Vec::new());
 
         for latch_received in latch_event_reader.iter() {
             //
             start = latch_received.position;
             control_start = latch_received.control_point;
-            spawner_id = latch_received.latcher_id;
+            default_spawner_id = latch_received.latcher_id;
 
             let latch_local = LatchData {
                 latched_to_id: latch_received.latchee_id,
@@ -90,10 +84,6 @@ pub fn spawn_bezier_system(
 
         cursor.latch = Vec::new();
 
-        // pub positions: BezierPositions,
-        // pub color: Option<Color>,
-        // pub latches: HashMap<AnchorEdge, LatchData>,
-
         let mut bezier = Bezier {
             positions: BezierPositions {
                 start,
@@ -103,7 +93,7 @@ pub fn spawn_bezier_system(
             },
             previous_positions: BezierPositions::default(),
             move_quad: Anchor::End,
-            id: spawner_id,
+            id: default_spawner_id,
             latches,
             ..Default::default()
         };
@@ -114,10 +104,8 @@ pub fn spawn_bezier_system(
             bezier.latches = bezier_hist.latches.clone();
             bezier.color = bezier_hist.color.clone();
             bezier.move_quad = Anchor::None;
-            bezier.id = bezier_hist.id;
+            bezier.id = bezier_hist.id.into();
             bezier.do_compute_lut = true;
-            // maps.id_handle_map
-            //     .insert(bezier_hist.id, bezier_hist.bezier_handle);
 
             do_nothing = true;
         } else {
@@ -140,7 +128,7 @@ pub fn spawn_bezier_system(
             &mut globals,
             &mut maps,
             &mut add_to_history_event_writer,
-            &maybe_bezier_handle,
+            &maybe_bezier_id,
             do_send_to_history,
         );
     }
@@ -166,7 +154,7 @@ pub fn spawn_bezier(
     globals: &mut ResMut<Globals>,
     maps: &mut ResMut<Maps>,
     add_to_history_event_writer: &mut EventWriter<HistoryAction>,
-    maybe_bezier_handle: &Option<Handle<Bezier>>,
+    maybe_bezier_id: &Option<BezierId>,
     do_send_to_history: bool,
 ) -> (Entity, Handle<Bezier>) {
     bezier.compute_lut_walk(100);
@@ -217,12 +205,17 @@ pub fn spawn_bezier(
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(bigger_size))));
 
     // since bezier is cloned, be careful about modifying it after the cloning, it won't have any side-effects
-    let bezier_handle = if let Some(handle) = maybe_bezier_handle {
+    let bezier_handle = if let Some(b_id) = maybe_bezier_id {
         // handle.clone()
-        bezier_curves.set(handle, bezier.clone())
+        // let handle_entity = maps.bezier_map.get(b_id).unwrap().clone();
+        bezier_curves.set(b_id.0, bezier.clone())
     } else {
         bezier_curves.add(bezier.clone())
     };
+
+    // assign the bezier handle id to the bezier id
+    let bezier_got = bezier_curves.get_mut(&bezier_handle).unwrap();
+    bezier_got.id = bezier_handle.id.into();
 
     //////////////////// Bounding box ////////////////////
 
@@ -275,10 +268,10 @@ pub fn spawn_bezier(
     if do_send_to_history {
         add_to_history_event_writer.send(HistoryAction::SpawnedCurve {
             // bezier_handle: bezier_handle.clone(),
-            bezier_id: bezier.id,
+            bezier_id: bezier.id.into(),
             bezier_hist: BezierHist::from(&bezier.clone()),
             // entity: parent,
-            id: bezier.id,
+            // id: bezier.id,
         });
     }
 

@@ -149,7 +149,7 @@ pub fn update_anchors(
                 // Problems with non-existing ids may occur when using undo, redo and delete
                 // TODO: Delete latched anchors that no longer have a partner
                 println!(
-                    "Warning: Could not retrieve handle for Bezier id: {}",
+                    "Warning: Could not retrieve handle for Bezier id: {:?}",
                     &partner_latch.latched_to_id
                 );
             }
@@ -403,6 +403,8 @@ pub fn selection_final(
                 }
             }
             selection.selected = selected.clone();
+
+            println!("selected: {:?}", &selection.selected);
         }
 
         // return the UserState to Idle when finished selecting
@@ -818,6 +820,7 @@ pub fn delete(
             for (entity, handle) in selection.selected.group.clone() {
                 //
                 let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
+                println!("within DELETE ---> bezier: {:?}", bezier.id);
 
                 // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
                 if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
@@ -832,7 +835,7 @@ pub fn delete(
                 if &handle == bezier_handle {
                     add_to_history_event_writer.send(HistoryAction::DeletedCurve {
                         bezier: BezierHist::from(&bezier.clone()),
-                        bezier_id: bezier.id,
+                        bezier_id: bezier.id.into(),
                     });
                     commands.entity(entity).despawn_recursive();
                     maps.bezier_map.remove(&bezier.id);
@@ -1069,7 +1072,7 @@ pub fn load(
 
         use rand::prelude::*;
         let mut rng = thread_rng();
-        let id: GroupId = rng.gen();
+        let id: GroupId = GroupId::default();
 
         let mut group = Group {
             group: HashSet::new(),
