@@ -13,6 +13,7 @@ use std::io::Write;
 
 // use flo_curves::*;
 
+// TODO: make a version of this targeted to only one curve
 pub fn recompute_lut(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BezierParent>>,
@@ -30,6 +31,7 @@ pub fn recompute_lut(
         for bezier_handle in query.iter_mut() {
             let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap();
 
+            // info!("recomputing LUT for {:?}", bezier_handle);
             bezier.compute_lut_walk(globals.group_lut_num_points as usize);
 
             bezier.do_compute_lut = false;
@@ -79,6 +81,12 @@ pub fn update_lut(
                     }
                 }
             }
+
+            if bezier.do_compute_lut {
+                println!("recomputing LUT for {:?}", b_handle);
+                bezier_to_update.insert(b_handle);
+                bezier.do_compute_lut = false;
+            }
         }
     }
     for handle in bezier_to_update.iter() {
@@ -97,14 +105,15 @@ pub fn update_lut(
     }
 }
 
+// TODO: make this run only when an anchor actually moves
 pub fn update_anchors(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<&Handle<Bezier>, With<BezierParent>>,
     // globals: Res<Globals>,
     cursor: Res<Cursor>,
     maps: ResMut<Maps>,
-    mut history: ResMut<History>,
-    mut add_to_history_event_reader: EventReader<HistoryAction>,
+    // mut history: ResMut<History>,
+    // mut add_to_history_event_reader: EventReader<HistoryAction>,
 ) {
     // TODO: remove dependency on Cursor
     if cursor.latch.is_empty() {
@@ -115,19 +124,8 @@ pub fn update_anchors(
             //
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
                 //
-
+                // println!("updating!!!!!!!!!!!!!!!");
                 bezier.update_positions_cursor(&cursor);
-
-                // for hist_event in add_to_history_event_reader.iter() {
-                //     println!("hist event: {:?}", hist_event);
-
-                //     history.actions.push(HistoryAction::MovedAnchor {
-                //         bezier_handle: bezier_handle.clone(),
-                //         anchor: hist_event.anchor,
-                //         new_position: bezier.get_position(hist_event.anchor),
-                //         previous_position: bezier.get_previous_position(hist_event.anchor),
-                //     });
-                // }
 
                 latch_info = bezier.get_mover_latch_info();
 
@@ -216,7 +214,7 @@ pub fn bezier_anchor_order(
         }
     }
 
-    // Move the whole chain is Anchor::All is sent
+    // Move the whole chain -> Anchor::All is sent
     for handle in latched_chain_whole_curve.iter() {
         let bezier = bezier_curves.get_mut(handle).unwrap();
         bezier.move_quad = Anchor::All;
@@ -1092,6 +1090,7 @@ pub fn load(
                     &mut globals,
                     &mut maps,
                     &mut add_to_history_event_writer,
+                    &None,
                 );
                 group.group.insert((entity.clone(), handle.clone()));
                 group.bezier_handles.insert(handle.clone());

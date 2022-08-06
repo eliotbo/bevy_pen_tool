@@ -15,6 +15,7 @@ pub struct PenPlugin;
 // on mouseclick, if moving, remember initial position (preivous_position in Cursor)
 // on mouse release, add action to history
 // moved anchor
+// 2) remove UserState
 
 impl Plugin for PenPlugin {
     fn build(&self, app: &mut App) {
@@ -52,6 +53,7 @@ impl Plugin for PenPlugin {
                     .with_system(ungroup)
                     .with_system(undo)
                     .with_system(redo)
+                    .with_system(compute_lut_sender)
                     .with_system(add_to_history)
                     .label("model")
                     .after("controller")
@@ -153,6 +155,7 @@ fn debug(
     mids_groups: Query<&GroupMiddleQuad>,
     maps: Res<Maps>,
     history: Res<History>,
+    mut action_event_writer: EventWriter<Action>,
 ) {
     if keyboard_input.just_pressed(KeyCode::B)
         && !keyboard_input.pressed(KeyCode::LShift)
@@ -162,13 +165,15 @@ fn debug(
         // println!("'B' currently pressed");
         for handle in query.iter() {
             let _bezier = bezier_curves.get_mut(handle).unwrap();
+            action_event_writer.send(Action::ComputeLut);
 
             // println!("group id: {:?}", bezier.group);
             // println!("latches: {:#?}", BezierPrint::from_bezier(bezier));
         }
 
         // println!("mids: {:?}", mids_groups.iter().count());
-        println!("history actions: {:?}", history.actions);
+        println!("history actions: {:#?}", history.actions);
+        println!("history actions len: {:#?}", history.actions.len());
         println!("history index: {:?}", history.index);
         println!("");
     }

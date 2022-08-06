@@ -2,8 +2,8 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
     get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BezierGrandParent,
-    BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, HistoryAction, OfficialLatch,
-    UiAction, UiBoard, UserState,
+    BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, History, HistoryAction,
+    OfficialLatch, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -522,7 +522,10 @@ pub fn spawn_curve_order_on_mouseclick(
         Some(MouseClickEvent::SpawnOnBezier((anchor_edge, handle, is_latched))) => {
             // this is too stateful, be more functional please. events please.
             let us = user_state.as_mut();
-            *us = UserState::SpawningCurve { bezier_hist: None };
+            *us = UserState::SpawningCurve {
+                bezier_hist: None,
+                maybe_bezier_handle: None,
+            };
             //
             if !is_latched {
                 if let Some(bezier) = bezier_curves.get_mut(handle) {
@@ -535,7 +538,10 @@ pub fn spawn_curve_order_on_mouseclick(
         }
         Some(MouseClickEvent::SpawnOnCanvas) => {
             let us = user_state.as_mut();
-            *us = UserState::SpawningCurve { bezier_hist: None };
+            *us = UserState::SpawningCurve {
+                bezier_hist: None,
+                maybe_bezier_handle: None,
+            };
         }
         _ => {}
     }
@@ -577,6 +583,7 @@ pub fn mouse_release_actions(
     mut ui_query: Query<(&mut Transform, &mut UiBoard), With<BezierGrandParent>>,
     mut user_state: ResMut<UserState>,
     mut cursor: ResMut<Cursor>,
+    mut history: ResMut<History>,
     mut action_event_writer: EventWriter<Action>,
     mut latch_event_writer: EventWriter<OfficialLatch>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
@@ -609,9 +616,24 @@ pub fn mouse_release_actions(
                     add_to_history_event_writer.send(HistoryAction::MovedAnchor {
                         anchor,
                         bezier_handle: bezier_handle.clone(),
-                        previous_position: bezier.get_position(anchor),
-                        new_position: bezier.get_previous_position(anchor),
+                        previous_position: bezier.get_previous_position(anchor),
+                        new_position: bezier.get_position(anchor),
                     });
+
+                    // // if the last action was spawning a curve, and the user is
+                    // // its end anchor, then we update the history with the new
+                    // // end position
+                    // if let Some(history_action) = history.actions.get_mut(0) {
+                    //     if let HistoryAction::SpawnedCurve {
+                    //         bezier_handle: _,
+                    //         bezier_hist,
+                    //         entity: _,
+                    //     } = history_action
+                    //     {
+                    //         //
+                    //         bezier_hist.positions = bezier.positions.clone();
+                    //     }
+                    // }
                 }
 
                 bezier.potential_latch = None;

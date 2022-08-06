@@ -19,6 +19,7 @@ pub struct BezierHist {
     pub positions: BezierPositions,
     pub color: Option<Color>,
     pub latches: HashMap<AnchorEdge, LatchData>,
+    pub id: BezierId,
 }
 
 impl From<&Bezier> for BezierHist {
@@ -27,9 +28,12 @@ impl From<&Bezier> for BezierHist {
             positions: bezier.positions.clone(),
             color: None,
             latches: bezier.latches.clone(),
+            id: bezier.id,
         }
     }
 }
+
+pub struct ComputeLut;
 
 #[derive(Debug, Clone)]
 pub struct GroupHist {
@@ -63,6 +67,7 @@ pub enum HistoryAction {
         bezier_handle: Handle<Bezier>,
         bezier_hist: BezierHist,
         entity: Entity,
+        id: u128,
     },
     DeletedCurve {
         bezier: BezierHist,
@@ -133,7 +138,10 @@ pub enum UserState {
     Idle,
     Selecting(Vec2),
     Selected(Group),
-    SpawningCurve { bezier_hist: Option<BezierHist> },
+    SpawningCurve {
+        bezier_hist: Option<BezierHist>,
+        maybe_bezier_handle: Option<Handle<Bezier>>,
+    },
     MovingAnchor,
     MovingWholeCurve,
 }
@@ -798,6 +806,7 @@ pub struct BezierCoord2 {
 }
 
 type GroupId = u128;
+pub type BezierId = u128;
 
 // #[derive(RenderResources, Default, TypeUuid, Debug, Clone)]
 #[derive(Debug, Clone, TypeUuid, Serialize, Deserialize)]
@@ -809,7 +818,7 @@ pub struct Bezier {
     pub color: Option<Color>,
     pub do_compute_lut: bool,
     pub lut: LutDistance,
-    pub id: u128,
+    pub id: BezierId,
     pub latches: HashMap<AnchorEdge, LatchData>,
     pub potential_latch: Option<LatchData>,
     pub group: Option<GroupId>,

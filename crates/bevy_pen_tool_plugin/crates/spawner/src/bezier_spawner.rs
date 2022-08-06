@@ -35,6 +35,7 @@ pub fn spawn_bezier_system(
     let mut do_nothing = false;
     if let UserState::SpawningCurve {
         bezier_hist: maybe_bezier_hist,
+        maybe_bezier_handle,
     } = &*user_state
     {
         //
@@ -110,6 +111,10 @@ pub fn spawn_bezier_system(
             bezier.latches = bezier_hist.latches.clone();
             bezier.color = bezier_hist.color.clone();
             bezier.move_quad = Anchor::None;
+            bezier.id = bezier_hist.id;
+            bezier.do_compute_lut = true;
+            // maps.id_handle_map
+            //     .insert(bezier_hist.id, bezier_hist.bezier_handle);
 
             do_nothing = true;
         } else {
@@ -132,6 +137,7 @@ pub fn spawn_bezier_system(
             &mut globals,
             &mut maps,
             &mut add_to_history_event_writer,
+            &maybe_bezier_handle,
         );
     }
 
@@ -156,6 +162,7 @@ pub fn spawn_bezier(
     globals: &mut ResMut<Globals>,
     maps: &mut ResMut<Maps>,
     add_to_history_event_writer: &mut EventWriter<HistoryAction>,
+    maybe_bezier_handle: &Option<Handle<Bezier>>,
 ) -> (Entity, Handle<Bezier>) {
     bezier.compute_lut_walk(100);
 
@@ -205,7 +212,12 @@ pub fn spawn_bezier(
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(bigger_size))));
 
     // since bezier is cloned, be careful about modifying it after the cloning, it won't have any side-effects
-    let bezier_handle = bezier_curves.add(bezier.clone());
+    let bezier_handle = if let Some(handle) = maybe_bezier_handle {
+        // handle.clone()
+        bezier_curves.set(handle, bezier.clone())
+    } else {
+        bezier_curves.add(bezier.clone())
+    };
 
     maps.id_handle_map.insert(bezier.id, bezier_handle.clone());
     //////////////////// Bounding box ////////////////////
@@ -252,6 +264,7 @@ pub fn spawn_bezier(
         bezier_handle: bezier_handle.clone(),
         bezier_hist: BezierHist::from(&bezier.clone()),
         entity: parent,
+        id: bezier.id,
     });
 
     let bbquad_entity = commands
