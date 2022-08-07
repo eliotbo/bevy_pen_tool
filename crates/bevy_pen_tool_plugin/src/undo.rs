@@ -7,6 +7,21 @@ use bevy::{asset::HandleId, prelude::*};
 use bevy_inspector_egui::{Inspectable, InspectorPlugin};
 
 #[derive(Debug, Clone, Inspectable)]
+pub struct HistoryLenInspector {
+    pub length: usize,
+    pub index: i32,
+}
+
+impl Default for HistoryLenInspector {
+    fn default() -> Self {
+        Self {
+            length: 0,
+            index: -1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Inspectable)]
 pub struct HistoryInspector {
     pub history: Vec<HistoryActionInspector>,
     pub index: i32,
@@ -152,8 +167,16 @@ pub fn add_to_history(
     // bezier_curves: ResMut<Assets<Bezier>>,
     // mut action_event_writer: EventWriter<Action>,
 ) {
-    let mut clear_history = false;
+    let mut clear_history = true;
+
     for hist_event in add_to_history_event_reader.iter() {
+        // if history has a tail branching away from the head, remove it, but
+        // only once
+        if clear_history && history.index > -1 {
+            clear_history = false;
+            history.actions = history.actions[0..(history.index + 1) as usize].to_vec();
+        }
+
         //
         clear_history = true;
         // println!("hist event: {:?}", hist_event);
@@ -164,42 +187,7 @@ pub fn add_to_history(
                 history.actions.push(x.clone());
             }
 
-            x @ HistoryAction::SpawnedCurve {
-                // bezier_id: xid,
-                // entity: xentity,
-                ..
-            } => {
-                // replace history element if it's a redo. Else, push
-                // let index = history.index as usize;
-
-                // if let Some(HistoryAction::SpawnedCurve { id, .. }) = history.actions.get_mut(index)
-                // {
-                //     // if the ids are identical, it means that the curve was issued
-                //     // from a redo. In that case, the history future is not wiped out
-                //     if id == xid {
-                //         println!(
-                //             "Spawned from redo (not increasing history index nor history actions)"
-                //         );
-                //         // *entity = *xentity;
-                //         // action_event_writer.send(Action::ComputeLut);
-
-                //         return;
-                //     }
-                // }
-
-                // if let Some(HistoryAction::DeletedCurve { bezier, .. }) =
-                //     history.actions.get_mut(index + 1)
-                // {
-                //     println!("added delete to history: {} -----> {}", bezier.id, xid);
-                //     if bezier.id == *xid {
-                //         // *entity = *xentity;
-                //         // action_event_writer.send(Action::ComputeLut);
-                //         println!("not increasing history index nor history actions");
-
-                //         return;
-                //     }
-                // }
-
+            x @ HistoryAction::SpawnedCurve { .. } => {
                 history.actions.push(x.clone());
             }
             x @ HistoryAction::DeletedCurve { .. } => {
@@ -211,11 +199,6 @@ pub fn add_to_history(
 
         // move history head forward
         history.index += 1;
-    }
-
-    // if history has a tail branching away from the head, remove it
-    if clear_history && history.index > -1 {
-        history.actions = history.actions[0..(history.index + 1) as usize].to_vec();
     }
 }
 
@@ -237,7 +220,9 @@ pub fn history_effects(
                 .entity(handle_entity.entity.unwrap())
                 .despawn_recursive();
         }
-        maps.bezier_map.remove(&deleter.bezier_id);
+        if let None = maps.bezier_map.remove(&deleter.bezier_id) {
+            info!("COULD NOT DELETE CURVE FROM MAP: {:?}", deleter.bezier_id);
+        }
     }
 }
 
@@ -304,19 +289,10 @@ pub fn redo(
                 bezier_id,
             } => {
                 println!("redoing delete with id: {:?}", bezier_id);
-                // selection.selected.group.clear();
-                // if let Some(handle_entity) = maps.id_handle_map.get(&bezier.id) {
-                // selection
-                //     .selected
-                //     .group
-                //     .insert((handle_entity.entity.unwrap(), bezier_handle));
+
                 delete_curve_event_writer.send(DeleteCurve {
                     bezier_id: bezier_id.into(),
                 });
-                //     return;
-                // } else {
-                //     info!("redo: could not find entity curve to delete");
-                // }
             }
             _ => {}
         }

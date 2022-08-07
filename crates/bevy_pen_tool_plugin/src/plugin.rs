@@ -28,9 +28,11 @@ impl Plugin for PenPlugin {
             .add_plugin(SpawnerPlugin)
             .add_plugin(InspectorPlugin::<History>::new())
             .add_plugin(InspectorPlugin::<HistoryInspector>::new().on_window(*SECOND_WINDOW_ID))
+            .add_plugin(InspectorPlugin::<HistoryLenInspector>::new().on_window(*SECOND_WINDOW_ID))
             .add_event::<GroupBoxEvent>()
             .insert_resource(History::default())
             .insert_resource(HistoryInspector::default())
+            .insert_resource(HistoryLenInspector::default())
             .add_startup_system(set_window_position)
             .add_startup_system(create_new_window)
             //
@@ -173,9 +175,12 @@ const SECONDARY_EGUI_PASS: &str = "secondary_egui_pass";
 fn update_history_inspector(
     mut history: ResMut<History>,
     mut history_inspector: ResMut<HistoryInspector>,
+    mut history_len_inspector: ResMut<HistoryLenInspector>,
 ) {
     if history.is_changed() {
         *history_inspector = HistoryInspector::from(history.clone());
+        history_len_inspector.length = history_inspector.history.len();
+        history_len_inspector.index = history_inspector.index;
     }
 }
 
