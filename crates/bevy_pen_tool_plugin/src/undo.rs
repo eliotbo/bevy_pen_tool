@@ -4,6 +4,68 @@ use bevy_pen_tool_spawner::util::*;
 
 use bevy::{asset::HandleId, prelude::*};
 
+use bevy_inspector_egui::{Inspectable, InspectorPlugin};
+
+#[derive(Debug, Clone, Inspectable)]
+pub struct HistoryInspector {
+    pub history: Vec<HistoryActionInspector>,
+    pub index: i32,
+}
+
+impl Default for HistoryInspector {
+    fn default() -> Self {
+        Self {
+            history: vec![],
+            index: -1,
+        }
+    }
+}
+
+impl From<History> for HistoryInspector {
+    fn from(history: History) -> Self {
+        Self {
+            history: history
+                .actions
+                .iter()
+                .map(|x| HistoryActionInspector::from(x.clone()))
+                .collect(),
+            index: history.index,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Inspectable)]
+pub enum HistoryActionInspector {
+    MovedAnchor { bezier_id: BezierHistId },
+    SpawnedCurve { bezier_id: BezierHistId },
+    DeletedCurve { bezier_id: BezierHistId },
+
+    None,
+}
+
+impl From<HistoryAction> for HistoryActionInspector {
+    fn from(action: HistoryAction) -> Self {
+        match action {
+            HistoryAction::MovedAnchor { bezier_id, .. } => {
+                HistoryActionInspector::MovedAnchor { bezier_id }
+            }
+            HistoryAction::SpawnedCurve { bezier_id, .. } => {
+                HistoryActionInspector::SpawnedCurve { bezier_id }
+            }
+            HistoryAction::DeletedCurve { bezier_id, .. } => {
+                HistoryActionInspector::DeletedCurve { bezier_id }
+            }
+            HistoryAction::None => HistoryActionInspector::None,
+        }
+    }
+}
+
+impl Default for HistoryActionInspector {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 pub fn undo(
     mut commands: Commands,
     // mut globals: ResMut<Globals>,
@@ -90,9 +152,10 @@ pub fn add_to_history(
     // bezier_curves: ResMut<Assets<Bezier>>,
     // mut action_event_writer: EventWriter<Action>,
 ) {
+    let mut clear_history = false;
     for hist_event in add_to_history_event_reader.iter() {
         //
-
+        clear_history = true;
         // println!("hist event: {:?}", hist_event);
 
         match hist_event {
@@ -148,11 +211,11 @@ pub fn add_to_history(
 
         // move history head forward
         history.index += 1;
+    }
 
-        // if history has a tail branching away from the head, remove it
-        if history.index > -1 {
-            history.actions = history.actions[0..(history.index + 1) as usize].to_vec();
-        }
+    // if history has a tail branching away from the head, remove it
+    if clear_history && history.index > -1 {
+        history.actions = history.actions[0..(history.index + 1) as usize].to_vec();
     }
 }
 
@@ -161,7 +224,7 @@ pub fn history_effects(
     mut lut_event_reader: EventReader<ComputeLut>,
     mut delete_curver_event_reader: EventReader<DeleteCurve>,
     mut action_event_writer: EventWriter<Action>,
-    maps: ResMut<Maps>,
+    mut maps: ResMut<Maps>,
 ) {
     for _ in lut_event_reader.iter() {
         // println!("compute_lut_sender");
@@ -170,11 +233,11 @@ pub fn history_effects(
 
     for deleter in delete_curver_event_reader.iter() {
         if let Some(handle_entity) = maps.bezier_map.get(&deleter.bezier_id) {
-            if let Some(entity) = handle_entity.entity {
-                commands.entity(entity).despawn_recursive();
-            }
+            commands
+                .entity(handle_entity.entity.unwrap())
+                .despawn_recursive();
         }
-        // action_event_writer.send(Action::Delete);
+        maps.bezier_map.remove(&deleter.bezier_id);
     }
 }
 

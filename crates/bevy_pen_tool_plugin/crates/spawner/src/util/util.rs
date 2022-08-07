@@ -16,7 +16,7 @@ use flo_curves::*;
 
 use bevy_inspector_egui::{Inspectable, InspectorPlugin};
 
-type BezierHistId = u64;
+pub type BezierHistId = u64;
 
 #[derive(Debug, Clone, Default, Inspectable)]
 pub struct BezierHist {

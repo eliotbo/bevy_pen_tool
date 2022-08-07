@@ -68,8 +68,9 @@ pub fn spawn_bezier_system(
             start = latch_received.position;
             control_start = latch_received.control_point;
 
-            // TODO: huh?
-            // default_spawner_id = latch_received.latcher_id;
+            // if a latch is taking place, the id will have been generated
+            // in the generate_start_latch_on_spawn(..) method for Bezier
+            default_spawner_id = latch_received.latcher_id;
 
             let latch_local = LatchData {
                 latched_to_id: latch_received.latchee_id,

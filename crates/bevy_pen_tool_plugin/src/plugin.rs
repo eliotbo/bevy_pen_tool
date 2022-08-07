@@ -5,10 +5,13 @@ use crate::moves::*;
 use bevy_pen_tool_spawner::*;
 
 use bevy::prelude::*;
+use bevy::render::{render_graph::RenderGraph, RenderApp};
 
 pub struct PenPlugin;
+use bevy::window::{CreateWindow, WindowId};
 use bevy_inspector_egui::{Inspectable, InspectorPlugin};
 
+use once_cell::sync::Lazy;
 // TODO
 // 0) change to bevy 0.8
 // 1) undo/redo
@@ -24,9 +27,15 @@ impl Plugin for PenPlugin {
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(SpawnerPlugin)
             .add_plugin(InspectorPlugin::<History>::new())
+            .add_plugin(InspectorPlugin::<HistoryInspector>::new().on_window(*SECOND_WINDOW_ID))
             .add_event::<GroupBoxEvent>()
             .insert_resource(History::default())
+            .insert_resource(HistoryInspector::default())
             .add_startup_system(set_window_position)
+            .add_startup_system(create_new_window)
+            //
+            .add_system(debug)
+            .add_system(update_history_inspector)
             //
             // Update controller
             .add_system_set(
@@ -51,7 +60,6 @@ impl Plugin for PenPlugin {
                     .with_system(delete)
                     .with_system(hide_control_points)
                     .with_system(unselect)
-                    .with_system(debug)
                     .with_system(ungroup)
                     .with_system(undo)
                     .with_system(redo)
@@ -82,6 +90,16 @@ impl Plugin for PenPlugin {
                     .label("view")
                     .after("model"),
             );
+
+        let render_app = app.sub_app_mut(RenderApp);
+        let mut graph = render_app.world.get_resource_mut::<RenderGraph>().unwrap();
+        bevy_egui::setup_pipeline(
+            &mut graph,
+            bevy_egui::RenderGraphConfig {
+                window_id: *SECOND_WINDOW_ID,
+                egui_pass: SECONDARY_EGUI_PASS,
+            },
+        );
     }
 }
 
@@ -147,6 +165,32 @@ impl GroupPrint {
             ends: group.ends.clone(),
         }
     }
+}
+
+static SECOND_WINDOW_ID: Lazy<WindowId> = Lazy::new(WindowId::new);
+const SECONDARY_EGUI_PASS: &str = "secondary_egui_pass";
+
+fn update_history_inspector(
+    mut history: ResMut<History>,
+    mut history_inspector: ResMut<HistoryInspector>,
+) {
+    if history.is_changed() {
+        *history_inspector = HistoryInspector::from(history.clone());
+    }
+}
+
+fn create_new_window(mut create_window_events: EventWriter<CreateWindow>) {
+    let window_id = *SECOND_WINDOW_ID;
+
+    create_window_events.send(CreateWindow {
+        id: window_id,
+        descriptor: WindowDescriptor {
+            width: 800.,
+            height: 600.,
+            title: "Second window".to_string(),
+            ..Default::default()
+        },
+    });
 }
 
 fn debug(
