@@ -105,18 +105,18 @@ pub enum HistoryAction {
     // UnGrouped {
     //     bezier_handles: Vec<Handle<Bezier>>,
     // },
-    // Latched {
-    //     bezier_handle_1: BezierId, //Handle<Bezier>,
-    //     bezier_handle_2: BezierId, //Handle<Bezier>,
-    //     anchor_1: Anchor,
-    //     anchor_2: Anchor,
-    // },
-    // Unlatched {
-    //     bezier_handle_1: BezierId, //Handle<Bezier>,
-    //     bezier_handle_2: BezierId, //Handle<Bezier>,
-    //     anchor_1: Anchor,
-    //     anchor_2: Anchor,
-    // },
+    Latched {
+        self_id: BezierHistId, //Handle<Bezier>,
+        self_anchor: Anchor,
+        partner_bezier_id: BezierHistId, //Handle<Bezier>,
+        partner_anchor: Anchor,
+    },
+    Unlatched {
+        self_id: BezierHistId,           //Handle<Bezier>,
+        partner_bezier_id: BezierHistId, //Handle<Bezier>,
+        self_anchor: Anchor,
+        partner_anchor: Anchor,
+    },
     None,
 }
 
@@ -282,6 +282,16 @@ impl Anchor {
             Self::End => AnchorEdge::End,
             _ => {
                 panic!("Failure to convert Anchor to AnchorEdge!");
+            }
+        }
+    }
+
+    pub fn to_edge_with_controls(&self) -> AnchorEdge {
+        match self {
+            Self::Start | Self::ControlStart => AnchorEdge::Start,
+            Self::End | Self::ControlEnd => AnchorEdge::End,
+            _ => {
+                panic!("Failure to convert Anchor::None to AnchorEdge!");
             }
         }
     }
@@ -887,6 +897,8 @@ impl Default for LatchData {
     }
 }
 
+pub type LatchInfo = Option<(LatchData, Vec2, Vec2)>;
+
 pub struct BezierCoord2 {
     pub start: Coord2,
     pub end: Coord2,
@@ -1282,6 +1294,35 @@ impl Bezier {
         }
     }
 
+    // gives the LatchData of the anchor that is attached to the moving anchor
+    pub fn get_anchor_latch_info(&self, anchor: Anchor) -> Option<(LatchData, Vec2, Vec2)> {
+        match anchor {
+            Anchor::Start | Anchor::ControlStart => {
+                if let Some(latch_start) = self.latches.get(&AnchorEdge::Start) {
+                    let latch_partner_id = latch_start.clone();
+                    let partner_position = self.positions.start;
+
+                    // The control points of latched edges are facing each other
+                    let opposite_control =
+                        2.0 * self.positions.start - self.positions.control_start;
+                    return Some((latch_partner_id, partner_position, opposite_control));
+                }
+                return None;
+            }
+            Anchor::End | Anchor::ControlEnd => {
+                if let Some(latch_end) = self.latches.get(&AnchorEdge::End) {
+                    let latch_partner_id = latch_end.clone();
+                    let partner_position = self.positions.end;
+
+                    let opposite_control = 2.0 * self.positions.end - self.positions.control_end;
+                    return Some((latch_partner_id, partner_position, opposite_control));
+                }
+                return None;
+            }
+            _ => None,
+        }
+    }
+
     pub fn generate_start_latch_on_spawn(&self, anchor_edge: AnchorEdge) -> Latch {
         let mut rng = thread_rng();
         match anchor_edge {
@@ -1425,6 +1466,38 @@ impl Bezier {
         }
 
         return connected_curves;
+    }
+}
+
+pub fn update_latched_partner_position(
+    bezier_map: &HashMap<BezierId, BezierHandleEntity>,
+    bezier_curves: &mut ResMut<Assets<Bezier>>,
+    latch_info: LatchInfo,
+    // control: Vec2,
+    // position: Vec2,
+) {
+    // let latch_info = self.get_mover_latch_info();
+    // change the control point of a latched point
+    if let Some((partner_latch, mover_position, opposite_control)) = latch_info {
+        //
+
+        if let Some(bezier_handle) = bezier_map.get(&partner_latch.latched_to_id) {
+            //
+            let bezier_partner = bezier_curves.get_mut(&bezier_handle.handle).unwrap();
+
+            bezier_partner.update_latched_position(
+                partner_latch.partners_edge,
+                opposite_control,
+                mover_position,
+            );
+        } else {
+            // Problems with non-existing ids may occur when using undo, redo and delete
+            // TODO: Delete latched anchors that no longer have a partner
+            println!(
+                "Warning: Could not retrieve handle for Bezier id: {:?}",
+                &partner_latch.latched_to_id
+            );
+        }
     }
 }
 

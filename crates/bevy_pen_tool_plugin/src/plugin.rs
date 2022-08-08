@@ -65,7 +65,7 @@ impl Plugin for PenPlugin {
                     .with_system(ungroup)
                     .with_system(undo)
                     .with_system(redo)
-                    .with_system(history_effects)
+                    .with_system(redo_effects)
                     .with_system(add_to_history)
                     .label("model")
                     .after("controller")

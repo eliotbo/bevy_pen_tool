@@ -116,7 +116,7 @@ pub fn update_anchors(
 ) {
     // TODO: remove dependency on Cursor
     if cursor.latch.is_empty() {
-        let mut latch_info: Option<(LatchData, Vec2, Vec2)> = None;
+        // let mut latch_info: LatchInfo = None;
 
         // TODO: use an event here instead of scanning for a moving quad
         for bezier_handle in query.iter_mut() {
@@ -126,34 +126,40 @@ pub fn update_anchors(
                 // println!("updating!!!!!!!!!!!!!!!");
                 bezier.update_positions_cursor(&cursor);
 
-                latch_info = bezier.get_mover_latch_info();
+                // find the latched partner in real time while the anchor is moving
+                let latch_info = bezier.get_anchor_latch_info(bezier.move_quad);
 
                 if let Some(_) = latch_info {
+                    update_latched_partner_position(
+                        &maps.bezier_map,
+                        &mut bezier_curves,
+                        latch_info,
+                    );
                     break;
                 }
             }
         }
 
-        // change the control point of a latched point
-        if let Some((partner_latch, mover_position, opposite_control)) = latch_info {
-            //
-            if let Some(bezier_handle) = maps.bezier_map.get(&partner_latch.latched_to_id) {
-                //
-                let bezier = bezier_curves.get_mut(&bezier_handle.handle).unwrap();
-                bezier.update_latched_position(
-                    partner_latch.partners_edge,
-                    opposite_control,
-                    mover_position,
-                );
-            } else {
-                // Problems with non-existing ids may occur when using undo, redo and delete
-                // TODO: Delete latched anchors that no longer have a partner
-                println!(
-                    "Warning: Could not retrieve handle for Bezier id: {:?}",
-                    &partner_latch.latched_to_id
-                );
-            }
-        }
+        // // change the control point of a latched point
+        // if let Some((partner_latch, mover_position, opposite_control)) = latch_info {
+        //     //
+        //     if let Some(bezier_handle) = maps.bezier_map.get(&partner_latch.latched_to_id) {
+        //         //
+        //         let bezier = bezier_curves.get_mut(&bezier_handle.handle).unwrap();
+        //         bezier.update_latched_position(
+        //             partner_latch.partners_edge,
+        //             opposite_control,
+        //             mover_position,
+        //         );
+        //     } else {
+        //         // Problems with non-existing ids may occur when using undo, redo and delete
+        //         // TODO: Delete latched anchors that no longer have a partner
+        //         println!(
+        //             "Warning: Could not retrieve handle for Bezier id: {:?}",
+        //             &partner_latch.latched_to_id
+        //         );
+        //     }
+        // }
     }
 }
 
@@ -188,6 +194,7 @@ pub fn bezier_anchor_order(
 
             bezier.update_previous_pos();
 
+            // Move entire curve if Anchor::All is sent
             if move_anchor.anchor == Anchor::All {
                 latched_chain_whole_curve =
                     bezier.find_connected_curves(bezier_curve_hack, &maps.bezier_map);
@@ -548,6 +555,7 @@ pub fn latchy(
 
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
+
     maps: Res<Maps>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Latch) {
@@ -671,16 +679,31 @@ pub fn latchy(
 pub fn officiate_latch_partnership(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut latch_event_reader: EventReader<OfficialLatch>,
+    mut history_action_event_writer: EventWriter<HistoryAction>,
     globals: ResMut<Globals>,
     audio: Res<Audio>,
     maps: ResMut<Maps>,
 ) {
+    let mut latch_ids = Vec::new();
     for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
         let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
         bezier.set_latch(latch.clone());
         bezier.compute_lut_walk(100);
 
         // bezier.has_just_latched = true;
+
+        // push to history action
+        if !latch_ids.contains(&bezier.id) && !latch_ids.contains(&latch.latched_to_id) {
+            history_action_event_writer.send(HistoryAction::Latched {
+                self_id: bezier.id.into(),
+                self_anchor: latch.self_edge.to_anchor(),
+                partner_bezier_id: latch.latched_to_id.into(),
+                partner_anchor: latch.partners_edge.to_anchor(),
+            });
+        }
+
+        latch_ids.push(bezier.id);
+        latch_ids.push(latch.latched_to_id);
 
         if globals.sound_on {
             if let Some(sound) = maps.sounds.get("latch") {
@@ -814,13 +837,15 @@ pub fn delete(
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Delete) {
         // list of partners that need to be unlatched
+        let mut delete_curve_events = Vec::new();
+
         let mut latched_partners: Vec<LatchData> = Vec::new();
         for (entity, bezier_handle) in query.iter() {
             //
             for (entity, handle) in selection.selected.group.clone() {
                 //
                 let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
-                println!("within DELETE ---> bezier: {:?}", bezier.id);
+                // println!("within DELETE ---> bezier: {:?}", bezier.id);
 
                 // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
                 if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
@@ -833,10 +858,11 @@ pub fn delete(
                 }
 
                 if &handle == bezier_handle {
-                    add_to_history_event_writer.send(HistoryAction::DeletedCurve {
+                    delete_curve_events.push(HistoryAction::DeletedCurve {
                         bezier: BezierHist::from(&bezier.clone()),
                         bezier_id: bezier.id.into(),
                     });
+
                     commands.entity(entity).despawn_recursive();
                     maps.bezier_map.remove(&bezier.id);
                     if let Some(group_id) = bezier.group {
@@ -870,9 +896,17 @@ pub fn delete(
             //
             if let Some(handle_entity) = maps.bezier_map.get(&latch_data.latched_to_id) {
                 //
-                let bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
+                let partner_bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
 
-                bezier.latches.remove(&latch_data.partners_edge);
+                // important to send the Unlatched to history before the DeletedCurve
+                add_to_history_event_writer.send(HistoryAction::Unlatched {
+                    self_id: partner_bezier.id.into(),
+                    partner_bezier_id: latch_data.latched_to_id.into(),
+                    self_anchor: latch_data.partners_edge.to_anchor(),
+                    partner_anchor: latch_data.self_edge.to_anchor(),
+                });
+
+                partner_bezier.latches.remove(&latch_data.partners_edge);
 
                 // if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
                 //     // println!("selectd: {:?}", &latch_local);
@@ -892,6 +926,11 @@ pub fn delete(
         // reset selection
         selection.selected.group = HashSet::new();
         selection.selected.bezier_handles = HashSet::new();
+
+        // send the delete events
+        for e in delete_curve_events.iter() {
+            add_to_history_event_writer.send(e.clone());
+        }
     }
 }
 

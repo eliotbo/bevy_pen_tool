@@ -1,4 +1,4 @@
-use bevy_pen_tool_spawner::inputs::{Action, Cursor, MoveAnchor, UiButton};
+use bevy_pen_tool_spawner::inputs::{Action, Cursor, Latch, MoveAnchor, UiButton};
 use bevy_pen_tool_spawner::spawn_bezier;
 use bevy_pen_tool_spawner::util::*;
 
@@ -51,10 +51,23 @@ impl From<History> for HistoryInspector {
 
 #[derive(Debug, Clone, Inspectable)]
 pub enum HistoryActionInspector {
-    MovedAnchor { bezier_id: BezierHistId },
-    SpawnedCurve { bezier_id: BezierHistId },
-    DeletedCurve { bezier_id: BezierHistId },
-
+    MovedAnchor {
+        bezier_id: BezierHistId,
+    },
+    SpawnedCurve {
+        bezier_id: BezierHistId,
+    },
+    DeletedCurve {
+        bezier_id: BezierHistId,
+    },
+    Latched {
+        bezier_id1: BezierHistId,
+        bezier_id2: BezierHistId,
+    },
+    Unlatched {
+        self_id: BezierHistId,
+        partner_bezier_id: BezierHistId,
+    },
     None,
 }
 
@@ -70,6 +83,23 @@ impl From<HistoryAction> for HistoryActionInspector {
             HistoryAction::DeletedCurve { bezier_id, .. } => {
                 HistoryActionInspector::DeletedCurve { bezier_id }
             }
+            HistoryAction::Latched {
+                self_id: bezier_handle_1,
+                partner_bezier_id: bezier_handle_2,
+                ..
+            } => HistoryActionInspector::Latched {
+                bezier_id1: bezier_handle_1,
+                bezier_id2: bezier_handle_2,
+            },
+            HistoryAction::Unlatched {
+                self_id,
+                partner_bezier_id,
+                ..
+            } => HistoryActionInspector::Unlatched {
+                self_id,
+                partner_bezier_id,
+            },
+
             HistoryAction::None => HistoryActionInspector::None,
         }
     }
@@ -124,12 +154,23 @@ pub fn undo(
                 // println!("undo: MovedAnchor");
                 let handle_entity = maps.bezier_map[&bezier_id.into()].clone();
                 let bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
-                // let mut new_bezier = bezier.clone();
-                // bezier.set_position(anchor, previous_position);
-                // bezier.set_position(anchor, new_position);
+
                 bezier.set_position(anchor, previous_position);
-                // bezier.set_previous_pos(anchor, previous_position);
+
                 bezier.do_compute_lut = true;
+
+                // move the latched partner anchor
+                let anchor_edge = anchor.to_edge_with_controls();
+
+                if let Some(_) = bezier.latches.get(&anchor_edge) {
+                    let latch_info = bezier.get_anchor_latch_info(anchor);
+
+                    update_latched_partner_position(
+                        &maps.bezier_map,
+                        &mut bezier_curves,
+                        latch_info,
+                    );
+                }
             }
             HistoryAction::SpawnedCurve {
                 bezier_id,
@@ -153,6 +194,50 @@ pub fn undo(
                     maybe_bezier_id: Some(bezier_id.into()),
                 };
             }
+            HistoryAction::Latched {
+                self_id: bezier_id_1,
+                partner_bezier_id: bezier_id_2,
+                self_anchor: anchor_1,
+                partner_anchor: anchor_2,
+            } => {
+                let handle_entity_1 = maps.bezier_map[&bezier_id_1.into()].clone();
+                let bezier_1 = bezier_curves.get_mut(&handle_entity_1.handle).unwrap();
+                bezier_1.latches.remove(&anchor_1.to_edge());
+
+                let handle_entity_2 = maps.bezier_map[&bezier_id_2.into()].clone();
+                let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
+                bezier_2.latches.remove(&anchor_2.to_edge());
+            }
+
+            HistoryAction::Unlatched {
+                self_id,           //Handle<Bezier>,
+                partner_bezier_id, //Handle<Bezier>,
+                self_anchor,
+                partner_anchor,
+            } => {
+                info!("undoing latch");
+                let handle_entity_1 = maps.bezier_map[&self_id.into()].clone();
+                let bezier_1 = bezier_curves.get_mut(&handle_entity_1.handle).unwrap();
+
+                let latch_1 = LatchData {
+                    latched_to_id: partner_bezier_id.into(),
+                    self_edge: self_anchor.to_edge(),
+                    partners_edge: partner_anchor.to_edge(),
+                };
+
+                bezier_1.latches.insert(self_anchor.to_edge(), latch_1);
+
+                let handle_entity_2 = maps.bezier_map[&partner_bezier_id.into()].clone();
+                let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
+
+                let latch_2 = LatchData {
+                    latched_to_id: self_id.into(),
+                    self_edge: partner_anchor.to_edge(),
+                    partners_edge: self_anchor.to_edge(),
+                };
+
+                bezier_2.latches.insert(partner_anchor.to_edge(), latch_2);
+            }
 
             _ => (),
         };
@@ -160,26 +245,18 @@ pub fn undo(
     }
 }
 
-// pub id_handle_map: HashMap<u128, Handle<Bezier>>,
 pub fn add_to_history(
     mut history: ResMut<History>,
     mut add_to_history_event_reader: EventReader<HistoryAction>,
     // bezier_curves: ResMut<Assets<Bezier>>,
     // mut action_event_writer: EventWriter<Action>,
 ) {
-    let mut clear_history = true;
-
-    for hist_event in add_to_history_event_reader.iter() {
+    for (k, hist_event) in add_to_history_event_reader.iter().enumerate() {
         // if history has a tail branching away from the head, remove it, but
         // only once
-        if clear_history && history.index > -1 {
-            clear_history = false;
+        if k == 0 && history.index > -1 {
             history.actions = history.actions[0..(history.index + 1) as usize].to_vec();
         }
-
-        //
-        clear_history = true;
-        // println!("hist event: {:?}", hist_event);
 
         match hist_event {
             //
@@ -191,7 +268,10 @@ pub fn add_to_history(
                 history.actions.push(x.clone());
             }
             x @ HistoryAction::DeletedCurve { .. } => {
-                info!("pushing deleted curve");
+                // info!("pushing deleted curve");
+                history.actions.push(x.clone());
+            }
+            x @ HistoryAction::Latched { .. } => {
                 history.actions.push(x.clone());
             }
             _ => {}
@@ -202,23 +282,28 @@ pub fn add_to_history(
     }
 }
 
-pub fn history_effects(
-    mut commands: Commands,
-    mut lut_event_reader: EventReader<ComputeLut>,
+pub fn redo_effects(
+    // mut commands: Commands,
+    // mut lut_event_reader: EventReader<ComputeLut>,
     mut delete_curver_event_reader: EventReader<DeleteCurve>,
     mut action_event_writer: EventWriter<Action>,
+    mut selection: ResMut<Selection>,
     mut maps: ResMut<Maps>,
 ) {
-    for _ in lut_event_reader.iter() {
-        // println!("compute_lut_sender");
-        action_event_writer.send(Action::ComputeLut);
-    }
+    // for _ in lut_event_reader.iter() {
+    //     // println!("compute_lut_sender");
+    //     action_event_writer.send(Action::ComputeLut);
+    // }
 
     for deleter in delete_curver_event_reader.iter() {
+        // to delete a curve, we programmatically select the curve and send
+        // an Action::Delete event
         if let Some(handle_entity) = maps.bezier_map.get(&deleter.bezier_id) {
-            commands
-                .entity(handle_entity.entity.unwrap())
-                .despawn_recursive();
+            selection
+                .selected
+                .group
+                .insert((handle_entity.entity.unwrap(), handle_entity.handle.clone()));
+            action_event_writer.send(Action::Delete);
         }
         if let None = maps.bezier_map.remove(&deleter.bezier_id) {
             info!("COULD NOT DELETE CURVE FROM MAP: {:?}", deleter.bezier_id);
@@ -233,9 +318,9 @@ pub fn redo(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut action_event_reader: EventReader<Action>,
     mut user_state: ResMut<UserState>,
-    mut lut_event_writer: EventWriter<ComputeLut>,
+    // mut lut_event_writer: EventWriter<ComputeLut>,
     mut delete_curve_event_writer: EventWriter<DeleteCurve>,
-    mut selection: ResMut<Selection>,
+    // mut selection: ResMut<Selection>,
     maps: ResMut<Maps>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Redo) {
@@ -268,6 +353,27 @@ pub fn redo(
                 bezier.set_position(anchor, new_position);
                 // lut_event_writer.send(ComputeLut);
                 bezier.do_compute_lut = true;
+
+                // let latch_info = bezier.get_mover_latch_info();
+                // update_latched_partner_position(&maps.bezier_map, &mut bezier_curves, latch_info);
+
+                // move the latched partner anchor
+                let anchor_edge = anchor.to_edge_with_controls();
+
+                if let Some(_) = bezier.latches.get(&anchor_edge) {
+                    let latch_info = bezier.get_anchor_latch_info(anchor);
+
+                    update_latched_partner_position(
+                        &maps.bezier_map,
+                        &mut bezier_curves,
+                        latch_info,
+                    );
+                }
+
+                // if let Some((partner_latch, mover_position, opposite_control)) = latch_info {
+                //                 if let Some(bezier_handle) = maps.bezier_map.get(&partner_latch.latched_to_id) {
+                //                     let partner_bezier = bezier_curves.get_mut(&bezier_handle.handle).unwrap();
+                //                 }
                 // bezier.set_previous_pos(anchor, previous_position);
             }
             // TODO: NEED TO CHANGE THE ENTITY INFO WHEN RESPAWNING WITH REDO
@@ -293,6 +399,36 @@ pub fn redo(
                 delete_curve_event_writer.send(DeleteCurve {
                     bezier_id: bezier_id.into(),
                 });
+            }
+
+            HistoryAction::Latched {
+                self_id: bezier_id_1,
+                self_anchor: anchor_1,
+                partner_bezier_id: bezier_id_2,
+                partner_anchor: anchor_2,
+            } => {
+                info!("redoing latching");
+                let handle_entity_1 = maps.bezier_map[&bezier_id_1.into()].clone();
+                let bezier_1 = bezier_curves.get_mut(&handle_entity_1.handle).unwrap();
+
+                let latch_1 = LatchData {
+                    latched_to_id: bezier_id_2.into(),
+                    self_edge: anchor_1.to_edge(),
+                    partners_edge: anchor_2.to_edge(),
+                };
+
+                bezier_1.latches.insert(anchor_1.to_edge(), latch_1);
+
+                let handle_entity_2 = maps.bezier_map[&bezier_id_2.into()].clone();
+                let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
+
+                let latch_2 = LatchData {
+                    latched_to_id: bezier_id_1.into(),
+                    self_edge: anchor_2.to_edge(),
+                    partners_edge: anchor_1.to_edge(),
+                };
+
+                bezier_2.latches.insert(anchor_2.to_edge(), latch_2);
             }
             _ => {}
         }
