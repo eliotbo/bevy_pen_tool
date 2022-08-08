@@ -68,7 +68,7 @@ pub enum Action {
     ScaleDown,
     HideControls,
     ComputeLut,
-    Delete,
+    Delete(bool), // bool is whether the delete originated from a redo
     SelectionBox,
     Selected,
     SpawnHeli,
@@ -115,7 +115,7 @@ pub fn send_action(
             UiButton::Helicopter => action_event_writer.send(Action::SpawnHeli),
             UiButton::MakeMesh => action_event_writer.send(Action::MakeMesh),
             UiButton::SpawnRoad => action_event_writer.send(Action::SpawnRoad),
-            UiButton::Delete => action_event_writer.send(Action::Delete),
+            UiButton::Delete => action_event_writer.send(Action::Delete(false)),
 
             _ => {}
         }
@@ -175,7 +175,7 @@ pub fn send_action(
         (true, true, false) if _pressed_z => action_event_writer.send(Action::Redo),
         (false, true, false) if mouse_wheel_up => action_event_writer.send(Action::ScaleUp),
         (false, true, false) if mouse_wheel_down => action_event_writer.send(Action::ScaleDown),
-        (false, false, false) if _pressed_delete => action_event_writer.send(Action::Delete),
+        (false, false, false) if _pressed_delete => action_event_writer.send(Action::Delete(false)),
         (true, false, false) if _pressed_t => action_event_writer.send(Action::ComputeLut),
 
         _ => {}

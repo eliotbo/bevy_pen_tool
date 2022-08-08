@@ -48,7 +48,7 @@ impl From<&Bezier> for BezierHist {
     }
 }
 
-pub struct DeleteCurve {
+pub struct RedoDelete {
     pub bezier_id: BezierId,
 }
 pub struct ComputeLut;

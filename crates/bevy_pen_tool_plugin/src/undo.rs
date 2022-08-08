@@ -274,6 +274,9 @@ pub fn add_to_history(
             x @ HistoryAction::Latched { .. } => {
                 history.actions.push(x.clone());
             }
+            x @ HistoryAction::Unlatched { .. } => {
+                history.actions.push(x.clone());
+            }
             _ => {}
         }
 
@@ -285,7 +288,7 @@ pub fn add_to_history(
 pub fn redo_effects(
     // mut commands: Commands,
     // mut lut_event_reader: EventReader<ComputeLut>,
-    mut delete_curver_event_reader: EventReader<DeleteCurve>,
+    mut redo_delete_event_reader: EventReader<RedoDelete>,
     mut action_event_writer: EventWriter<Action>,
     mut selection: ResMut<Selection>,
     mut maps: ResMut<Maps>,
@@ -295,18 +298,21 @@ pub fn redo_effects(
     //     action_event_writer.send(Action::ComputeLut);
     // }
 
-    for deleter in delete_curver_event_reader.iter() {
+    for redo_delete in redo_delete_event_reader.iter() {
         // to delete a curve, we programmatically select the curve and send
         // an Action::Delete event
-        if let Some(handle_entity) = maps.bezier_map.get(&deleter.bezier_id) {
+        if let Some(handle_entity) = maps.bezier_map.get(&redo_delete.bezier_id) {
             selection
                 .selected
                 .group
                 .insert((handle_entity.entity.unwrap(), handle_entity.handle.clone()));
-            action_event_writer.send(Action::Delete);
+            action_event_writer.send(Action::Delete(true));
         }
-        if let None = maps.bezier_map.remove(&deleter.bezier_id) {
-            info!("COULD NOT DELETE CURVE FROM MAP: {:?}", deleter.bezier_id);
+        if let None = maps.bezier_map.remove(&redo_delete.bezier_id) {
+            info!(
+                "COULD NOT DELETE CURVE FROM MAP: {:?}",
+                redo_delete.bezier_id
+            );
         }
     }
 }
@@ -319,7 +325,7 @@ pub fn redo(
     mut action_event_reader: EventReader<Action>,
     mut user_state: ResMut<UserState>,
     // mut lut_event_writer: EventWriter<ComputeLut>,
-    mut delete_curve_event_writer: EventWriter<DeleteCurve>,
+    mut delete_curve_event_writer: EventWriter<RedoDelete>,
     // mut selection: ResMut<Selection>,
     maps: ResMut<Maps>,
 ) {
@@ -396,7 +402,7 @@ pub fn redo(
             } => {
                 println!("redoing delete with id: {:?}", bezier_id);
 
-                delete_curve_event_writer.send(DeleteCurve {
+                delete_curve_event_writer.send(RedoDelete {
                     bezier_id: bezier_id.into(),
                 });
             }

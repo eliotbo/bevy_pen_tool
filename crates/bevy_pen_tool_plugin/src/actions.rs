@@ -835,101 +835,122 @@ pub fn delete(
     mut action_event_reader: EventReader<Action>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {
-    if action_event_reader.iter().any(|x| x == &Action::Delete) {
-        // list of partners that need to be unlatched
-        let mut delete_curve_events = Vec::new();
+    // if action_event_reader.iter().any(|x| x == &Action::Delete) {
+    for action in action_event_reader.iter() {
+        if let Action::Delete(is_from_redo) = action {
+            // list of partners that need to be unlatched
+            let mut delete_curve_events = Vec::new();
 
-        let mut latched_partners: Vec<LatchData> = Vec::new();
-        for (entity, bezier_handle) in query.iter() {
-            //
-            for (entity, handle) in selection.selected.group.clone() {
+            let mut latched_partners: Vec<(BezierId, LatchData)> = Vec::new();
+            for (entity, bezier_handle) in query.iter() {
                 //
-                let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
-                // println!("within DELETE ---> bezier: {:?}", bezier.id);
+                for (entity, handle) in selection.selected.group.clone() {
+                    //
+                    let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
+                    // println!("within DELETE ---> bezier: {:?}", bezier.id);
 
-                // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
-                if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
-                    latched_partners.push(latched_anchor.clone());
-                }
+                    // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
+                    if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
+                        latched_partners.push((bezier.id, latched_anchor.clone()));
+                    }
 
-                // latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
-                if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::End) {
-                    latched_partners.push(latched_anchor.clone());
-                }
+                    // latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
+                    if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::End) {
+                        latched_partners.push((bezier.id, latched_anchor.clone()));
+                    }
 
-                if &handle == bezier_handle {
-                    delete_curve_events.push(HistoryAction::DeletedCurve {
-                        bezier: BezierHist::from(&bezier.clone()),
-                        bezier_id: bezier.id.into(),
-                    });
+                    if &handle == bezier_handle {
+                        delete_curve_events.push(HistoryAction::DeletedCurve {
+                            bezier: BezierHist::from(&bezier.clone()),
+                            bezier_id: bezier.id.into(),
+                        });
 
-                    commands.entity(entity).despawn_recursive();
-                    maps.bezier_map.remove(&bezier.id);
-                    if let Some(group_id) = bezier.group {
-                        maps.group_map.remove(&group_id);
+                        commands.entity(entity).despawn_recursive();
+                        maps.bezier_map.remove(&bezier.id);
+                        if let Some(group_id) = bezier.group {
+                            maps.group_map.remove(&group_id);
+                        }
                     }
                 }
             }
-        }
 
-        for (entity, group_handle) in query2.iter() {
-            //
-            let group = groups.get(group_handle).unwrap();
-            for (entity, bezier_handle) in selection.selected.group.clone() {
-                if group.bezier_handles.contains(&bezier_handle) {
-                    let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
+            for (entity, group_handle) in query2.iter() {
+                //
+                let group = groups.get(group_handle).unwrap();
+                for (entity, bezier_handle) in selection.selected.group.clone() {
+                    if group.bezier_handles.contains(&bezier_handle) {
+                        let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
 
-                    // add_to_history_event_writer.send(HistoryAction::DeletedCurve {
-                    //     bezier: BezierHist::from(&bezier.clone()),
-                    //     bezier_handle: bezier_handle.clone(),
-                    // });
+                        // add_to_history_event_writer.send(HistoryAction::DeletedCurve {
+                        //     bezier: BezierHist::from(&bezier.clone()),
+                        //     bezier_handle: bezier_handle.clone(),
+                        // });
 
-                    commands.entity(entity).despawn_recursive();
+                        commands.entity(entity).despawn_recursive();
+                    }
                 }
             }
-        }
 
-        // unlatch partners of deleted curves
-        for latch_data in latched_partners {
-            //
-            // if let Some(latch) = latch_vec {
-            //
-            if let Some(handle_entity) = maps.bezier_map.get(&latch_data.latched_to_id) {
+            // unlatch partners of deleted curves
+            let mut unlatched_pairs: Vec<HashSet<BezierId>> = Vec::new();
+            for (self_id, latch_data) in latched_partners {
                 //
-                let partner_bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
+                // if let Some(latch) = latch_vec {
+                //
+                if let Some(handle_entity) = maps.bezier_map.get(&latch_data.latched_to_id) {
+                    //
+                    let partner_bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
 
-                // important to send the Unlatched to history before the DeletedCurve
-                add_to_history_event_writer.send(HistoryAction::Unlatched {
-                    self_id: partner_bezier.id.into(),
-                    partner_bezier_id: latch_data.latched_to_id.into(),
-                    self_anchor: latch_data.partners_edge.to_anchor(),
-                    partner_anchor: latch_data.self_edge.to_anchor(),
-                });
+                    // important to send the Unlatched to history before the DeletedCurve
 
-                partner_bezier.latches.remove(&latch_data.partners_edge);
+                    let mut unlatched_pair = HashSet::new();
+                    unlatched_pair.insert(partner_bezier.id);
+                    unlatched_pair.insert(self_id);
 
-                // if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
-                //     // println!("selectd: {:?}", &latch_local);
-                //     *latch_local = Vec::new();
+                    // send Unlatched only once per pair
+                    if !*is_from_redo && !unlatched_pairs.contains(&unlatched_pair) {
+                        unlatched_pairs.push(unlatched_pair);
+
+                        // from the point of view of the deleted curve's partner
+
+                        let unlatched = HistoryAction::Unlatched {
+                            self_id: self_id.into(),
+                            partner_bezier_id: latch_data.latched_to_id.into(),
+                            self_anchor: latch_data.self_edge.to_anchor(),
+                            partner_anchor: latch_data.partners_edge.to_anchor(),
+                        };
+
+                        info!("unlatched: {:?}", unlatched);
+                        add_to_history_event_writer.send(unlatched);
+                    }
+
+                    partner_bezier.latches.remove(&latch_data.partners_edge);
+
+                    // if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
+                    //     // println!("selectd: {:?}", &latch_local);
+                    //     *latch_local = Vec::new();
+                    // }
+                }
+
+                // maps.id_handle_map.remove(&latch_data.latched_to_id);
                 // }
             }
 
-            // maps.id_handle_map.remove(&latch_data.latched_to_id);
-            // }
-        }
+            // make the group box quad invisible
+            for mut visible in visible_query.iter_mut() {
+                visible.is_visible = false;
+            }
 
-        // make the group box quad invisible
-        for mut visible in visible_query.iter_mut() {
-            visible.is_visible = false;
-        }
+            // reset selection
+            selection.selected.group = HashSet::new();
+            selection.selected.bezier_handles = HashSet::new();
 
-        // reset selection
-        selection.selected.group = HashSet::new();
-        selection.selected.bezier_handles = HashSet::new();
-
-        // send the delete events
-        for e in delete_curve_events.iter() {
-            add_to_history_event_writer.send(e.clone());
+            // send the delete events, provided they are not from a redo
+            if !*is_from_redo {
+                for e in delete_curve_events.iter() {
+                    add_to_history_event_writer.send(e.clone());
+                }
+            }
         }
     }
 }

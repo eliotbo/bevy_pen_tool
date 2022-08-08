@@ -34,7 +34,7 @@ impl Plugin for SpawnerPlugin {
             .add_event::<SpawnMids>()
             .add_event::<HistoryAction>()
             .add_event::<ComputeLut>()
-            .add_event::<DeleteCurve>()
+            .add_event::<RedoDelete>()
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(ColoredMesh2dPlugin) // mesh making
             .add_plugin(RoadMesh2dPlugin) // mesh making
