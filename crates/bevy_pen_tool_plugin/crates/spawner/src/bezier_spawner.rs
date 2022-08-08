@@ -65,6 +65,7 @@ pub fn spawn_bezier_system(
 
         for latch_received in latch_event_reader.iter() {
             //
+
             start = latch_received.position;
             control_start = latch_received.control_point;
 
@@ -283,22 +284,22 @@ pub fn spawn_bezier(
             // entity: parent,
             // id: bezier.id,
         });
-    }
 
-    // send the latch to history
-    if !bezier.latches.is_empty() {
-        let latch = &bezier
-            .latches
-            .clone()
-            .into_values()
-            .collect::<Vec<LatchData>>()[0];
+        // send the latch to history
+        if !bezier.latches.is_empty() {
+            let latch = &bezier
+                .latches
+                .clone()
+                .into_values()
+                .collect::<Vec<LatchData>>()[0];
 
-        add_to_history_event_writer.send(HistoryAction::Latched {
-            self_id: bezier.id.into(),
-            self_anchor: latch.self_edge.to_anchor(),
-            partner_bezier_id: latch.latched_to_id.into(),
-            partner_anchor: latch.partners_edge.to_anchor(),
-        });
+            add_to_history_event_writer.send(HistoryAction::Latched {
+                self_id: bezier.id.into(),
+                self_anchor: latch.self_edge.to_anchor(),
+                partner_bezier_id: latch.latched_to_id.into(),
+                partner_anchor: latch.partners_edge.to_anchor(),
+            });
+        }
     }
 
     // println!("spawned bezier curve with id: {:?}", bezier.latches);

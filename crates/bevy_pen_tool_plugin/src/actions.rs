@@ -915,6 +915,7 @@ pub fn delete(
 
                         let unlatched = HistoryAction::Unlatched {
                             self_id: self_id.into(),
+
                             partner_bezier_id: latch_data.latched_to_id.into(),
                             self_anchor: latch_data.self_edge.to_anchor(),
                             partner_anchor: latch_data.partners_edge.to_anchor(),

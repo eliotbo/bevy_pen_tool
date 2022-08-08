@@ -192,6 +192,7 @@ fn create_new_window(mut create_window_events: EventWriter<CreateWindow>) {
         descriptor: WindowDescriptor {
             width: 800.,
             height: 600.,
+            position: WindowPosition::At(Vec2::new(1250., 0.)),
             title: "Second window".to_string(),
             ..Default::default()
         },

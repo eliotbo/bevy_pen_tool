@@ -215,7 +215,7 @@ pub fn undo(
                 self_anchor,
                 partner_anchor,
             } => {
-                info!("undoing latch");
+                info!("undoing unlatch");
                 let handle_entity_1 = maps.bezier_map[&self_id.into()].clone();
                 let bezier_1 = bezier_curves.get_mut(&handle_entity_1.handle).unwrap();
 
