@@ -1,9 +1,9 @@
 use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
-    get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BezierGrandParent,
-    BezierId, BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, History,
-    HistoryAction, Maps, MoveAnchorEvent, MovingAnchor, OfficialLatch, UiAction, UiBoard,
+    get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier,
+    BezierGrandParent, BezierId, BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals,
+    History, HistoryAction, Maps, MoveAnchorEvent, MovingAnchor, OfficialLatch, UiAction, UiBoard,
     UserState,
 };
 
@@ -252,6 +252,7 @@ pub fn check_mouseclick_on_objects(
     color_button_query: Query<(&GlobalTransform, &Handle<ButtonMat>, &ColorButton)>,
     mut ui_query: Query<(&Transform, &mut UiBoard), With<BezierGrandParent>>,
     bezier_query: Query<(&Handle<Bezier>, &BezierParent)>,
+    non_moving_edge_query: Query<(&Handle<Bezier>, &AchorEdgeQuad), Without<MovingAnchor>>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut mouse_event_writer: EventWriter<MouseClickEvent>,
     mut action_event_writer: EventWriter<Action>,
@@ -353,9 +354,12 @@ pub fn check_mouseclick_on_objects(
 
         // check for mouseclick on anchors (excluding control points)
         let mut anchor_edge_event: Option<MouseClickEvent> = None;
-        if let Some((_dist, anchor_edge, handle, latched)) =
-            get_close_still_anchor(12.0, cursor.position, &bezier_curves, &bezier_query)
-        {
+        if let Some((_dist, anchor_edge, handle, latched)) = get_close_still_anchor(
+            12.0,
+            cursor.position,
+            &bezier_curves,
+            &non_moving_edge_query,
+        ) {
             anchor_edge_event = Some(MouseClickEvent::OnAnchorEdge((
                 anchor_edge,
                 handle,
@@ -372,6 +376,7 @@ pub fn check_mouseclick_on_objects(
         ) {
             // case of spawning a curve close to an anchor
             (_, Some(MouseClickEvent::OnAnchorEdge(info)), true, false, false) => {
+                // println!("spawn on anchor edge");
                 mouse_event_writer.send(MouseClickEvent::SpawnOnBezier(info));
             }
 
@@ -516,6 +521,7 @@ pub fn spawn_curve_order_on_mouseclick(
     match click_event {
         Some(MouseClickEvent::SpawnOnBezier((anchor_edge, bezier_id, is_latched))) => {
             // this is too stateful, be more functional please. events please.
+
             let us = user_state.as_mut();
             *us = UserState::SpawningCurve {
                 bezier_hist: None,
@@ -577,7 +583,7 @@ pub fn mouse_release_actions(
     mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
+    query: Query<(&Handle<Bezier>, &Anchor, &MovingAnchor)>,
     moving_query: Query<Entity, With<MovingAnchor>>,
     mut ui_query: Query<(&mut Transform, &mut UiBoard), With<BezierGrandParent>>,
     mut user_state: ResMut<UserState>,
@@ -606,30 +612,41 @@ pub fn mouse_release_actions(
         }
 
         // let go of all any moving quad upon mouse button release
-        for (bezier_handle, _unused) in query.iter() {
-            //
-            if let Some(mut bezier) = bezier_curves.get_mut(bezier_handle) {
-                //
-                if let Some(potential_latch) = bezier.potential_latch.clone() {
-                    latch_event_writer.send(OfficialLatch(potential_latch, bezier_handle.clone()));
-                }
+        for (bezier_handle, anchor, moving_anchor) in query.iter() {
+            if moving_anchor.is_clicked {
+                if let Some(mut bezier) = bezier_curves.get_mut(bezier_handle) {
+                    //
+                    // Anchor Position History
+                    //
+                    // On mouse release, if an achor
 
-                // Anchor Position History
-                //
-                // On mouse release, if an achor
-                let anchor = bezier.move_quad;
-                if bezier.move_quad != Anchor::None {
-                    add_to_history_event_writer.send(HistoryAction::MovedAnchor {
-                        anchor,
+                    let history_action = HistoryAction::MovedAnchor {
+                        anchor: *anchor,
                         // bezier_handle: bezier_handle.clone(),
                         bezier_id: bezier.id.into(),
-                        previous_position: bezier.get_previous_position(anchor),
-                        new_position: bezier.get_position(anchor),
-                    });
-                }
+                        previous_position: bezier.get_previous_position(*anchor),
+                        new_position: bezier.get_position(*anchor),
+                    };
+                    // info!("Anchor position history: {:?}", history_action);
 
-                bezier.potential_latch = None;
-                bezier.move_quad = Anchor::None;
+                    add_to_history_event_writer.send(history_action);
+
+                    if anchor.is_edge() {
+                        //
+
+                        if let None = bezier.latches.get(&anchor.to_edge()) {
+                            if let Some(potential_latch) = bezier.potential_latch.clone() {
+                                latch_event_writer
+                                    .send(OfficialLatch(potential_latch, bezier_handle.clone()));
+                            }
+
+                            // }
+
+                            bezier.potential_latch = None;
+                            // bezier.move_quad = Anchor::None;
+                        }
+                    }
+                }
             }
         }
 

@@ -113,22 +113,14 @@ impl Default for HistoryActionInspector {
 
 pub fn undo(
     mut commands: Commands,
-    // mut globals: ResMut<Globals>,
     mut history: ResMut<History>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut action_event_reader: EventReader<Action>,
     mut user_state: ResMut<UserState>,
     maps: ResMut<Maps>,
-    // mut bezier_query: Query<(Entity, &Handle<Bezier>)>,
+    mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Undo) {
-        //
-        // println!("undo: {:?}", history.actions.iter().count());
-        //
-
-        // let index = history.index;
-        // println!("tried index: {:?}", index);
-
         if history.index == -1 {
             info!(
                 "undo has reached the end of the history: {:?}",
@@ -136,11 +128,6 @@ pub fn undo(
             );
             return ();
         }
-
-        // if index + 1 > 0 {
-        //     history.index -= 1;
-        //     println!("history index now: {:?}", history.index);
-        // }
 
         let previous_hist_action = history.actions[history.index as usize].clone();
 
@@ -152,16 +139,20 @@ pub fn undo(
                 anchor,
             } => {
                 // println!("undo: MovedAnchor");
-                let handle_entity = maps.bezier_map[&bezier_id.into()].clone();
-                let bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
+                let handle_entities = maps.bezier_map[&bezier_id.into()].clone();
+                let bezier = bezier_curves.get_mut(&handle_entities.handle).unwrap();
 
-                bezier.set_position(anchor, previous_position);
+                bezier.move_once(
+                    &mut commands,
+                    bezier_id.into(),
+                    previous_position,
+                    anchor,
+                    maps.as_ref(),
+                );
 
-                bezier.do_compute_lut = true;
+                // bezier.move_partner_once(anchor, &maps, &mut bezier_curves);
 
-                // move the latched partner anchor
                 let anchor_edge = anchor.to_edge_with_controls();
-
                 if let Some(_) = bezier.latches.get(&anchor_edge) {
                     let latch_info = bezier.get_anchor_latch_info(anchor);
 
@@ -200,16 +191,16 @@ pub fn undo(
             } => {
                 let handle_entity_1 = maps.bezier_map[&bezier_id_1.into()].clone();
                 let bezier_1 = bezier_curves.get_mut(&handle_entity_1.handle).unwrap();
-                bezier_1.latches.remove(&anchor_1.to_edge());
+                bezier_1.latches.remove(&anchor_1);
 
                 let handle_entity_2 = maps.bezier_map[&bezier_id_2.into()].clone();
                 let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
-                bezier_2.latches.remove(&anchor_2.to_edge());
+                bezier_2.latches.remove(&anchor_2);
             }
 
             HistoryAction::Unlatched {
-                self_id,           //Handle<Bezier>,
-                partner_bezier_id, //Handle<Bezier>,
+                self_id,
+                partner_bezier_id,
                 self_anchor,
                 partner_anchor,
             } => {
@@ -219,22 +210,22 @@ pub fn undo(
 
                 let latch_1 = LatchData {
                     latched_to_id: partner_bezier_id.into(),
-                    self_edge: self_anchor.to_edge(),
-                    partners_edge: partner_anchor.to_edge(),
+                    self_edge: self_anchor,
+                    partners_edge: partner_anchor,
                 };
 
-                bezier_1.latches.insert(self_anchor.to_edge(), latch_1);
+                bezier_1.latches.insert(self_anchor, latch_1);
 
                 let handle_entity_2 = maps.bezier_map[&partner_bezier_id.into()].clone();
                 let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
 
                 let latch_2 = LatchData {
                     latched_to_id: self_id.into(),
-                    self_edge: partner_anchor.to_edge(),
-                    partners_edge: self_anchor.to_edge(),
+                    self_edge: partner_anchor,
+                    partners_edge: self_anchor,
                 };
 
-                bezier_2.latches.insert(partner_anchor.to_edge(), latch_2);
+                bezier_2.latches.insert(partner_anchor, latch_2);
             }
 
             _ => (),
@@ -256,30 +247,32 @@ pub fn add_to_history(
             history.actions = history.actions[0..(history.index + 1) as usize].to_vec();
         }
 
-        match hist_event {
-            //
-            x @ HistoryAction::MovedAnchor { .. } => {
-                history.actions.push(x.clone());
-            }
-
-            x @ HistoryAction::SpawnedCurve { .. } => {
-                history.actions.push(x.clone());
-            }
-            x @ HistoryAction::DeletedCurve { .. } => {
-                // info!("pushing deleted curve");
-                history.actions.push(x.clone());
-            }
-            x @ HistoryAction::Latched { .. } => {
-                history.actions.push(x.clone());
-            }
-            x @ HistoryAction::Unlatched { .. } => {
-                history.actions.push(x.clone());
-            }
-            _ => {}
-        }
+        history.actions.push(hist_event.clone());
 
         // move history head forward
         history.index += 1;
+
+        // match hist_event {
+        //     //
+        //     x @ HistoryAction::MovedAnchor { .. } => {
+        //         history.actions.push(x.clone());
+        //     }
+
+        //     x @ HistoryAction::SpawnedCurve { .. } => {
+        //         history.actions.push(x.clone());
+        //     }
+        //     x @ HistoryAction::DeletedCurve { .. } => {
+        //         // info!("pushing deleted curve");
+        //         history.actions.push(x.clone());
+        //     }
+        //     x @ HistoryAction::Latched { .. } => {
+        //         history.actions.push(x.clone());
+        //     }
+        //     x @ HistoryAction::Unlatched { .. } => {
+        //         history.actions.push(x.clone());
+        //     }
+        //     _ => {}
+        // }
     }
 }
 
@@ -324,6 +317,7 @@ pub fn redo(
     mut user_state: ResMut<UserState>,
     // mut lut_event_writer: EventWriter<ComputeLut>,
     mut delete_curve_event_writer: EventWriter<RedoDelete>,
+    mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
     // mut selection: ResMut<Selection>,
     maps: ResMut<Maps>,
 ) {
@@ -349,7 +343,10 @@ pub fn redo(
                 new_position,
                 previous_position: _,
             } => {
-                // info!("redoing moving");
+                // info!(
+                //     "redoing moving: {:?} to new_position: {:?}",
+                //     anchor, new_position
+                // );
                 let handle_entity = maps.bezier_map[&bezier_id.into()].clone();
                 let bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
                 // let mut new_bezier = bezier.clone();
@@ -358,14 +355,33 @@ pub fn redo(
                 // lut_event_writer.send(ComputeLut);
                 bezier.do_compute_lut = true;
 
+                let moving_anchor_event = MoveAnchorEvent {
+                    bezier_id: bezier.id,
+                    anchor: anchor.clone(),
+                    unlatch: false,
+                    once: true,
+                    // is_clicked: false,
+                };
+
+                move_anchor_event_writer.send(moving_anchor_event);
+
                 // let latch_info = bezier.get_mover_latch_info();
                 // update_latched_partner_position(&maps.bezier_map, &mut bezier_curves, latch_info);
 
                 // move the latched partner anchor
                 let anchor_edge = anchor.to_edge_with_controls();
 
-                if let Some(_) = bezier.latches.get(&anchor_edge) {
+                if let Some(latch) = bezier.latches.get(&anchor_edge) {
                     let latch_info = bezier.get_anchor_latch_info(anchor);
+
+                    // let moving_partner_anchor_event = MoveAnchorEvent {
+                    //     bezier_id: latch.latched_to_id,
+                    //     anchor: latch.partners_edge.to_anchor(),
+                    //     unlatch: false,
+                    //     once: true,
+                    // };
+
+                    // move_anchor_event_writer.send(moving_partner_anchor_event);
 
                     update_latched_partner_position(
                         &maps.bezier_map,
@@ -417,22 +433,22 @@ pub fn redo(
 
                 let latch_1 = LatchData {
                     latched_to_id: bezier_id_2.into(),
-                    self_edge: anchor_1.to_edge(),
-                    partners_edge: anchor_2.to_edge(),
+                    self_edge: anchor_1,
+                    partners_edge: anchor_2,
                 };
 
-                bezier_1.latches.insert(anchor_1.to_edge(), latch_1);
+                bezier_1.latches.insert(anchor_1, latch_1);
 
                 let handle_entity_2 = maps.bezier_map[&bezier_id_2.into()].clone();
                 let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
 
                 let latch_2 = LatchData {
                     latched_to_id: bezier_id_1.into(),
-                    self_edge: anchor_2.to_edge(),
-                    partners_edge: anchor_1.to_edge(),
+                    self_edge: anchor_2,
+                    partners_edge: anchor_1,
                 };
 
-                bezier_2.latches.insert(anchor_2.to_edge(), latch_2);
+                bezier_2.latches.insert(anchor_2, latch_2);
             }
             _ => {}
         }

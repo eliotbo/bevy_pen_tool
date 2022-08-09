@@ -16,13 +16,14 @@ use once_cell::sync::Lazy;
 
 // 1) undo/redo for groups
 // 2) remove UserState
+// 3) replace move_quad Anchor::All, by event
 
 impl Plugin for PenPlugin {
     fn build(&self, app: &mut App) {
         app
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(SpawnerPlugin)
-            // .add_plugin(InspectorPlugin::<History>::new())
+            .add_plugin(InspectorPlugin::<History>::new())
             .add_plugin(InspectorPlugin::<HistoryInspector>::new().on_window(*SECOND_WINDOW_ID))
             .add_plugin(InspectorPlugin::<HistoryLenInspector>::new().on_window(*SECOND_WINDOW_ID))
             .add_event::<RemoveMovingQuadEvent>()
@@ -130,7 +131,7 @@ use std::collections::HashMap;
 struct BezierPrint {
     pub positions: BezierPositions,
     pub previous_positions: BezierPositions,
-    pub move_quad: Anchor,
+    // pub move_quad: Anchor,
     pub color: Option<Color>,
     pub do_compute_lut: bool,
     pub id: BezierId,
@@ -145,7 +146,7 @@ impl BezierPrint {
         Self {
             positions: bezier.positions.clone(),
             previous_positions: bezier.positions.clone(),
-            move_quad: bezier.move_quad,
+            // move_quad: bezier.move_quad,
             color: None,
             do_compute_lut: false,
             id: bezier.id,

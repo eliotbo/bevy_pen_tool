@@ -1,8 +1,8 @@
 use bevy_pen_tool_plugin::{Bezier, Globals, PenPlugin};
 use bevy_pen_tool_spawner::util::UiBoard;
 
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::{prelude::*, render::camera::OrthographicProjection};
-
 // TODO:
 // - make whole group move when selected
 // - add enabled/disabled to buttons
@@ -22,6 +22,8 @@ fn main() {
             // vsync: true,
             ..Default::default()
         })
+        // .add_plugin(LogDiagnosticsPlugin::default())
+        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugins(DefaultPlugins)
         .add_plugin(CamPlugin)
         .add_startup_system(camera_setup)

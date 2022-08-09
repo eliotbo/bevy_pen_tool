@@ -44,11 +44,9 @@ use std::io::Write;
 //     }
 // }
 
-// TODO: HEEEEEEERE --> stop using bezier.move_quad
-// TODO: don't scan all curves.
 pub fn update_lut(
     mut bezier_assets: ResMut<Assets<Bezier>>,
-    bezier_handles: Query<&Handle<Bezier>>,
+    bezier_handles: Query<&Handle<Bezier>, (With<MovingAnchor>, With<AchorEdgeQuad>)>,
     globals: ResMut<Globals>,
     mut groups: ResMut<Assets<Group>>,
     maps: ResMut<Maps>,
@@ -57,22 +55,20 @@ pub fn update_lut(
     let mut bezier_partners_to_update = HashSet::new();
     for b_handle in bezier_handles.iter() {
         if let Some(bezier) = bezier_assets.get_mut(b_handle) {
-            if bezier.move_quad != Anchor::None {
-                bezier.compute_lut_walk(globals.group_lut_num_points as usize);
+            bezier.compute_lut_walk(globals.group_lut_num_points as usize);
 
-                for (_parter_anchor, latch) in bezier.latches.iter() {
-                    if let Some(handle) = maps.bezier_map.get(&latch.latched_to_id) {
-                        bezier_partners_to_update.insert(&handle.handle);
-                    }
+            for (_parter_anchor, latch) in bezier.latches.iter() {
+                if let Some(handle) = maps.bezier_map.get(&latch.latched_to_id) {
+                    bezier_partners_to_update.insert(&handle.handle);
                 }
+            }
 
-                // if curve is part of a group, recompute the group lut
-                if let Some(_id) = bezier.group {
-                    for (group_handle_id, group) in groups.iter_mut() {
-                        // if _id == group_handle_id.id {
-                        if group.bezier_handles.contains(b_handle) {
-                            groups_to_update.insert(group_handle_id);
-                        }
+            // if curve is part of a group, recompute the group lut
+            if let Some(_id) = bezier.group {
+                for (group_handle_id, group) in groups.iter_mut() {
+                    // if _id == group_handle_id.id {
+                    if group.bezier_handles.contains(b_handle) {
+                        groups_to_update.insert(group_handle_id);
                     }
                 }
             }
@@ -101,10 +97,10 @@ pub fn update_lut(
 
 // TODO: make this run only when an anchor actually moves
 pub fn update_anchors(
-    mut commands: Commands,
+    // mut commands: Commands,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<(Entity, &Handle<Bezier>, &Anchor, &MovingAnchor)>,
-    anchor_query: Query<(Entity, &Handle<Bezier>), With<AchorEdgeQuad>>,
+    mut query: Query<(&Handle<Bezier>, &Anchor, &MovingAnchor)>,
+    // anchor_query: Query<(Entity, &Handle<Bezier>), With<AchorEdgeQuad>>,
 
     // anchor_move_query: Query<&MoveAnchor>,
     // globals: Res<Globals>,
@@ -115,7 +111,7 @@ pub fn update_anchors(
 ) {
     // TODO: remove dependency on Cursor
     if cursor.latch.is_empty() {
-        for (entity, bezier_handle, anchor, moving_anchor) in query.iter_mut() {
+        for (bezier_handle, anchor, moving_anchor) in query.iter_mut() {
             //
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
                 //
@@ -130,8 +126,10 @@ pub fn update_anchors(
                     // let latch_info = bezier.get_anchor_latch_info(bezier.move_quad);
                     let latch_info = bezier.get_anchor_latch_info(*anchor);
 
+                    // println!("latch_info: {:?}", latch_info);
+
                     if let Some(_) = latch_info {
-                        info!("latch info: {:#?}", latch_info);
+                        // info!("update_latched_partner_position",);
 
                         update_latched_partner_position(
                             &maps.bezier_map,
@@ -139,6 +137,7 @@ pub fn update_anchors(
                             latch_info,
                         );
 
+                        // once a latch is found, no need to search for more
                         break;
                     }
                 }
@@ -198,17 +197,17 @@ pub fn bezier_anchor_order(
                     latched_beziers.push(bezier.id);
                 }
 
-                info!(
-                    "Adding MovingQuad to Bezier with anchor {:?}",
-                    move_anchor.anchor
-                );
+                // info!(
+                //     "Adding MovingQuad to Bezier with anchor {:?}",
+                //     move_anchor.anchor
+                // );
 
                 // Insert MovingAnchor to the latched anchors
                 if let Some(latch_data) = bezier
                     .latches
                     .get(&move_anchor.anchor.to_edge_with_controls())
                 {
-                    info!("Latched anchor found");
+                    // info!("Latched anchor found");
                     // get partner entity
                     let partner_map = &maps
                         .bezier_map
@@ -234,7 +233,7 @@ pub fn bezier_anchor_order(
 
                 commands.entity(anchor_entity).insert(MovingAnchor {
                     once: move_anchor.once,
-                    is_clicked: true,
+                    is_clicked: !move_anchor.once,
                 });
                 commands.entity(adjoint_anchor_entity).insert(MovingAnchor {
                     once: move_anchor.once,
@@ -323,7 +322,7 @@ pub fn bezier_anchor_order(
     // Move the whole chain -> Anchor::All is sent
     for handle in latched_chain_whole_curve.iter() {
         let bezier = bezier_curves.get_mut(handle).unwrap();
-        bezier.move_quad = Anchor::All;
+        // bezier.move_quad = Anchor::All;
 
         bezier.update_previous_pos();
     }
@@ -651,10 +650,11 @@ pub fn groupy(
 pub fn latchy(
     cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    query: Query<(&Handle<Bezier>, &BezierParent)>,
+    query: Query<(&Handle<Bezier>, &AchorEdgeQuad), With<MovingAnchor>>,
 
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
+    non_moving_edge_query: Query<(&Handle<Bezier>, &AchorEdgeQuad), Without<MovingAnchor>>,
 
     maps: Res<Maps>,
 ) {
@@ -671,28 +671,21 @@ pub fn latchy(
         )> = None;
 
         // find moving quad and store its parameters
-
-        // TODO: insert a Moving component to a moving anchor
-        for (bezier_handle, _bb) in query.iter() {
+        for (bezier_handle, anchor_edge) in query.iter() {
             let mut bezier = bezier_curves.get(bezier_handle).unwrap().clone();
             bezier.potential_latch = None;
-            if bezier.edge_is_moving() {
-                // a latched point does not latch to an additional point
-                let moving_anchor = bezier.get_mover_edge();
-                if bezier.quad_is_latched(&moving_anchor) {
-                    return (); // TODO: find out if this introduces a bug
-                }
 
-                let mover_pos = cursor.position;
-                potential_mover = Some((
-                    mover_pos,
-                    bezier.id,
-                    bezier.get_mover_edge(),
-                    bezier_handle.clone(),
-                ));
-
-                break;
+            // a latched point does not latch to an additional point
+            let moving_anchor = anchor_edge.0;
+            if bezier.quad_is_latched(&moving_anchor) {
+                return (); // TODO: find out if this introduces a bug
             }
+
+            let mover_pos = cursor.position;
+            potential_mover = Some((mover_pos, bezier.id, moving_anchor, bezier_handle.clone()));
+
+            // only runs once so as to not latch to multiple achor edges
+            break;
         }
 
         // find quad within latching_distance. Upon success, setup a latch and store the
@@ -703,8 +696,10 @@ pub fn latchy(
                 globals.anchor_clicking_dist,
                 pos,
                 &bezier_curves,
-                &query,
+                // &query,
+                &non_moving_edge_query,
             ) {
+                // println!("processing Partner latch");
                 let partner_bezier = bezier_curves.get_mut(&partner_handle.clone()).unwrap();
 
                 // if the potential partner is free, continue
@@ -731,6 +726,7 @@ pub fn latchy(
 
                 // event_writer.send(OfficialLatch(partner_latch_data, partner_handle.clone()));
             } else {
+                // if no partner is found, remove the potential latch
                 let bezier = bezier_curves.get(&mover_handle).unwrap().clone();
 
                 if let Some(potential_latch) = bezier.potential_latch {
@@ -784,26 +780,39 @@ pub fn officiate_latch_partnership(
     audio: Res<Audio>,
     maps: ResMut<Maps>,
 ) {
-    let mut latch_ids = Vec::new();
     for OfficialLatch(latch, bezier_handle) in latch_event_reader.iter() {
-        let bezier = bezier_curves.get_mut(bezier_handle).unwrap();
-        bezier.set_latch(latch.clone());
-        bezier.compute_lut_walk(100);
+        let bezier_1 = bezier_curves.get_mut(bezier_handle).unwrap();
 
-        // bezier.has_just_latched = true;
+        bezier_1.latches.insert(latch.self_edge, latch.clone());
+        bezier_1.compute_lut_walk(100); // TODO: is this useful? also, it should be dependent on a global var
 
-        // push to history action
-        if !latch_ids.contains(&bezier.id) && !latch_ids.contains(&latch.latched_to_id) {
-            history_action_event_writer.send(HistoryAction::Latched {
-                self_id: bezier.id.into(),
-                self_anchor: latch.self_edge.to_anchor(),
-                partner_bezier_id: latch.latched_to_id.into(),
-                partner_anchor: latch.partners_edge.to_anchor(),
-            });
-        }
+        let bezier_1_id = bezier_1.id;
 
-        latch_ids.push(bezier.id);
-        latch_ids.push(latch.latched_to_id);
+        //
+        ///////////// partner //////////////////////////////////
+
+        let handle_entity_2 = maps.bezier_map[&latch.latched_to_id.into()].clone();
+        let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
+
+        let latch_2 = LatchData {
+            latched_to_id: bezier_1_id.into(),
+            self_edge: latch.partners_edge,
+            partners_edge: latch.self_edge,
+        };
+
+        bezier_2.latches.insert(latch.partners_edge, latch_2);
+        // TODO: is this useful? also, it should be dependent on a global var
+        bezier_2.compute_lut_walk(100);
+
+        ///////////// partner //////////////////////////////////
+        //
+
+        history_action_event_writer.send(HistoryAction::Latched {
+            self_id: bezier_1_id.into(),
+            partner_bezier_id: bezier_2.id.into(),
+            self_anchor: latch.self_edge,
+            partner_anchor: latch.partners_edge,
+        });
 
         if globals.sound_on {
             if let Some(sound) = maps.sounds.get("latch") {
@@ -1017,10 +1026,9 @@ pub fn delete(
 
                         let unlatched = HistoryAction::Unlatched {
                             self_id: self_id.into(),
-
                             partner_bezier_id: latch_data.latched_to_id.into(),
-                            self_anchor: latch_data.self_edge.to_anchor(),
-                            partner_anchor: latch_data.partners_edge.to_anchor(),
+                            self_anchor: latch_data.self_edge,
+                            partner_anchor: latch_data.partners_edge,
                         };
 
                         // info!("unlatched: {:?}", unlatched);

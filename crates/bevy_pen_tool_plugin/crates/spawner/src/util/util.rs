@@ -78,7 +78,7 @@ impl From<&Group> for GroupHist {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Inspectable)]
 pub enum HistoryAction {
     MovedAnchor {
         bezier_id: BezierHistId,
@@ -99,16 +99,16 @@ pub enum HistoryAction {
 
     Latched {
         self_id: BezierHistId,
-        self_anchor: Anchor,
+        self_anchor: AnchorEdge,
         partner_bezier_id: BezierHistId,
-        partner_anchor: Anchor,
+        partner_anchor: AnchorEdge,
     },
 
     Unlatched {
         self_id: BezierHistId,
         partner_bezier_id: BezierHistId,
-        self_anchor: Anchor,
-        partner_anchor: Anchor,
+        self_anchor: AnchorEdge,
+        partner_anchor: AnchorEdge,
     },
 
     // MovedGroup {
@@ -136,7 +136,7 @@ impl Default for HistoryAction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Inspectable)]
 pub struct History {
     pub actions: Vec<HistoryAction>,
     pub index: i32,
@@ -317,6 +317,12 @@ impl Anchor {
             _ => {
                 panic!("Anchor::None has no adjoint!");
             }
+        }
+    }
+    pub fn is_edge(&self) -> bool {
+        match self {
+            Self::Start | Self::End => true,
+            _ => false,
         }
     }
 }
@@ -1018,7 +1024,7 @@ impl fmt::Display for BezierId {
 #[derive(Component)]
 pub struct MovingAnchor {
     pub once: bool,       // if true, the anchor will move for only one frame
-    pub is_clicked: bool, // if true, the anchor is the adjoint of actively moving anchor
+    pub is_clicked: bool, // if false, the anchor is the adjoint of actively moving anchor
 }
 
 // pub struct MoveQuadEvent(pub BezierId);
@@ -1029,7 +1035,7 @@ pub struct MovingAnchor {
 pub struct Bezier {
     pub positions: BezierPositions,
     pub previous_positions: BezierPositions, // was useful for an undo functionality
-    pub move_quad: Anchor,
+    // pub move_quad: Anchor,
     pub color: Option<Color>,
     pub do_compute_lut: bool,
     pub lut: LutDistance,
@@ -1052,7 +1058,7 @@ impl Default for Bezier {
             id: BezierId::default(),
             positions: BezierPositions::default(),
             previous_positions: BezierPositions::default(),
-            move_quad: Anchor::default(),
+            // move_quad: Anchor::default(),
             color: None,
             lut: LutDistance::default(),
             potential_latch: None,
@@ -1196,23 +1202,23 @@ impl Bezier {
         }
     }
 
-    pub fn get_mover_edge(&self) -> AnchorEdge {
-        match self.move_quad {
-            Anchor::Start => AnchorEdge::Start,
-            Anchor::End => AnchorEdge::End,
-            _ => {
-                println!("Warning: could not get mover edge, returning AnchorEdge::End by default");
-                return AnchorEdge::End;
-            }
-        }
-    }
+    // pub fn get_mover_edge(&self) -> AnchorEdge {
+    //     match self.move_quad {
+    //         Anchor::Start => AnchorEdge::Start,
+    //         Anchor::End => AnchorEdge::End,
+    //         _ => {
+    //             println!("Warning: could not get mover edge, returning AnchorEdge::End by default");
+    //             return AnchorEdge::End;
+    //         }
+    //     }
+    // }
 
-    pub fn edge_is_moving(&self) -> bool {
-        if self.move_quad == Anchor::Start || self.move_quad == Anchor::End {
-            return true;
-        }
-        return false;
-    }
+    // pub fn edge_is_moving(&self) -> bool {
+    //     if self.move_quad == Anchor::Start || self.move_quad == Anchor::End {
+    //         return true;
+    //     }
+    //     return false;
+    // }
 
     pub fn set_latch(&mut self, latch: LatchData) {
         // self.latches[&latch.self_edge] = vec![latch.clone()];
@@ -1384,34 +1390,34 @@ impl Bezier {
     //     }
     // }
 
-    // gives the LatchData of the anchor that is attached to the moving anchor
-    pub fn get_mover_latch_info(&self) -> Option<(LatchData, Vec2, Vec2)> {
-        match self.move_quad {
-            Anchor::Start | Anchor::ControlStart => {
-                if let Some(latch_start) = self.latches.get(&AnchorEdge::Start) {
-                    let latch_partner_id = latch_start.clone();
-                    let partner_position = self.positions.start;
+    // // gives the LatchData of the anchor that is attached to the moving anchor
+    // pub fn get_mover_latch_info(&self) -> Option<(LatchData, Vec2, Vec2)> {
+    //     match self.move_quad {
+    //         Anchor::Start | Anchor::ControlStart => {
+    //             if let Some(latch_start) = self.latches.get(&AnchorEdge::Start) {
+    //                 let latch_partner_id = latch_start.clone();
+    //                 let partner_position = self.positions.start;
 
-                    // The control points of latched edges are facing each other
-                    let opposite_control =
-                        2.0 * self.positions.start - self.positions.control_start;
-                    return Some((latch_partner_id, partner_position, opposite_control));
-                }
-                return None;
-            }
-            Anchor::End | Anchor::ControlEnd => {
-                if let Some(latch_end) = self.latches.get(&AnchorEdge::End) {
-                    let latch_partner_id = latch_end.clone();
-                    let partner_position = self.positions.end;
+    //                 // The control points of latched edges are facing each other
+    //                 let opposite_control =
+    //                     2.0 * self.positions.start - self.positions.control_start;
+    //                 return Some((latch_partner_id, partner_position, opposite_control));
+    //             }
+    //             return None;
+    //         }
+    //         Anchor::End | Anchor::ControlEnd => {
+    //             if let Some(latch_end) = self.latches.get(&AnchorEdge::End) {
+    //                 let latch_partner_id = latch_end.clone();
+    //                 let partner_position = self.positions.end;
 
-                    let opposite_control = 2.0 * self.positions.end - self.positions.control_end;
-                    return Some((latch_partner_id, partner_position, opposite_control));
-                }
-                return None;
-            }
-            _ => None,
-        }
-    }
+    //                 let opposite_control = 2.0 * self.positions.end - self.positions.control_end;
+    //                 return Some((latch_partner_id, partner_position, opposite_control));
+    //             }
+    //             return None;
+    //         }
+    //         _ => None,
+    //     }
+    // }
 
     // gives the LatchData of the anchor that is attached to the moving anchor
     pub fn get_anchor_latch_info(&self, anchor: Anchor) -> Option<(LatchData, Vec2, Vec2)> {
@@ -1443,7 +1449,7 @@ impl Bezier {
     }
 
     pub fn generate_start_latch_on_spawn(&self, anchor_edge: AnchorEdge) -> Latch {
-        let mut rng = thread_rng();
+        // let mut rng = thread_rng();
         match anchor_edge {
             AnchorEdge::Start => Latch {
                 position: self.positions.start,
@@ -1497,6 +1503,72 @@ impl Bezier {
             }
         }
     }
+
+    pub fn move_once(
+        &mut self,
+        commands: &mut Commands,
+        id: BezierId,
+        pos: Vec2,
+        anchor: Anchor,
+        maps: &Maps,
+    ) {
+        self.set_position(anchor, pos);
+
+        self.do_compute_lut = true;
+
+        let handle_entities = maps.bezier_map[&id.into()].clone();
+
+        let anchor_entity = handle_entities.anchor_entities[&anchor];
+
+        commands.entity(anchor_entity).insert(MovingAnchor {
+            once: true,
+            is_clicked: false,
+        });
+
+        let adjoint_anchor_entity = handle_entities.anchor_entities[&anchor.adjoint()];
+
+        commands.entity(adjoint_anchor_entity).insert(MovingAnchor {
+            once: true,
+            is_clicked: false,
+        });
+
+        // move_anchor_event_writer.send(moving_partner_anchor_event);
+        let anchor_edge = anchor.to_edge_with_controls();
+        if let Some(latch) = self.latches.get(&anchor_edge) {
+            let partner_handle_entity = maps.bezier_map[&latch.latched_to_id.into()].clone();
+
+            commands
+                .entity(partner_handle_entity.anchor_entities[&latch.partners_edge.to_anchor()])
+                .insert(MovingAnchor {
+                    once: true,
+                    is_clicked: false,
+                });
+
+            commands
+                .entity(
+                    partner_handle_entity.anchor_entities
+                        [&latch.partners_edge.to_anchor().adjoint()],
+                )
+                .insert(MovingAnchor {
+                    once: true,
+                    is_clicked: false,
+                });
+        }
+    }
+
+    // pub fn move_partner_once(
+    //     &self,
+    //     anchor: Anchor,
+    //     maps: &Maps,
+    //     bezier_curves: &mut ResMut<Assets<Bezier>>,
+    // ) {
+    //     let anchor_edge = anchor.to_edge_with_controls();
+    //     if let Some(_) = self.latches.get(&anchor_edge) {
+    //         let latch_info = self.get_anchor_latch_info(anchor);
+
+    //         update_latched_partner_position(&maps.bezier_map, bezier_curves, latch_info);
+    //     }
+    // }
 
     pub fn bounding_box(&self) -> (Vec2, Vec2) {
         let bezier_coord = self.to_coord2();
@@ -1833,23 +1905,35 @@ pub fn get_close_still_unlatched_anchor(
     max_dist: f32,
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
-    query: &Query<(&Handle<Bezier>, &BezierParent)>,
+    query: &Query<(&Handle<Bezier>, &AchorEdgeQuad), Without<MovingAnchor>>,
 ) -> Option<(f32, AnchorEdge, Handle<Bezier>)> {
-    for (bezier_handle, _bb) in query.iter() {
+    for (bezier_handle, anchor_edge) in query.iter() {
         if let Some(bezier) = bezier_curves.get(bezier_handle) {
-            let distance_to_start = (bezier.positions.start - position).length();
-            let distance_to_endpoint = (bezier.positions.end - position).length();
+            if !bezier.quad_is_latched(&anchor_edge.0) {
+                //
+                let distance_to_anchor = match anchor_edge.0 {
+                    AnchorEdge::Start => (bezier.positions.start - position).length(),
+                    AnchorEdge::End => (bezier.positions.end - position).length(),
+                };
 
-            if distance_to_start < max_dist
-                && (bezier.move_quad != Anchor::Start)
-                && !bezier.quad_is_latched(&AnchorEdge::Start)
-            {
-                return Some((distance_to_start, AnchorEdge::Start, bezier_handle.clone()));
-            } else if distance_to_endpoint < max_dist
-                && (bezier.move_quad != Anchor::End)
-                && !bezier.quad_is_latched(&AnchorEdge::End)
-            {
-                return Some((distance_to_endpoint, AnchorEdge::End, bezier_handle.clone()));
+                if distance_to_anchor < max_dist {
+                    return Some((distance_to_anchor, anchor_edge.0, bezier_handle.clone()));
+                }
+
+                // let distance_to_start = (bezier.positions.start - position).length();
+                // let distance_to_endpoint = (bezier.positions.end - position).length();
+
+                // if distance_to_start < max_dist
+                // // && (bezier.move_quad != Anchor::Start)
+                // && !bezier.quad_is_latched(&AnchorEdge::Start)
+                // {
+                //     return Some((distance_to_start, AnchorEdge::Start, bezier_handle.clone()));
+                // } else if distance_to_endpoint < max_dist
+                // // && (bezier.move_quad != Anchor::End)
+                // && !bezier.quad_is_latched(&AnchorEdge::End)
+                // {
+                //     return Some((distance_to_endpoint, AnchorEdge::End, bezier_handle.clone()));
+                // }
             }
         }
     }
@@ -1860,26 +1944,22 @@ pub fn get_close_still_anchor(
     max_dist: f32,
     position: Vec2,
     bezier_curves: &ResMut<Assets<Bezier>>,
-    query: &Query<(&Handle<Bezier>, &BezierParent)>,
+    query: &Query<(&Handle<Bezier>, &AchorEdgeQuad), Without<MovingAnchor>>,
 ) -> Option<(f32, AnchorEdge, BezierId, bool)> {
-    for (bezier_handle, _bb) in query.iter() {
+    for (bezier_handle, anchor_edge) in query.iter() {
         if let Some(bezier) = bezier_curves.get(bezier_handle) {
-            let distance_to_start = (bezier.positions.start - position).length();
-            let distance_to_endpoint = (bezier.positions.end - position).length();
+            //
+            let distance_to_anchor = match anchor_edge.0 {
+                AnchorEdge::Start => (bezier.positions.start - position).length(),
+                AnchorEdge::End => (bezier.positions.end - position).length(),
+            };
 
-            if distance_to_start < max_dist && (bezier.move_quad != Anchor::Start) {
+            if distance_to_anchor < max_dist {
                 return Some((
-                    distance_to_start,
-                    AnchorEdge::Start,
+                    distance_to_anchor,
+                    anchor_edge.0,
                     bezier.id.clone(),
-                    bezier.quad_is_latched(&AnchorEdge::Start),
-                ));
-            } else if distance_to_endpoint < max_dist && (bezier.move_quad != Anchor::End) {
-                return Some((
-                    distance_to_endpoint,
-                    AnchorEdge::End,
-                    bezier.id.clone(),
-                    bezier.quad_is_latched(&AnchorEdge::End),
+                    bezier.quad_is_latched(&anchor_edge.0),
                 ));
             }
         }

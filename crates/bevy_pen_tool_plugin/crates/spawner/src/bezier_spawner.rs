@@ -101,18 +101,19 @@ pub fn spawn_bezier_system(
                 control_end,
             },
             previous_positions: BezierPositions::default(),
-            move_quad: Anchor::End,
+            // move_quad: Anchor::End,
             id: default_spawner_id,
             latches,
             ..Default::default()
         };
 
+        // if the spawn if sent from a redo action
         if let Some(bezier_hist) = maybe_bezier_hist {
             do_send_to_history = false;
             bezier.positions = bezier_hist.positions.clone();
             bezier.latches = bezier_hist.latches.clone();
             bezier.color = bezier_hist.color.clone();
-            bezier.move_quad = Anchor::None;
+            // bezier.move_quad = Anchor::None;
             bezier.id = bezier_hist.id.into();
             bezier.do_compute_lut = true;
             // the id part is done above
@@ -303,9 +304,9 @@ pub fn spawn_bezier(
 
             add_to_history_event_writer.send(HistoryAction::Latched {
                 self_id: bezier.id.into(),
-                self_anchor: latch.self_edge.to_anchor(),
+                self_anchor: latch.self_edge,
                 partner_bezier_id: latch.latched_to_id.into(),
-                partner_anchor: latch.partners_edge.to_anchor(),
+                partner_anchor: latch.partners_edge,
             });
         }
     }
