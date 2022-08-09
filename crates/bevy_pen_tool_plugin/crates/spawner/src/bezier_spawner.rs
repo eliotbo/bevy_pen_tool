@@ -1,10 +1,10 @@
 use crate::inputs::{Cursor, Latch};
 
 use crate::util::{
-    Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent,
-    BezierHandleEntity, BezierHist, BezierId, BezierMidMat, BezierParent, BezierPositions,
-    BoundingBoxQuad, ControlPointQuad, EndpointQuad, Globals, HistoryAction, LatchData, Maps,
-    MiddlePointQuad, SelectionMat, SpawnMids, UserState,
+    AchorEdgeQuad, Anchor, AnchorEdge, AnchorEntities, Bezier, BezierControlsMat, BezierEndsMat,
+    BezierGrandParent, BezierHandleEntity, BezierHist, BezierId, BezierMidMat, BezierParent,
+    BezierPositions, BoundingBoxQuad, ControlPointQuad, Globals, HistoryAction, LatchData, Maps,
+    MiddlePointQuad, MoveAnchorEvent, MovingAnchor, SelectionMat, SpawnMids, UserState,
 };
 
 use bevy::{asset::HandleId, prelude::*, sprite::MaterialMesh2dBundle};
@@ -30,6 +30,7 @@ pub fn spawn_bezier_system(
     mut latch_event_reader: EventReader<Latch>,
     mut user_state: ResMut<UserState>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
+    mut move_quad_event_writer: EventWriter<MoveAnchorEvent>,
     // cam_query: Query<&Transform, With<OrthographicProjection>>,
 ) {
     let mut do_send_to_history = true;
@@ -119,6 +120,21 @@ pub fn spawn_bezier_system(
             do_nothing = true;
         } else {
             do_move_anchor = true;
+            // move_quad_event_writer.send(MoveQuadEvent(bezier.id));
+
+            // move_quad_event_writer.send(MoveAnchorEvent {
+            //     bezier_id: bezier.id,
+            //     anchor: Anchor::End,
+            //     unlatch: false,
+            //     once: false, // if true, MovingQuad will be removed after a single frame
+            // });
+
+            // move_quad_event_writer.send(MoveAnchorEvent {
+            //     bezier_id: bezier.id,
+            //     anchor: Anchor::Start,
+            //     unlatch: false,
+            //     once: true, // if true, MovingQuad will be removed after a single frame
+            // });
         }
 
         bezier.update_previous_pos();
@@ -268,14 +284,6 @@ pub fn spawn_bezier(
         ))
         .id();
 
-    maps.bezier_map.insert(
-        bezier.id,
-        BezierHandleEntity {
-            handle: bezier_handle.clone(),
-            entity: Some(parent),
-        },
-    );
-
     if do_send_to_history {
         add_to_history_event_writer.send(HistoryAction::SpawnedCurve {
             // bezier_handle: bezier_handle.clone(),
@@ -361,8 +369,13 @@ pub fn spawn_bezier(
             material: ends_params_handle.clone(),
             ..Default::default()
         })
-        .insert(EndpointQuad(AnchorEdge::Start))
+        .insert(AchorEdgeQuad(AnchorEdge::Start))
+        .insert(Anchor::Start)
         .insert(bezier_handle.clone())
+        .insert(MovingAnchor {
+            once: true,
+            is_clicked: false,
+        })
         // .insert(shader_params_handle_bb.clone())
         .id();
 
@@ -380,7 +393,12 @@ pub fn spawn_bezier(
             // )]),
             ..Default::default()
         })
-        .insert(EndpointQuad(AnchorEdge::End))
+        .insert(AchorEdgeQuad(AnchorEdge::End))
+        .insert(Anchor::End)
+        .insert(MovingAnchor {
+            once: false,
+            is_clicked: true,
+        })
         .insert(bezier_handle.clone())
         // .insert(shader_params_handle_bb.clone())
         .id();
@@ -398,50 +416,137 @@ pub fn spawn_bezier(
         visible_ctrl.is_visible = true;
     };
 
-    // control points
-    for k in 0..2 {
-        // let z_ctr = pos_z + 50.0 + (k as f32) * 10.0;
-        let mut ctr_pos_transform =
-            Transform::from_translation(ctr0_pos.extend(globals.z_pos.controls));
+    // // control points
+    // for k in 0..2 {
+    //     // let z_ctr = pos_z + 50.0 + (k as f32) * 10.0;
+    //     let mut ctr_pos_transform =
+    //         Transform::from_translation(ctr0_pos.extend(globals.z_pos.controls));
 
-        let mut point = AnchorEdge::Start;
-        if k == 1 {
-            point = AnchorEdge::End;
-            ctr_pos_transform =
-                Transform::from_translation(ctr1_pos.extend(globals.z_pos.controls));
-        }
+    //     let mut point = AnchorEdge::Start;
+    //     if k == 1 {
+    //         point = AnchorEdge::End;
+    //         ctr_pos_transform =
+    //             Transform::from_translation(ctr1_pos.extend(globals.z_pos.controls));
+    //     }
 
-        let controls_params_handle = controls_params.add(BezierControlsMat {
-            color: color.into(),
-            t: 2.5,
-            zoom: 1.0 / globals.scale,
-            size: Vec2::new(5.0, 5.0) * globals.scale,
-            clearcolor: clearcolor.clone().into(),
+    //     let controls_params_handle = controls_params.add(BezierControlsMat {
+    //         color: color.into(),
+    //         t: 2.5,
+    //         zoom: 1.0 / globals.scale,
+    //         size: Vec2::new(5.0, 5.0) * globals.scale,
+    //         clearcolor: clearcolor.clone().into(),
+    //         ..Default::default()
+    //     });
+
+    //     let child = commands
+    //         .spawn_bundle(MaterialMesh2dBundle {
+    //             mesh: ends_controls_mesh_handle.clone(),
+    //             visibility: visible_ctrl.clone(),
+    //             // render_pipelines: ctrl_render_piplines.clone(),
+    //             transform: ctr_pos_transform,
+    //             material: controls_params_handle.clone(),
+    //             ..Default::default()
+    //         })
+    //         .insert(ControlPointQuad(point))
+    //         .insert(bezier_handle.clone())
+    //         // .insert(shader_params_handle_bb.clone())
+    //         .id();
+
+    //     commands.entity(parent).push_children(&[child]);
+
+    // }
+
+    /////////////////////////////////////////
+    // Control start
+
+    let ctr_pos_transform = Transform::from_translation(ctr0_pos.extend(globals.z_pos.controls));
+
+    let controls_params_handle = controls_params.add(BezierControlsMat {
+        color: color.into(),
+        t: 2.5,
+        zoom: 1.0 / globals.scale,
+        size: Vec2::new(5.0, 5.0) * globals.scale,
+        clearcolor: clearcolor.clone().into(),
+        ..Default::default()
+    });
+
+    let control_start = commands
+        .spawn_bundle(MaterialMesh2dBundle {
+            mesh: ends_controls_mesh_handle.clone(),
+            visibility: visible_ctrl.clone(),
+            // render_pipelines: ctrl_render_piplines.clone(),
+            transform: ctr_pos_transform,
+            material: controls_params_handle.clone(),
             ..Default::default()
-        });
+        })
+        .insert(ControlPointQuad(AnchorEdge::Start))
+        .insert(Anchor::ControlStart)
+        .insert(MovingAnchor {
+            once: true,
+            is_clicked: false,
+        })
+        .insert(bezier_handle.clone())
+        // .insert(shader_params_handle_bb.clone())
+        .id();
 
-        let child = commands
-            .spawn_bundle(MaterialMesh2dBundle {
-                mesh: ends_controls_mesh_handle.clone(),
-                visibility: visible_ctrl.clone(),
-                // render_pipelines: ctrl_render_piplines.clone(),
-                transform: ctr_pos_transform,
-                material: controls_params_handle.clone(),
-                ..Default::default()
-            })
-            .insert(ControlPointQuad(point))
-            .insert(bezier_handle.clone())
-            // .insert(shader_params_handle_bb.clone())
-            .id();
+    commands.entity(parent).push_children(&[control_start]);
 
-        commands.entity(parent).push_children(&[child]);
+    /////////////////////////////////////////
+    // Control end
 
-        // if k == 0 {
-        //     commands.entity(child_start).push_children(&[child]);
-        // } else {
-        //     commands.entity(child_end).push_children(&[child]);
-        // }
-    }
+    let ctr_pos_transform = Transform::from_translation(ctr1_pos.extend(globals.z_pos.controls));
+
+    let controls_params_handle = controls_params.add(BezierControlsMat {
+        color: color.into(),
+        t: 2.5,
+        zoom: 1.0 / globals.scale,
+        size: Vec2::new(5.0, 5.0) * globals.scale,
+        clearcolor: clearcolor.clone().into(),
+        ..Default::default()
+    });
+
+    let control_end = commands
+        .spawn_bundle(MaterialMesh2dBundle {
+            mesh: ends_controls_mesh_handle.clone(),
+            visibility: visible_ctrl.clone(),
+            // render_pipelines: ctrl_render_piplines.clone(),
+            transform: ctr_pos_transform,
+            material: controls_params_handle.clone(),
+            ..Default::default()
+        })
+        .insert(ControlPointQuad(AnchorEdge::End))
+        .insert(Anchor::ControlEnd)
+        .insert(MovingAnchor {
+            once: false,
+            is_clicked: false,
+        })
+        .insert(bezier_handle.clone())
+        // .insert(shader_params_handle_bb.clone())
+        .id();
+
+    commands.entity(parent).push_children(&[control_end]);
+
+    // add entities to the Bezier map.
+    // This map is used to improve query performance
+
+    let anchor_entities = vec![
+        (Anchor::Start, child_start),
+        (Anchor::End, child_end),
+        (Anchor::ControlStart, control_start),
+        (Anchor::ControlEnd, control_end),
+    ]
+    .iter()
+    .cloned()
+    .collect::<HashMap<Anchor, Entity>>();
+
+    maps.bezier_map.insert(
+        bezier.id,
+        BezierHandleEntity {
+            handle: bezier_handle.clone(),
+            entity: parent,
+            anchor_entities,
+        },
+    );
 
     //////////////////// Small moving rings aka middle quads ////////////////////
     let visible = Visibility { is_visible: true };

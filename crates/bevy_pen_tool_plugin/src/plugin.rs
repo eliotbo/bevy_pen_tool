@@ -13,12 +13,8 @@ use bevy_inspector_egui::{Inspectable, InspectorPlugin};
 
 use once_cell::sync::Lazy;
 // TODO
-// 0) change to bevy 0.8
-// 1) undo/redo
-// History of actions
-// on mouseclick, if moving, remember initial position (preivous_position in Cursor)
-// on mouse release, add action to history
-// moved anchor
+
+// 1) undo/redo for groups
 // 2) remove UserState
 
 impl Plugin for PenPlugin {
@@ -26,9 +22,10 @@ impl Plugin for PenPlugin {
         app
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(SpawnerPlugin)
-            .add_plugin(InspectorPlugin::<History>::new())
+            // .add_plugin(InspectorPlugin::<History>::new())
             .add_plugin(InspectorPlugin::<HistoryInspector>::new().on_window(*SECOND_WINDOW_ID))
             .add_plugin(InspectorPlugin::<HistoryLenInspector>::new().on_window(*SECOND_WINDOW_ID))
+            .add_event::<RemoveMovingQuadEvent>()
             .add_event::<GroupBoxEvent>()
             .insert_resource(History::default())
             .insert_resource(HistoryInspector::default())
@@ -38,6 +35,7 @@ impl Plugin for PenPlugin {
             //
             .add_system(debug)
             .add_system(update_history_inspector)
+            .add_system(remove_all_moving_quad)
             //
             // Update controller
             .add_system_set(
@@ -51,8 +49,9 @@ impl Plugin for PenPlugin {
                 SystemSet::on_update("ModelViewController")
                     .with_system(groupy.label("group"))
                     .with_system(load.after("group"))
-                    .with_system(recompute_lut.label("recompute_lut"))
-                    .with_system(save.after("recompute_lut"))
+                    // .with_system(recompute_all_lut.label("recompute_lut"))
+                    // .with_system(save.after("recompute_lut"))
+                    .with_system(save)
                     .with_system(latchy)
                     .with_system(update_lut)
                     .with_system(officiate_latch_partnership)
@@ -102,6 +101,18 @@ impl Plugin for PenPlugin {
                 egui_pass: SECONDARY_EGUI_PASS,
             },
         );
+    }
+}
+
+pub fn remove_all_moving_quad(
+    mut commands: Commands,
+    mut events: EventReader<RemoveMovingQuadEvent>,
+    mut query: Query<(Entity, &MovingAnchor)>,
+) {
+    for _ in events.iter() {
+        for (entity, anchor) in query.iter_mut() {
+            commands.entity(entity).remove::<MovingAnchor>();
+        }
     }
 }
 
@@ -192,7 +203,7 @@ fn create_new_window(mut create_window_events: EventWriter<CreateWindow>) {
         descriptor: WindowDescriptor {
             width: 800.,
             height: 600.,
-            position: WindowPosition::At(Vec2::new(1250., 0.)),
+            position: WindowPosition::At(Vec2::new(1350., 0.)),
             title: "Second window".to_string(),
             ..Default::default()
         },

@@ -1,8 +1,9 @@
 use bevy_pen_tool_spawner::inputs::{Action, Cursor};
 use bevy_pen_tool_spawner::util::{
-    AnchorEdge, Bezier, BezierGrandParent, BezierMidMat, BezierParent, BoundingBoxQuad,
-    ControlPointQuad, EndpointQuad, FollowBezierAnimation, Globals, Group, GroupMiddleQuad,
-    MiddlePointQuad, SelectionMat, TurnRoundAnimation, UiAction, UiBoard,
+    AchorEdgeQuad, AnchorEdge, Bezier, BezierGrandParent, BezierMidMat, BezierParent,
+    BoundingBoxQuad, ControlPointQuad, FollowBezierAnimation, Globals, Group, GroupMiddleQuad,
+    MiddlePointQuad, MovingAnchor, RemoveMovingQuadEvent, SelectionMat, TurnRoundAnimation,
+    UiAction, UiBoard,
 };
 
 use bevy::math::Vec3A;
@@ -178,14 +179,26 @@ pub fn move_bb_quads(
 }
 
 pub fn move_end_quads(
+    mut commands: Commands,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<(&mut Transform, &Handle<Bezier>, &EndpointQuad, &Parent)>,
-    q_parent: Query<&GlobalTransform, (With<BezierParent>, Without<EndpointQuad>)>,
+    mut query: Query<(
+        Entity,
+        &mut Transform,
+        &Handle<Bezier>,
+        &AchorEdgeQuad,
+        &Parent,
+        &MovingAnchor,
+    )>,
+    q_parent: Query<&GlobalTransform, (With<BezierParent>, Without<AchorEdgeQuad>)>,
+    // mut remove_moving_quad_event: EventWriter<RemoveMovingQuadEvent>,
     // globals: Res<Globals>,
 ) {
-    for (mut transform, bezier_handle, endpoint_quad_id, parent) in query.iter_mut() {
+    for (entity, mut transform, bezier_handle, endpoint_quad_id, parent, moving_quad) in
+        query.iter_mut()
+    {
         //
-        let EndpointQuad(point) = endpoint_quad_id;
+        let AchorEdgeQuad(point) = endpoint_quad_id;
+        // info!("point: {:?}", point);
         //
         // checks whether the transforms are equal to the positions in the Bezier data structure
         if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
@@ -210,17 +223,67 @@ pub fn move_end_quads(
                     .extend(transform.translation.z);
                     transform.rotation = end_rotation;
                 }
+
+                if moving_quad.once {
+                    commands.entity(entity).remove::<MovingAnchor>();
+                }
             }
         }
     }
 }
 
+// pub fn move_end_quads(
+//     mut bezier_curves: ResMut<Assets<Bezier>>,
+//     mut query: Query<(&mut Transform, &Handle<Bezier>, &AchorEdgeQuad, &Parent)>,
+//     q_parent: Query<&GlobalTransform, (With<BezierParent>, Without<AchorEdgeQuad>)>,
+//     // globals: Res<Globals>,
+// ) {
+//     for (mut transform, bezier_handle, endpoint_quad_id, parent) in query.iter_mut() {
+//         //
+//         let AchorEdgeQuad(point) = endpoint_quad_id;
+//         //
+//         // checks whether the transforms are equal to the positions in the Bezier data structure
+//         if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
+//             if (*point == AnchorEdge::Start
+//                 && transform.translation.truncate() != bezier.positions.start)
+//                 || (*point == AnchorEdge::End
+//                     && transform.translation.truncate() != bezier.positions.end)
+//             {
+//                 let parent_global_transform = q_parent.get(**parent).unwrap();
+
+//                 let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
+//                     bezier.ends_displacement();
+
+//                 if *point == AnchorEdge::Start {
+//                     transform.translation = (bezier.positions.start + start_displacement
+//                         - parent_global_transform.translation().truncate())
+//                     .extend(transform.translation.z);
+//                     transform.rotation = start_rotation;
+//                 } else {
+//                     transform.translation = (bezier.positions.end + end_displacement
+//                         - parent_global_transform.translation().truncate())
+//                     .extend(transform.translation.z);
+//                     transform.rotation = end_rotation;
+//                 }
+//             }
+//         }
+//     }
+// }
+
 pub fn move_control_quads(
+    mut commands: Commands,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut query: Query<(&mut Transform, &Handle<Bezier>, &ControlPointQuad, &Parent)>,
+    mut query: Query<(
+        Entity,
+        &mut Transform,
+        &Handle<Bezier>,
+        &ControlPointQuad,
+        &Parent,
+        &MovingAnchor,
+    )>,
     q_parent: Query<&GlobalTransform, (With<BezierParent>, Without<ControlPointQuad>)>,
 ) {
-    for (mut transform, bezier_handle, ctr_pt_id, parent) in query.iter_mut() {
+    for (entity, mut transform, bezier_handle, ctr_pt_id, parent, moving_quad) in query.iter_mut() {
         let ControlPointQuad(point) = ctr_pt_id;
         //
         if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
@@ -260,9 +323,62 @@ pub fn move_control_quads(
                 // transform.translation = control_point.extend(transform.translation.z);
                 transform.rotation = Quat::from_rotation_z(bezier_angle_90);
             }
+
+            if moving_quad.once {
+                commands.entity(entity).remove::<MovingAnchor>();
+            }
         }
     }
 }
+
+// pub fn move_control_quads(
+//     mut bezier_curves: ResMut<Assets<Bezier>>,
+//     mut query: Query<(&mut Transform, &Handle<Bezier>, &ControlPointQuad, &Parent)>,
+//     q_parent: Query<&GlobalTransform, (With<BezierParent>, Without<ControlPointQuad>)>,
+// ) {
+//     for (mut transform, bezier_handle, ctr_pt_id, parent) in query.iter_mut() {
+//         let ControlPointQuad(point) = ctr_pt_id;
+//         //
+//         if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
+//             let parent_global_transform = q_parent.get(**parent).unwrap().translation();
+
+//             //
+//             let (_axis, quad_angle) = transform.rotation.to_axis_angle();
+
+//             let control_point: Vec2;
+//             let anchor_point: Vec2;
+//             let constant_angle: f32;
+
+//             if *point == AnchorEdge::Start {
+//                 control_point = bezier.positions.control_start;
+//                 anchor_point = bezier.positions.start;
+//                 constant_angle = std::f32::consts::PI / 2.0;
+//             } else {
+//                 control_point = bezier.positions.control_end;
+//                 anchor_point = bezier.positions.end;
+//                 constant_angle = std::f32::consts::PI / 2.0;
+//             }
+
+//             let relative_position: Vec2 = control_point - anchor_point;
+//             let bezier_angle: f32 = relative_position.y.atan2(relative_position.x);
+
+//             let bezier_angle_90: f32 = bezier_angle + constant_angle;
+
+//             let offset: bool = transform.translation.truncate() != control_point;
+//             let rotated: bool = !((quad_angle.abs() - bezier_angle_90.abs()).abs() < 0.01);
+
+//             // if the quad's translation and rotation are not equal to the corresponding control point, fix them
+//             if offset || rotated {
+//                 // if offset {
+//                 let z = transform.translation.z;
+//                 transform.translation =
+//                     (control_point - parent_global_transform.truncate()).extend(z);
+//                 // transform.translation = control_point.extend(transform.translation.z);
+//                 transform.rotation = Quat::from_rotation_z(bezier_angle_90);
+//             }
+//         }
+//     }
+// }
 
 ////////// helicopter animation
 //

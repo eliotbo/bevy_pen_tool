@@ -3,7 +3,8 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 use crate::util::{
     get_close_anchor, get_close_still_anchor, Anchor, AnchorEdge, Bezier, BezierGrandParent,
     BezierId, BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals, History,
-    HistoryAction, OfficialLatch, UiAction, UiBoard, UserState,
+    HistoryAction, Maps, MoveAnchorEvent, MovingAnchor, OfficialLatch, UiAction, UiBoard,
+    UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -75,13 +76,6 @@ pub enum Action {
     MakeMesh,
     SpawnRoad,
     StartMoveAnchor,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MoveAnchor {
-    pub handle: Handle<Bezier>,
-    pub anchor: Anchor,
-    pub unlatch: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -235,10 +229,10 @@ pub enum MouseClickEvent {
     OnUiBoard,
     OnColorButton((Color, Handle<ButtonMat>)),
     OnUiButton(UiButton),
-    OnAnchor((Anchor, Handle<Bezier>, IsLatched)), // the bool is for unlatching
-    OnAnchorEdge((AnchorEdge, Handle<Bezier>, IsLatched)),
-    OnWholeBezier((Handle<Bezier>, IsLatched)),
-    SpawnOnBezier((AnchorEdge, Handle<Bezier>, IsLatched)),
+    OnAnchor((Anchor, BezierId, IsLatched)), // the bool is for unlatching
+    OnAnchorEdge((AnchorEdge, BezierId, IsLatched)),
+    OnWholeBezier((BezierId, IsLatched)),
+    SpawnOnBezier((AnchorEdge, BezierId, IsLatched)),
     SpawnOnCanvas,
 }
 
@@ -515,11 +509,12 @@ pub fn spawn_curve_order_on_mouseclick(
     mut event_writer: EventWriter<Latch>,
     mut user_state: ResMut<UserState>,
     mut mouse_event_reader: EventReader<MouseClickEvent>,
+    maps: Res<Maps>,
 ) {
     let click_event = mouse_event_reader.iter().next();
 
     match click_event {
-        Some(MouseClickEvent::SpawnOnBezier((anchor_edge, handle, is_latched))) => {
+        Some(MouseClickEvent::SpawnOnBezier((anchor_edge, bezier_id, is_latched))) => {
             // this is too stateful, be more functional please. events please.
             let us = user_state.as_mut();
             *us = UserState::SpawningCurve {
@@ -528,7 +523,8 @@ pub fn spawn_curve_order_on_mouseclick(
             };
             //
             if !is_latched {
-                if let Some(bezier) = bezier_curves.get_mut(handle) {
+                let handle_entity = maps.bezier_map.get(&bezier_id).unwrap();
+                if let Some(bezier) = bezier_curves.get_mut(&handle_entity.handle) {
                     //
                     // println!("Spawning curve on anchor edge ");
 
@@ -548,7 +544,7 @@ pub fn spawn_curve_order_on_mouseclick(
 }
 
 pub fn check_mouse_on_canvas(
-    mut move_anchor_event_writer: EventWriter<MoveAnchor>,
+    mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
 
     mut user_state: ResMut<UserState>,
     mut mouse_event_reader: EventReader<MouseClickEvent>,
@@ -558,10 +554,11 @@ pub fn check_mouse_on_canvas(
     match click_event {
         Some(MouseClickEvent::OnAnchor((anchor, handle, unlatch))) => {
             // println!("On anchor unlatch: {:?}", unlatch);
-            let moving_anchor = MoveAnchor {
-                handle: handle.clone(),
+            let moving_anchor = MoveAnchorEvent {
+                bezier_id: handle.clone(),
                 anchor: anchor.clone(),
                 unlatch: *unlatch,
+                once: false,
             };
             // passing anchor data to a MoveAnchor event
             move_anchor_event_writer.send(moving_anchor.clone());
@@ -577,18 +574,27 @@ pub fn check_mouse_on_canvas(
 }
 
 pub fn mouse_release_actions(
+    mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(&Handle<Bezier>, &BoundingBoxQuad)>,
+    moving_query: Query<Entity, With<MovingAnchor>>,
     mut ui_query: Query<(&mut Transform, &mut UiBoard), With<BezierGrandParent>>,
     mut user_state: ResMut<UserState>,
     mut cursor: ResMut<Cursor>,
-    mut history: ResMut<History>,
+    // mut history: ResMut<History>,
     mut action_event_writer: EventWriter<Action>,
     mut latch_event_writer: EventWriter<OfficialLatch>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
+        //
+        // remove the MovingQuad component from any entity that has it
+        for entity in moving_query.iter() {
+            // println!("Removing MovingQuad component");
+            commands.entity(entity).remove::<MovingAnchor>();
+        }
+
         cursor.latch = Vec::new();
         let user_state = user_state.as_mut();
 
@@ -620,21 +626,6 @@ pub fn mouse_release_actions(
                         previous_position: bezier.get_previous_position(anchor),
                         new_position: bezier.get_position(anchor),
                     });
-
-                    // // if the last action was spawning a curve, and the user is
-                    // // its end anchor, then we update the history with the new
-                    // // end position
-                    // if let Some(history_action) = history.actions.get_mut(0) {
-                    //     if let HistoryAction::SpawnedCurve {
-                    //         bezier_handle: _,
-                    //         bezier_hist,
-                    //         entity: _,
-                    //     } = history_action
-                    //     {
-                    //         //
-                    //         bezier_hist.positions = bezier.positions.clone();
-                    //     }
-                    // }
                 }
 
                 bezier.potential_latch = None;

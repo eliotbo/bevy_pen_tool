@@ -1,10 +1,10 @@
-use bevy_pen_tool_spawner::inputs::{Action, Cursor, Latch, MoveAnchor, UiButton};
-use bevy_pen_tool_spawner::spawn_bezier;
+use bevy_pen_tool_spawner::inputs::Action;
+
 use bevy_pen_tool_spawner::util::*;
 
-use bevy::{asset::HandleId, prelude::*};
+use bevy::prelude::*;
 
-use bevy_inspector_egui::{Inspectable, InspectorPlugin};
+use bevy_inspector_egui::Inspectable;
 
 #[derive(Debug, Clone, Inspectable)]
 pub struct HistoryLenInspector {
@@ -180,13 +180,11 @@ pub fn undo(
             } => {
                 // println!("undo: SpawnedCurve");
                 if let Some(handle_entity) = maps.bezier_map.get(&bezier_id.into()) {
-                    if let Some(entity) = handle_entity.entity {
-                        commands.entity(entity).despawn_recursive();
-                    }
+                    commands.entity(handle_entity.entity).despawn_recursive();
                 }
             }
             HistoryAction::DeletedCurve { bezier, bezier_id } => {
-                println!("undo DeletedCurve, so spawning with id: {:?}", bezier_id);
+                // println!("undo DeletedCurve, so spawning with id: {:?}", bezier_id);
                 maps.print_bezier_map();
                 // let handle_entity = maps.bezier_map[&bezier_id].clone();
                 *user_state = UserState::SpawningCurve {
@@ -215,7 +213,7 @@ pub fn undo(
                 self_anchor,
                 partner_anchor,
             } => {
-                info!("undoing unlatch");
+                // info!("undoing unlatch");
                 let handle_entity_1 = maps.bezier_map[&self_id.into()].clone();
                 let bezier_1 = bezier_curves.get_mut(&handle_entity_1.handle).unwrap();
 
@@ -305,7 +303,7 @@ pub fn redo_effects(
             selection
                 .selected
                 .group
-                .insert((handle_entity.entity.unwrap(), handle_entity.handle.clone()));
+                .insert((handle_entity.entity, handle_entity.handle.clone()));
             action_event_writer.send(Action::Delete(true));
         }
         if let None = maps.bezier_map.remove(&redo_delete.bezier_id) {
@@ -400,7 +398,7 @@ pub fn redo(
                 bezier: _,
                 bezier_id,
             } => {
-                println!("redoing delete with id: {:?}", bezier_id);
+                // println!("redoing delete with id: {:?}", bezier_id);
 
                 delete_curve_event_writer.send(RedoDelete {
                     bezier_id: bezier_id.into(),
@@ -413,7 +411,7 @@ pub fn redo(
                 partner_bezier_id: bezier_id_2,
                 partner_anchor: anchor_2,
             } => {
-                info!("redoing latching");
+                // info!("redoing latching");
                 let handle_entity_1 = maps.bezier_map[&bezier_id_1.into()].clone();
                 let bezier_1 = bezier_curves.get_mut(&handle_entity_1.handle).unwrap();
 

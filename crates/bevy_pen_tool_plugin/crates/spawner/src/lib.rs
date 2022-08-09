@@ -25,7 +25,7 @@ impl Plugin for SpawnerPlugin {
             .add_event::<MouseClickEvent>()
             .add_event::<Group>()
             .add_event::<OfficialLatch>()
-            .add_event::<MoveAnchor>()
+            .add_event::<MoveAnchorEvent>()
             .add_event::<Latch>()
             .add_event::<Loaded>()
             .add_event::<Action>()
