@@ -118,7 +118,7 @@ pub fn undo(
     mut action_event_reader: EventReader<Action>,
     mut user_state: ResMut<UserState>,
     maps: ResMut<Maps>,
-    mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
+    // mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Undo) {
         if history.index == -1 {
@@ -317,7 +317,7 @@ pub fn redo(
     mut user_state: ResMut<UserState>,
     // mut lut_event_writer: EventWriter<ComputeLut>,
     mut delete_curve_event_writer: EventWriter<RedoDelete>,
-    mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
+    // mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
     // mut selection: ResMut<Selection>,
     maps: ResMut<Maps>,
 ) {

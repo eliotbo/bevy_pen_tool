@@ -1,17 +1,15 @@
 use crate::inputs::{Cursor, Latch};
 
 use crate::util::{
-    AchorEdgeQuad, Anchor, AnchorEdge, AnchorEntities, Bezier, BezierControlsMat, BezierEndsMat,
-    BezierGrandParent, BezierHandleEntity, BezierHist, BezierId, BezierMidMat, BezierParent,
-    BezierPositions, BoundingBoxQuad, ControlPointQuad, Globals, HistoryAction, LatchData, Maps,
-    MiddlePointQuad, MoveAnchorEvent, MovingAnchor, SelectionMat, SpawnMids, UserState,
+    AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent,
+    BezierHandleEntity, BezierHist, BezierId, BezierMidMat, BezierParent, BezierPositions,
+    BoundingBoxQuad, ControlPointQuad, Globals, HistoryAction, LatchData, Maps, MiddlePointQuad,
+    MovingAnchor, SelectionMat, SpawnMids, UserState,
 };
 
 use bevy::{asset::HandleId, prelude::*, sprite::MaterialMesh2dBundle};
 
 use std::collections::HashMap;
-
-use rand::prelude::*;
 
 // TODO: merge spawn_bezier_system and spawn_bezier
 pub fn spawn_bezier_system(
@@ -19,7 +17,6 @@ pub fn spawn_bezier_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut cursor: ResMut<Cursor>,
-    // mut my_shader_params: ResMut<Assets<BezierMat>>,
     mut selection_params: ResMut<Assets<SelectionMat>>,
     mut controls_params: ResMut<Assets<BezierControlsMat>>,
     mut ends_params: ResMut<Assets<BezierEndsMat>>,
@@ -30,7 +27,7 @@ pub fn spawn_bezier_system(
     mut latch_event_reader: EventReader<Latch>,
     mut user_state: ResMut<UserState>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
-    mut move_quad_event_writer: EventWriter<MoveAnchorEvent>,
+    // mut move_quad_event_writer: EventWriter<MoveAnchorEvent>,
     // cam_query: Query<&Transform, With<OrthographicProjection>>,
 ) {
     let mut do_send_to_history = true;
@@ -81,14 +78,6 @@ pub fn spawn_bezier_system(
             };
 
             latches.insert(AnchorEdge::Start, latch_local);
-
-            // if let Some(latch_local) = latches.get_mut(&AnchorEdge::Start) {
-            //     *latch_local = LatchData {
-            //         latched_to_id: latch_received.latchee_id,
-            //         self_edge: AnchorEdge::Start,
-            //         partners_edge: latch_received.latchee_edge,
-            //     };
-            // }
         }
 
         cursor.latch = Vec::new();
@@ -121,21 +110,6 @@ pub fn spawn_bezier_system(
             do_nothing = true;
         } else {
             do_move_anchor = true;
-            // move_quad_event_writer.send(MoveQuadEvent(bezier.id));
-
-            // move_quad_event_writer.send(MoveAnchorEvent {
-            //     bezier_id: bezier.id,
-            //     anchor: Anchor::End,
-            //     unlatch: false,
-            //     once: false, // if true, MovingQuad will be removed after a single frame
-            // });
-
-            // move_quad_event_writer.send(MoveAnchorEvent {
-            //     bezier_id: bezier.id,
-            //     anchor: Anchor::Start,
-            //     unlatch: false,
-            //     once: true, // if true, MovingQuad will be removed after a single frame
-            // });
         }
 
         bezier.update_previous_pos();
@@ -159,6 +133,7 @@ pub fn spawn_bezier_system(
         );
     }
 
+    // TODO: remove this
     let us = user_state.as_mut();
     if do_move_anchor {
         *us = UserState::MovingAnchor;
@@ -200,6 +175,8 @@ pub fn spawn_bezier(
     }
     bezier.color = Some(color);
 
+    //
+    //
     //////////////////// Bounding box parameters ////////////////////
     // need to import the whole library in order to use the .min() and .max() methods: file issue?
     use flo_curves::*;
@@ -222,11 +199,6 @@ pub fn spawn_bezier(
     let ctr0_pos = bezier.positions.control_start; // - bb_pos;
     let ctr1_pos = bezier.positions.control_end - bb_pos;
 
-    // let mesh_handle_bb = meshes.add(Mesh::from(shape::Quad {
-    //     size: bigger_size,
-    //     flip: false,
-    // }));
-
     let mesh_handle_bb =
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(bigger_size))));
 
@@ -246,6 +218,8 @@ pub fn spawn_bezier(
     bezier_got.id = bezier_handle.id.into();
 
     //////////////////// Bounding box ////////////////////
+    //
+    //
 
     let visible_bb = Visibility {
         // is_visible: !globals.do_hide_bounding_boxes,
@@ -330,14 +304,6 @@ pub fn spawn_bezier(
 
     //////////////////// Bounding box ////////////////////
 
-    // let render_piplines_ends =
-    //     RenderPipelines::from_pipelines(vec![RenderPipeline::new(ends_pipeline_handle)]);
-
-    // let render_piplines =
-    //     RenderPipelines::from_pipelines(vec![RenderPipeline::new(ecm_pipeline_handle)]);
-
-    // Although the interface is two-dimensional, the z position of the quads is important for transparency
-
     let ((start_displacement, end_displacement), (start_rotation, end_rotation)) =
         bezier.ends_displacement();
 
@@ -418,46 +384,6 @@ pub fn spawn_bezier(
     if globals.hide_control_points {
         visible_ctrl.is_visible = true;
     };
-
-    // // control points
-    // for k in 0..2 {
-    //     // let z_ctr = pos_z + 50.0 + (k as f32) * 10.0;
-    //     let mut ctr_pos_transform =
-    //         Transform::from_translation(ctr0_pos.extend(globals.z_pos.controls));
-
-    //     let mut point = AnchorEdge::Start;
-    //     if k == 1 {
-    //         point = AnchorEdge::End;
-    //         ctr_pos_transform =
-    //             Transform::from_translation(ctr1_pos.extend(globals.z_pos.controls));
-    //     }
-
-    //     let controls_params_handle = controls_params.add(BezierControlsMat {
-    //         color: color.into(),
-    //         t: 2.5,
-    //         zoom: 1.0 / globals.scale,
-    //         size: Vec2::new(5.0, 5.0) * globals.scale,
-    //         clearcolor: clearcolor.clone().into(),
-    //         ..Default::default()
-    //     });
-
-    //     let child = commands
-    //         .spawn_bundle(MaterialMesh2dBundle {
-    //             mesh: ends_controls_mesh_handle.clone(),
-    //             visibility: visible_ctrl.clone(),
-    //             // render_pipelines: ctrl_render_piplines.clone(),
-    //             transform: ctr_pos_transform,
-    //             material: controls_params_handle.clone(),
-    //             ..Default::default()
-    //         })
-    //         .insert(ControlPointQuad(point))
-    //         .insert(bezier_handle.clone())
-    //         // .insert(shader_params_handle_bb.clone())
-    //         .id();
-
-    //     commands.entity(parent).push_children(&[child]);
-
-    // }
 
     /////////////////////////////////////////
     // Control start

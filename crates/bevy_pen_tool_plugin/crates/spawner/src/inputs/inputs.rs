@@ -2,9 +2,8 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::util::{
     get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier,
-    BezierGrandParent, BezierId, BezierParent, BoundingBoxQuad, ButtonMat, ColorButton, Globals,
-    History, HistoryAction, Maps, MoveAnchorEvent, MovingAnchor, OfficialLatch, UiAction, UiBoard,
-    UserState,
+    BezierGrandParent, BezierId, BezierParent, ButtonMat, ColorButton, Globals, HistoryAction,
+    Maps, MoveAnchorEvent, MovingAnchor, OfficialLatch, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -296,10 +295,6 @@ pub fn check_mouseclick_on_objects(
                 button_transform.translation().truncate() / scale,
                 shader_params.size * 0.95,
             ) {
-                // println!(
-                //     "{:?}",
-                //     button_transform.translation.truncate() - cursor.position
-                // );
                 // this sends into nothingness
                 mouse_event_writer.send(MouseClickEvent::OnUiButton(ui_button.clone()));
 

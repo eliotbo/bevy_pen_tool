@@ -9,7 +9,7 @@ use bevy::render::{render_graph::RenderGraph, RenderApp};
 
 pub struct PenPlugin;
 use bevy::window::{CreateWindow, WindowId};
-use bevy_inspector_egui::{Inspectable, InspectorPlugin};
+use bevy_inspector_egui::InspectorPlugin;
 
 use once_cell::sync::Lazy;
 // TODO
@@ -111,7 +111,7 @@ pub fn remove_all_moving_quad(
     mut query: Query<(Entity, &MovingAnchor)>,
 ) {
     for _ in events.iter() {
-        for (entity, anchor) in query.iter_mut() {
+        for (entity, _anchor) in query.iter_mut() {
             commands.entity(entity).remove::<MovingAnchor>();
         }
     }
@@ -185,7 +185,7 @@ static SECOND_WINDOW_ID: Lazy<WindowId> = Lazy::new(WindowId::new);
 const SECONDARY_EGUI_PASS: &str = "secondary_egui_pass";
 
 fn update_history_inspector(
-    mut history: ResMut<History>,
+    history: ResMut<History>,
     mut history_inspector: ResMut<HistoryInspector>,
     mut history_len_inspector: ResMut<HistoryLenInspector>,
 ) {
@@ -216,7 +216,7 @@ fn debug(
     query: Query<&Handle<Bezier>, With<BezierParent>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: Res<Assets<Group>>,
-    mids_groups: Query<&GroupMiddleQuad>,
+    // mids_groups: Query<&GroupMiddleQuad>,
     maps: Res<Maps>,
     history: Res<History>,
     mut action_event_writer: EventWriter<Action>,
