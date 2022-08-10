@@ -1,16 +1,16 @@
 use bevy_pen_tool_plugin::{Bezier, Globals, PenPlugin};
 use bevy_pen_tool_spawner::util::UiBoard;
 
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
+// use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::{prelude::*, render::camera::OrthographicProjection};
 // TODO:
-// - make whole group move when selected
 // - add enabled/disabled to buttons
-
+// - unlatch is broken: it only unlatches one of the two
+// - bug in officiate_latch_partnership(..) at let handle_entity_2 = maps.bezier_map[&latch.latched_to_id.into()].clone();
+//       perhaps the bug involves deletion and redo but I'm not sure
 // long-term
 // - ungroup
 // - compatibility with multiple groups
-// - undo/redo
 // - Attach UI to a UI camera -- waiting for UI to be compatible with shaders
 
 fn main() {

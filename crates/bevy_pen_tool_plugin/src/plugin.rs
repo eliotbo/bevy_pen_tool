@@ -28,6 +28,7 @@ impl Plugin for PenPlugin {
             .add_plugin(InspectorPlugin::<HistoryLenInspector>::new().on_window(*SECOND_WINDOW_ID))
             .add_event::<RemoveMovingQuadEvent>()
             .add_event::<GroupBoxEvent>()
+            .add_event::<SpawningCurve>()
             .insert_resource(History::default())
             .insert_resource(HistoryInspector::default())
             .insert_resource(HistoryLenInspector::default())

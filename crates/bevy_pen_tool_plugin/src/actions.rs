@@ -941,8 +941,8 @@ pub fn delete(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
     mut visible_query: Query<&mut Visibility, With<SelectedBoxQuad>>,
-    query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
-    query2: Query<(Entity, &Handle<Group>), With<GroupParent>>, // TODO: change to GroupParent
+    query: Query<&Handle<Bezier>, With<BezierParent>>,
+    query2: Query<&Handle<Group>, With<GroupParent>>, // TODO: change to GroupParent
     mut action_event_reader: EventReader<Action>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {
@@ -953,7 +953,7 @@ pub fn delete(
             let mut delete_curve_events = Vec::new();
 
             let mut latched_partners: Vec<(BezierId, LatchData)> = Vec::new();
-            for (entity, bezier_handle) in query.iter() {
+            for bezier_handle in query.iter() {
                 //
                 for (entity, handle) in selection.selected.group.clone() {
                     //
@@ -985,18 +985,11 @@ pub fn delete(
                 }
             }
 
-            for (entity, group_handle) in query2.iter() {
+            for group_handle in query2.iter() {
                 //
                 let group = groups.get(group_handle).unwrap();
                 for (entity, bezier_handle) in selection.selected.group.clone() {
                     if group.bezier_handles.contains(&bezier_handle) {
-                        let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
-
-                        // add_to_history_event_writer.send(HistoryAction::DeletedCurve {
-                        //     bezier: BezierHist::from(&bezier.clone()),
-                        //     bezier_handle: bezier_handle.clone(),
-                        // });
-
                         commands.entity(entity).despawn_recursive();
                     }
                 }
@@ -1036,11 +1029,6 @@ pub fn delete(
                     }
 
                     partner_bezier.latches.remove(&latch_data.partners_edge);
-
-                    // if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
-                    //     // println!("selectd: {:?}", &latch_local);
-                    //     *latch_local = Vec::new();
-                    // }
                 }
 
                 // maps.id_handle_map.remove(&latch_data.latched_to_id);
@@ -1241,8 +1229,6 @@ pub fn load(
 
         let loaded_groups_vec: Vec<GroupSaveLoad> = serde_json::from_str(&contents).unwrap();
 
-        use rand::prelude::*;
-        let mut rng = thread_rng();
         let id: GroupId = GroupId::default();
 
         let mut group = Group {
@@ -1264,9 +1250,6 @@ pub fn load(
                     &mut bezier_curves,
                     &mut commands,
                     &mut meshes,
-                    // &mut pipelines,
-
-                    // &mut my_shader_params,
                     &mut selection_params,
                     &mut controls_params,
                     &mut ends_params,

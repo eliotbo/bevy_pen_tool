@@ -116,8 +116,9 @@ pub fn undo(
     mut history: ResMut<History>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut action_event_reader: EventReader<Action>,
-    mut user_state: ResMut<UserState>,
+    // mut user_state: ResMut<UserState>,
     maps: ResMut<Maps>,
+    mut spawn_curve_event_writer: EventWriter<SpawningCurve>,
     // mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Undo) {
@@ -178,10 +179,14 @@ pub fn undo(
                 // println!("undo DeletedCurve, so spawning with id: {:?}", bezier_id);
                 maps.print_bezier_map();
                 // let handle_entity = maps.bezier_map[&bezier_id].clone();
-                *user_state = UserState::SpawningCurve {
+                // *user_state = UserState::SpawningCurve {
+                //     bezier_hist: Some(bezier),
+                //     maybe_bezier_id: Some(bezier_id.into()),
+                // };
+                spawn_curve_event_writer.send(SpawningCurve {
                     bezier_hist: Some(bezier),
                     maybe_bezier_id: Some(bezier_id.into()),
-                };
+                });
             }
             HistoryAction::Latched {
                 self_id: bezier_id_1,
@@ -314,9 +319,10 @@ pub fn redo(
     mut history: ResMut<History>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut action_event_reader: EventReader<Action>,
-    mut user_state: ResMut<UserState>,
+    // mut user_state: ResMut<UserState>,
     // mut lut_event_writer: EventWriter<ComputeLut>,
     mut delete_curve_event_writer: EventWriter<RedoDelete>,
+    mut spawn_curve_event_writer: EventWriter<SpawningCurve>,
     // mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
     // mut selection: ResMut<Selection>,
     maps: ResMut<Maps>,
@@ -373,10 +379,14 @@ pub fn redo(
                 bezier_id,
                 bezier_hist,
             } => {
-                *user_state = UserState::SpawningCurve {
+                // *user_state = UserState::SpawningCurve {
+                //     bezier_hist: Some(bezier_hist),
+                //     maybe_bezier_id: Some(bezier_id.into()),
+                // };
+                spawn_curve_event_writer.send(SpawningCurve {
                     bezier_hist: Some(bezier_hist),
                     maybe_bezier_id: Some(bezier_id.into()),
-                };
+                });
             }
             HistoryAction::DeletedCurve {
                 bezier: _,

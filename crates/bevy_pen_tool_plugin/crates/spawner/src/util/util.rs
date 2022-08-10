@@ -16,6 +16,11 @@ use flo_curves::*;
 
 use bevy_inspector_egui::Inspectable;
 
+pub struct SpawningCurve {
+    pub bezier_hist: Option<BezierHist>,
+    pub maybe_bezier_id: Option<BezierId>,
+}
+
 pub type BezierHistId = u64;
 
 #[derive(Debug, Clone, Default, Inspectable)]
@@ -173,11 +178,11 @@ pub enum UserState {
     Idle,
     Selecting(Vec2),
     Selected(Group),
-    SpawningCurve {
-        bezier_hist: Option<BezierHist>,
-        maybe_bezier_id: Option<BezierId>,
-    },
-    MovingAnchor,
+    // SpawningCurve {
+    //     bezier_hist: Option<BezierHist>,
+    //     maybe_bezier_id: Option<BezierId>,
+    // },
+    // MovingAnchor,
     MovingWholeCurve,
 }
 
@@ -1703,9 +1708,9 @@ pub fn adjust_selection_attributes(
 ) {
     let mut do_adjust = false;
 
-    if let UserState::MovingAnchor = user_state.as_ref() {
-        do_adjust = true;
-    }
+    // if let UserState::MovingAnchor = user_state.as_ref() {
+    //     do_adjust = true;
+    // }
 
     let us = user_state.as_ref();
     if let UserState::Selected(_) = us {

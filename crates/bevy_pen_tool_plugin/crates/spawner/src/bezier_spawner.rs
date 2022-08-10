@@ -4,7 +4,7 @@ use crate::util::{
     AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent,
     BezierHandleEntity, BezierHist, BezierId, BezierMidMat, BezierParent, BezierPositions,
     BoundingBoxQuad, ControlPointQuad, Globals, HistoryAction, LatchData, Maps, MiddlePointQuad,
-    MovingAnchor, SelectionMat, SpawnMids, UserState,
+    MovingAnchor, SelectionMat, SpawnMids, SpawningCurve, UserState,
 };
 
 use bevy::{asset::HandleId, prelude::*, sprite::MaterialMesh2dBundle};
@@ -27,16 +27,22 @@ pub fn spawn_bezier_system(
     mut latch_event_reader: EventReader<Latch>,
     mut user_state: ResMut<UserState>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
+    mut spawn_curve_event_reader: EventReader<SpawningCurve>,
     // mut move_quad_event_writer: EventWriter<MoveAnchorEvent>,
     // cam_query: Query<&Transform, With<OrthographicProjection>>,
 ) {
     let mut do_send_to_history = true;
     let mut do_move_anchor = false;
     let mut do_nothing = false;
-    if let UserState::SpawningCurve {
+    // if let UserState::SpawningCurve {
+    //     bezier_hist: maybe_bezier_hist,
+    //     maybe_bezier_id,
+    // } = &*user_state
+
+    for SpawningCurve {
         bezier_hist: maybe_bezier_hist,
         maybe_bezier_id,
-    } = &*user_state
+    } in spawn_curve_event_reader.iter()
     {
         let clearcolor = clearcolor_struct.0;
 
@@ -133,13 +139,13 @@ pub fn spawn_bezier_system(
         );
     }
 
-    // TODO: remove this
-    let us = user_state.as_mut();
-    if do_move_anchor {
-        *us = UserState::MovingAnchor;
-    } else if do_nothing {
-        *us = UserState::Idle;
-    }
+    // // TODO: remove this
+    // let us = user_state.as_mut();
+    // if do_move_anchor {
+    //     *us = UserState::MovingAnchor;
+    // } else if do_nothing {
+    //     *us = UserState::Idle;
+    // }
 }
 
 pub fn spawn_bezier(

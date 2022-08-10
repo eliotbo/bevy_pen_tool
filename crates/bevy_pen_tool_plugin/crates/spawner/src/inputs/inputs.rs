@@ -3,7 +3,8 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 use crate::util::{
     get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier,
     BezierGrandParent, BezierId, BezierParent, ButtonMat, ColorButton, Globals, HistoryAction,
-    Maps, MoveAnchorEvent, MovingAnchor, OfficialLatch, UiAction, UiBoard, UserState,
+    Maps, MoveAnchorEvent, MovingAnchor, OfficialLatch, SpawningCurve, UiAction, UiBoard,
+    UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -507,8 +508,9 @@ pub fn pick_color(
 pub fn spawn_curve_order_on_mouseclick(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut event_writer: EventWriter<Latch>,
-    mut user_state: ResMut<UserState>,
+    // mut user_state: ResMut<UserState>,
     mut mouse_event_reader: EventReader<MouseClickEvent>,
+    mut spawn_curve_event_writer: EventWriter<SpawningCurve>,
     maps: Res<Maps>,
 ) {
     let click_event = mouse_event_reader.iter().next();
@@ -517,11 +519,16 @@ pub fn spawn_curve_order_on_mouseclick(
         Some(MouseClickEvent::SpawnOnBezier((anchor_edge, bezier_id, is_latched))) => {
             // this is too stateful, be more functional please. events please.
 
-            let us = user_state.as_mut();
-            *us = UserState::SpawningCurve {
+            // let us = user_state.as_mut();
+            // *us = UserState::SpawningCurve {
+            //     bezier_hist: None,
+            //     maybe_bezier_id: None,
+            // };
+
+            spawn_curve_event_writer.send(SpawningCurve {
                 bezier_hist: None,
                 maybe_bezier_id: None,
-            };
+            });
             //
             if !is_latched {
                 let handle_entity = maps.bezier_map.get(&bezier_id).unwrap();
@@ -534,11 +541,16 @@ pub fn spawn_curve_order_on_mouseclick(
             }
         }
         Some(MouseClickEvent::SpawnOnCanvas) => {
-            let us = user_state.as_mut();
-            *us = UserState::SpawningCurve {
+            // let us = user_state.as_mut();
+            // *us = UserState::SpawningCurve {
+            //     bezier_hist: None,
+            //     maybe_bezier_id: None,
+            // };
+
+            spawn_curve_event_writer.send(SpawningCurve {
                 bezier_hist: None,
                 maybe_bezier_id: None,
-            };
+            });
         }
         _ => {}
     }
@@ -564,10 +576,10 @@ pub fn check_mouse_on_canvas(
             // passing anchor data to a MoveAnchor event
             move_anchor_event_writer.send(moving_anchor.clone());
 
-            // This state needs to be cleaned up.
-            // This is used in the selection attribute update
-            let user_state = user_state.as_mut();
-            *user_state = UserState::MovingAnchor;
+            // // This state needs to be cleaned up.
+            // // This is used in the selection attribute update
+            // let user_state = user_state.as_mut();
+            // *user_state = UserState::MovingAnchor;
         }
 
         _ => {}
