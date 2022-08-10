@@ -309,7 +309,7 @@ pub fn redo_effects(
 }
 
 pub fn redo(
-    // mut commands: Commands,
+    mut commands: Commands,
     // mut globals: ResMut<Globals>,
     mut history: ResMut<History>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
@@ -343,45 +343,23 @@ pub fn redo(
                 new_position,
                 previous_position: _,
             } => {
-                // info!(
-                //     "redoing moving: {:?} to new_position: {:?}",
-                //     anchor, new_position
-                // );
-                let handle_entity = maps.bezier_map[&bezier_id.into()].clone();
-                let bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
-                // let mut new_bezier = bezier.clone();
-                // bezier.set_position(anchor, previous_position);
-                bezier.set_position(anchor, new_position);
-                // lut_event_writer.send(ComputeLut);
-                bezier.do_compute_lut = true;
+                // println!("undo: MovedAnchor");
+                let handle_entities = maps.bezier_map[&bezier_id.into()].clone();
+                let bezier = bezier_curves.get_mut(&handle_entities.handle).unwrap();
 
-                let moving_anchor_event = MoveAnchorEvent {
-                    bezier_id: bezier.id,
-                    anchor: anchor.clone(),
-                    unlatch: false,
-                    once: true,
-                    // is_clicked: false,
-                };
+                bezier.move_once(
+                    &mut commands,
+                    bezier_id.into(),
+                    new_position,
+                    anchor,
+                    maps.as_ref(),
+                );
 
-                move_anchor_event_writer.send(moving_anchor_event);
+                // bezier.move_partner_once(anchor, &maps, &mut bezier_curves);
 
-                // let latch_info = bezier.get_mover_latch_info();
-                // update_latched_partner_position(&maps.bezier_map, &mut bezier_curves, latch_info);
-
-                // move the latched partner anchor
                 let anchor_edge = anchor.to_edge_with_controls();
-
-                if let Some(latch) = bezier.latches.get(&anchor_edge) {
+                if let Some(_) = bezier.latches.get(&anchor_edge) {
                     let latch_info = bezier.get_anchor_latch_info(anchor);
-
-                    // let moving_partner_anchor_event = MoveAnchorEvent {
-                    //     bezier_id: latch.latched_to_id,
-                    //     anchor: latch.partners_edge.to_anchor(),
-                    //     unlatch: false,
-                    //     once: true,
-                    // };
-
-                    // move_anchor_event_writer.send(moving_partner_anchor_event);
 
                     update_latched_partner_position(
                         &maps.bezier_map,
@@ -389,22 +367,12 @@ pub fn redo(
                         latch_info,
                     );
                 }
-
-                // if let Some((partner_latch, mover_position, opposite_control)) = latch_info {
-                //                 if let Some(bezier_handle) = maps.bezier_map.get(&partner_latch.latched_to_id) {
-                //                     let partner_bezier = bezier_curves.get_mut(&bezier_handle.handle).unwrap();
-                //                 }
-                // bezier.set_previous_pos(anchor, previous_position);
             }
-            // TODO: NEED TO CHANGE THE ENTITY INFO WHEN RESPAWNING WITH REDO
+
             HistoryAction::SpawnedCurve {
                 bezier_id,
                 bezier_hist,
-                // entity: _,
-                // id,
             } => {
-                // println!("redo!@#@!#$#%$%^^:",);
-                // let handle_entity = maps.bezier_map[&bezier_id].clone();
                 *user_state = UserState::SpawningCurve {
                     bezier_hist: Some(bezier_hist),
                     maybe_bezier_id: Some(bezier_id.into()),
@@ -437,7 +405,20 @@ pub fn redo(
                     partners_edge: anchor_2,
                 };
 
+                bezier_1.do_compute_lut = true;
+
                 bezier_1.latches.insert(anchor_1, latch_1);
+
+                // control point position must be opposite from partner's
+                let bezier_2_control_pos = bezier_1.get_opposite_control(anchor_1);
+
+                bezier_1.move_once(
+                    &mut commands,
+                    bezier_1.id.into(),
+                    bezier_1.get_position(anchor_1.to_anchor()),
+                    anchor_1.to_anchor(),
+                    maps.as_ref(),
+                );
 
                 let handle_entity_2 = maps.bezier_map[&bezier_id_2.into()].clone();
                 let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
@@ -448,7 +429,16 @@ pub fn redo(
                     partners_edge: anchor_1,
                 };
 
+                bezier_2.do_compute_lut = true;
                 bezier_2.latches.insert(anchor_2, latch_2);
+
+                bezier_2.move_once(
+                    &mut commands,
+                    bezier_2.id.into(),
+                    bezier_2_control_pos,
+                    anchor_2.to_anchor().adjoint(),
+                    maps.as_ref(),
+                );
             }
             _ => {}
         }
