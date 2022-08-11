@@ -38,12 +38,14 @@ impl Default for HistoryInspector {
 
 impl From<History> for HistoryInspector {
     fn from(history: History) -> Self {
+        let mut history_inspector: Vec<HistoryActionInspector> = history
+            .actions
+            .iter()
+            .map(|x| HistoryActionInspector::from(x.clone()))
+            .collect();
+        history_inspector.reverse();
         Self {
-            history: history
-                .actions
-                .iter()
-                .map(|x| HistoryActionInspector::from(x.clone()))
-                .collect(),
+            history: history_inspector,
             index: history.index,
         }
     }
@@ -143,10 +145,12 @@ pub fn undo(
                 let handle_entities = maps.bezier_map[&bezier_id.into()].clone();
                 let bezier = bezier_curves.get_mut(&handle_entities.handle).unwrap();
 
-                bezier.move_once(
+                bezier.set_position(anchor, previous_position);
+
+                bezier.move_anchor(
                     &mut commands,
-                    bezier_id.into(),
-                    previous_position,
+                    true,  // one move for a single frame
+                    false, // do not follow mouse
                     anchor,
                     maps.as_ref(),
                 );
@@ -353,10 +357,13 @@ pub fn redo(
                 let handle_entities = maps.bezier_map[&bezier_id.into()].clone();
                 let bezier = bezier_curves.get_mut(&handle_entities.handle).unwrap();
 
-                bezier.move_once(
+                bezier.set_position(anchor, new_position);
+                bezier.move_anchor(
                     &mut commands,
-                    bezier_id.into(),
-                    new_position,
+                    true, // one move for a single frame
+                    false,
+                    // bezier_id.into(),
+                    // new_position,
                     anchor,
                     maps.as_ref(),
                 );
@@ -422,10 +429,15 @@ pub fn redo(
                 // control point position must be opposite from partner's
                 let bezier_2_control_pos = bezier_1.get_opposite_control(anchor_1);
 
-                bezier_1.move_once(
-                    &mut commands,
-                    bezier_1.id.into(),
+                bezier_1.set_position(
+                    anchor_1.to_anchor(),
                     bezier_1.get_position(anchor_1.to_anchor()),
+                );
+
+                bezier_1.move_anchor(
+                    &mut commands,
+                    true,  // one move for a single frame
+                    false, // do not follow mouse
                     anchor_1.to_anchor(),
                     maps.as_ref(),
                 );
@@ -442,10 +454,11 @@ pub fn redo(
                 bezier_2.do_compute_lut = true;
                 bezier_2.latches.insert(anchor_2, latch_2);
 
-                bezier_2.move_once(
+                bezier_2.set_position(anchor_2.to_anchor().adjoint(), bezier_2_control_pos);
+                bezier_2.move_anchor(
                     &mut commands,
-                    bezier_2.id.into(),
-                    bezier_2_control_pos,
+                    true,  // one move for a single frame
+                    false, // do not follow mouse
                     anchor_2.to_anchor().adjoint(),
                     maps.as_ref(),
                 );

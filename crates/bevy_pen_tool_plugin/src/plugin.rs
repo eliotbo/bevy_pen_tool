@@ -17,6 +17,7 @@ use once_cell::sync::Lazy;
 // 1) undo/redo for groups
 // 2) remove UserState
 // 3) replace move_quad Anchor::All, by event
+// 4) Make "spawn" followed by "move end anchor" the same HistoryAction
 
 impl Plugin for PenPlugin {
     fn build(&self, app: &mut App) {

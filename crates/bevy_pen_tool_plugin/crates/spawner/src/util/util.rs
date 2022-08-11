@@ -996,8 +996,8 @@ impl fmt::Display for BezierId {
 
 #[derive(Component)]
 pub struct MovingAnchor {
-    pub once: bool,       // if true, the anchor will move for only one frame
-    pub is_clicked: bool, // if false, the anchor is the adjoint of actively moving anchor
+    pub once: bool,         // if true, the anchor will move for only one frame
+    pub follow_mouse: bool, // if false, the anchor is the adjoint of actively moving anchor
 }
 
 #[derive(Debug, Clone, TypeUuid, Serialize, Deserialize)]
@@ -1334,32 +1334,35 @@ impl Bezier {
         }
     }
 
-    pub fn move_once(
+    pub fn move_anchor(
         &mut self,
         commands: &mut Commands,
-        id: BezierId,
-        pos: Vec2,
+        once: bool,
+        follow_mouse: bool,
         anchor: Anchor,
         maps: &Maps,
     ) {
-        self.set_position(anchor, pos);
-
         self.do_compute_lut = true;
 
+        let id = self.id;
+
         let handle_entities = maps.bezier_map[&id.into()].clone();
+
+        info!("moving anchor {:?}", anchor);
 
         let anchor_entity = handle_entities.anchor_entities[&anchor];
 
         commands.entity(anchor_entity).insert(MovingAnchor {
-            once: true,
-            is_clicked: false,
+            once,
+            // the main anchor follows the mouse, unless it's a one-frame move
+            follow_mouse: follow_mouse && !once,
         });
 
         let adjoint_anchor_entity = handle_entities.anchor_entities[&anchor.adjoint()];
 
         commands.entity(adjoint_anchor_entity).insert(MovingAnchor {
-            once: true,
-            is_clicked: false,
+            once,
+            follow_mouse: false,
         });
 
         // move_anchor_event_writer.send(moving_partner_anchor_event);
@@ -1370,8 +1373,8 @@ impl Bezier {
             commands
                 .entity(partner_handle_entity.anchor_entities[&latch.partners_edge.to_anchor()])
                 .insert(MovingAnchor {
-                    once: true,
-                    is_clicked: false,
+                    once,
+                    follow_mouse: false,
                 });
 
             commands
@@ -1380,8 +1383,8 @@ impl Bezier {
                         [&latch.partners_edge.to_anchor().adjoint()],
                 )
                 .insert(MovingAnchor {
-                    once: true,
-                    is_clicked: false,
+                    once,
+                    follow_mouse: false,
                 });
         }
     }

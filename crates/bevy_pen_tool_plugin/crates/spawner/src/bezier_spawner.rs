@@ -347,7 +347,7 @@ pub fn spawn_bezier(
         .insert(bezier_handle.clone())
         .insert(MovingAnchor {
             once: true,
-            is_clicked: false,
+            follow_mouse: false,
         })
         // .insert(shader_params_handle_bb.clone())
         .id();
@@ -372,7 +372,7 @@ pub fn spawn_bezier(
             once: false,
             // follow mouse only if the spawn originate from a mouse click,
             // in which case an HistoryAction::SpawnedCurve is sent to the history
-            is_clicked: do_send_to_history,
+            follow_mouse: do_send_to_history,
         })
         .insert(bezier_handle.clone())
         // .insert(shader_params_handle_bb.clone())
@@ -418,7 +418,7 @@ pub fn spawn_bezier(
         .insert(Anchor::ControlStart)
         .insert(MovingAnchor {
             once: true,
-            is_clicked: false,
+            follow_mouse: false,
         })
         .insert(bezier_handle.clone())
         // .insert(shader_params_handle_bb.clone())
@@ -453,7 +453,7 @@ pub fn spawn_bezier(
         .insert(Anchor::ControlEnd)
         .insert(MovingAnchor {
             once: false,
-            is_clicked: false,
+            follow_mouse: false,
         })
         .insert(bezier_handle.clone())
         // .insert(shader_params_handle_bb.clone())

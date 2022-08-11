@@ -559,7 +559,7 @@ pub fn spawn_curve_order_on_mouseclick(
 pub fn check_mouse_on_canvas(
     mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
 
-    mut user_state: ResMut<UserState>,
+    // mut user_state: ResMut<UserState>,
     mut mouse_event_reader: EventReader<MouseClickEvent>,
 ) {
     let click_event = mouse_event_reader.iter().next();
@@ -620,7 +620,7 @@ pub fn mouse_release_actions(
 
         // let go of all any moving quad upon mouse button release
         for (bezier_handle, anchor, moving_anchor) in query.iter() {
-            if moving_anchor.is_clicked {
+            if moving_anchor.follow_mouse {
                 if let Some(mut bezier) = bezier_curves.get_mut(bezier_handle) {
                     //
                     // Anchor Position History

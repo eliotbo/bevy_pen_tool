@@ -95,19 +95,11 @@ pub fn update_lut(
     }
 }
 
-// TODO: make this run only when an anchor actually moves
 pub fn update_anchors(
-    // mut commands: Commands,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut query: Query<(&Handle<Bezier>, &Anchor, &MovingAnchor)>,
-    // anchor_query: Query<(Entity, &Handle<Bezier>), With<AchorEdgeQuad>>,
-
-    // anchor_move_query: Query<&MoveAnchor>,
-    // globals: Res<Globals>,
     cursor: Res<Cursor>,
     maps: ResMut<Maps>,
-    // mut history: ResMut<History>,
-    // mut add_to_history_event_reader: EventReader<HistoryAction>,
 ) {
     // TODO: remove dependency on Cursor
     if cursor.latch.is_empty() {
@@ -115,37 +107,20 @@ pub fn update_anchors(
             //
             if let Some(bezier) = bezier_curves.get_mut(bezier_handle) {
                 //
-                // println!("updating!!!!!!!!!!!!!!!");
-
-                if moving_anchor.is_clicked {
-                    // println!("not clicked");
+                if moving_anchor.follow_mouse {
                     bezier.update_positions_cursor(&cursor, *anchor);
 
-                    // TODO: latching does not work!
-                    // find the latched partner in real time while the anchor is moving
-                    // let latch_info = bezier.get_anchor_latch_info(bezier.move_quad);
                     let latch_info = bezier.get_anchor_latch_info(*anchor);
 
-                    // println!("latch_info: {:?}", latch_info);
-
                     if let Some(_) = latch_info {
-                        // info!("update_latched_partner_position",);
-
                         update_latched_partner_position(
                             &maps.bezier_map,
                             &mut bezier_curves,
                             latch_info,
                         );
-
-                        // once a latch is found, no need to search for more
-                        break;
                     }
                 }
             }
-
-            // if moving_anchor.once {
-            //     commands.entity(entity).remove::<MovingAnchor>();
-            // }
         }
     }
 }
@@ -160,10 +135,13 @@ pub fn bezier_anchor_order(
     mut move_anchor_event_reader: EventReader<MoveAnchorEvent>,
     // mut move_event_reader: EventReader<MoveAnchorEvent>,
     audio: Res<Audio>,
+    mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {
-    let mut latch_partner: Option<LatchData> = None;
+    let mut latch_partner: Option<(BezierId, LatchData)> = None;
 
     let mut latched_chain_whole_curve: Vec<Handle<Bezier>> = Vec::new();
+
+    let mut latched_chain_whole_curve_set: HashSet<BezierId> = HashSet::new();
 
     // // TODO: this is inefficient
     // let bezier_curve_hack = bezier_curves
@@ -182,10 +160,7 @@ pub fn bezier_anchor_order(
 
         // order to move the quad that was clicked on
         if let Some(bezier_handle_entity) = maps.bezier_map.get(&move_anchor.bezier_id) {
-            // let (Entity, ) = anchor_query.get(bezier_handle_entity.anchor_entities[&move_anchor.anchor]);
-            let anchor_entity = bezier_handle_entity.anchor_entities[&move_anchor.anchor];
-            let adjoint_anchor_entity =
-                bezier_handle_entity.anchor_entities[&move_anchor.anchor.adjoint()];
+            // TODO: take care of the Anchor::All case
 
             let bezier = bezier_curves.get_mut(&bezier_handle_entity.handle).unwrap();
 
@@ -194,58 +169,60 @@ pub fn bezier_anchor_order(
                 bezier.update_previous_pos();
 
                 if move_anchor.anchor == Anchor::All {
+                    latched_chain_whole_curve_set.insert(move_anchor.bezier_id);
                     latched_beziers.push(bezier.id);
+                } else {
+                    bezier.move_anchor(
+                        &mut commands,
+                        move_anchor.once,
+                        true,
+                        move_anchor.anchor,
+                        maps.as_ref(),
+                    );
                 }
 
-                // info!(
-                //     "Adding MovingQuad to Bezier with anchor {:?}",
-                //     move_anchor.anchor
-                // );
+                // let anchor_entity = bezier_handle_entity.anchor_entities[&move_anchor.anchor];
 
-                // Insert MovingAnchor to the latched anchors
-                if let Some(latch_data) = bezier
-                    .latches
-                    .get(&move_anchor.anchor.to_edge_with_controls())
-                {
-                    // info!("Latched anchor found");
-                    // get partner entity
-                    let partner_map = &maps
-                        .bezier_map
-                        .get(&latch_data.latched_to_id)
-                        .unwrap()
-                        .anchor_entities;
+                // let adjoint_anchor_entity =
+                //     bezier_handle_entity.anchor_entities[&move_anchor.anchor.adjoint()];
 
-                    let partner_entity = partner_map[&latch_data.partners_edge.to_anchor()];
-                    let adjoint_partner_entity =
-                        partner_map[&latch_data.partners_edge.to_anchor().adjoint()];
+                // commands.entity(anchor_entity).insert(MovingAnchor {
+                //     once,
+                //     is_clicked: !once, // MoveAnchorEvent could be sent from a undo/redo
+                // });
+                // commands.entity(adjoint_anchor_entity).insert(MovingAnchor {
+                //     once,
+                //     is_clicked: false,
+                // });
 
-                    commands.entity(partner_entity).insert(MovingAnchor {
-                        once: move_anchor.once,
-                        is_clicked: false,
-                    });
-                    commands
-                        .entity(adjoint_partner_entity)
-                        .insert(MovingAnchor {
-                            once: move_anchor.once,
-                            is_clicked: false,
-                        });
-                }
+                // // Insert MovingAnchor to the latched anchors
+                // if let Some(latch_data) = bezier
+                //     .latches
+                //     .get(&move_anchor.anchor.to_edge_with_controls())
+                // {
+                //     // info!("Latched anchor found");
+                //     // get partner entity
+                //     let partner_map = &maps
+                //         .bezier_map
+                //         .get(&latch_data.latched_to_id)
+                //         .unwrap()
+                //         .anchor_entities;
 
-                commands.entity(anchor_entity).insert(MovingAnchor {
-                    once: move_anchor.once,
-                    is_clicked: !move_anchor.once,
-                });
-                commands.entity(adjoint_anchor_entity).insert(MovingAnchor {
-                    once: move_anchor.once,
-                    is_clicked: false,
-                });
-                // TODO: is this needed?
-                commands
-                    .entity(bezier_handle_entity.entity)
-                    .insert(MovingAnchor {
-                        once: move_anchor.once,
-                        is_clicked: false,
-                    });
+                //     let partner_entity = partner_map[&latch_data.partners_edge.to_anchor()];
+                //     let adjoint_partner_entity =
+                //         partner_map[&latch_data.partners_edge.to_anchor().adjoint()];
+
+                //     commands.entity(partner_entity).insert(MovingAnchor {
+                //         once,
+                //         is_clicked: false,
+                //     });
+                //     commands
+                //         .entity(adjoint_partner_entity)
+                //         .insert(MovingAnchor {
+                //             once,
+                //             is_clicked: false,
+                //         });
+                // }
             }
 
             // unlatch mechanism
@@ -256,9 +233,11 @@ pub fn bezier_anchor_order(
                         anchor @ (Anchor::Start | Anchor::End) => {
                             if let Some(temp_latch) = bezier.latches.get(&anchor.to_edge()) {
                                 // keep the latch information in memory to unlatch the anchor's partner below
-                                latch_partner = Some(temp_latch.clone());
+                                latch_partner = Some((bezier.id, temp_latch.clone()));
                             }
                             bezier.latches.remove(&anchor.to_edge());
+                            bezier.potential_latch = None;
+                            // println!("Unlatched primary : {:?}", bezier.id);
                         }
 
                         _ => {}
@@ -274,6 +253,28 @@ pub fn bezier_anchor_order(
     for bezier_id in latched_beziers {
         latched_chain_whole_curve =
             find_connected_curves(bezier_id, &mut bezier_curves, &maps.bezier_map);
+
+        latched_chain_whole_curve_set = latched_chain_whole_curve
+            .iter()
+            .map(|x| x.id.into())
+            .collect::<HashSet<BezierId>>()
+            .union(&latched_chain_whole_curve_set)
+            .cloned()
+            .collect::<HashSet<BezierId>>();
+
+        println!(
+            "latched_chain_whole_curve_set: {:?}",
+            latched_chain_whole_curve_set
+        );
+        // // TODO: add this to all anchors in the chain
+        // commands.entity(anchor_entity).insert(MovingAnchor {
+        //     once: move_anchor.once,
+        //     is_clicked: !move_anchor.once,
+        // });
+        // commands.entity(adjoint_anchor_entity).insert(MovingAnchor {
+        //     once: move_anchor.once,
+        //     is_clicked: false,
+        // });
     }
     ////////////////////////////////////////
 
@@ -320,15 +321,33 @@ pub fn bezier_anchor_order(
     // }
 
     // Move the whole chain -> Anchor::All is sent
-    for handle in latched_chain_whole_curve.iter() {
-        let bezier = bezier_curves.get_mut(handle).unwrap();
+
+    for handle in latched_chain_whole_curve_set.iter() {
+        let handle_entity = maps.bezier_map.get(&handle).unwrap();
+        let bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
         // bezier.move_quad = Anchor::All;
 
         bezier.update_previous_pos();
+
+        bezier.move_anchor(
+            &mut commands,
+            false, /* once */
+            true,  /* follow_mouse */
+            Anchor::Start,
+            maps.as_ref(),
+        );
+
+        bezier.move_anchor(
+            &mut commands,
+            false, /* once */
+            true,  /* follow_mouse */
+            Anchor::End,
+            maps.as_ref(),
+        );
     }
 
     // unlatch partner
-    if let Some(latch) = latch_partner {
+    if let Some((self_id, latch)) = latch_partner {
         //
         if let Some(handle) = maps.bezier_map.get(&latch.latched_to_id) {
             //
@@ -336,6 +355,14 @@ pub fn bezier_anchor_order(
             //
             // if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
             if let Some(_) = bezier.latches.remove(&latch.partners_edge) {
+                bezier.potential_latch = None;
+                // println!("Unlatched secondary : {:?}", bezier.id);
+                add_to_history_event_writer.send(HistoryAction::Unlatched {
+                    self_id: self_id.into(),
+                    partner_bezier_id: latch.latched_to_id.into(),
+                    self_anchor: latch.self_edge,
+                    partner_anchor: latch.partners_edge,
+                });
                 // *latch_local = Vec::new();
                 if globals.sound_on {
                     if let Some(sound) = maps.sounds.get("unlatch") {
