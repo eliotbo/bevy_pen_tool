@@ -28,8 +28,6 @@ pub struct BezierState {
     pub group: Option<GroupId>,
 }
 
-pub struct TargetPositions(pub HashMap<BezierId, BezierPositions>);
-
 impl From<&Bezier> for BezierState {
     fn from(bezier: &Bezier) -> Self {
         Self {
@@ -85,7 +83,7 @@ pub struct FrameNumber(pub i32);
 impl Plugin for PenApiPlugin {
     fn build(&self, app: &mut App) {
         app
-            .insert_resource(TargetPositions(HashMap::new()))
+
             .insert_resource(PenCommandVec(Vec::new()))
             .insert_resource(FrameNumber(0))
             .insert_resource(CurveVec(Vec::new()))
@@ -174,6 +172,7 @@ fn direct_api_calls(
                             .group
                             .insert((handle_entity.entity, handle_entity.handle.clone()));
                         action_event_writer.send(Action::Delete(false));
+                        info!("DELETING: {:?}", id);
                     }
                     if let None = maps.bezier_map.remove(&id) {
                         info!("COULD NOT DELETE CURVE FROM MAP: {:?}", id);

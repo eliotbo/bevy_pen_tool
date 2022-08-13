@@ -30,3 +30,15 @@ path = "examples/blank.rs"
 [[example]]
 name = "move_test"
 path = "examples/move_test.rs"
+
+[[example]]
+name = "latch_test"
+path = "examples/latch_test.rs"
+
+[[example]]
+name = "unlatch_test"
+path = "examples/unlatch_test.rs"
+
+[[example]]
+name = "delete_test"
+path = "examples/delete_test.rs"

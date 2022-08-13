@@ -19,7 +19,7 @@ use bevy_inspector_egui::Inspectable;
 #[derive(Clone)]
 pub struct CurveVec(pub Vec<BezierId>);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct CurveIdEdge {
     pub id: BezierId,
     pub anchor_edge: AnchorEdge,
@@ -1588,6 +1588,15 @@ impl Default for BezierPositions {
             control_end: Vec2::ZERO,
         }
     }
+}
+
+impl BezierPositions {
+    pub const ZERO: Self = Self {
+        start: Vec2::ZERO,
+        end: Vec2::ZERO,
+        control_start: Vec2::ZERO,
+        control_end: Vec2::ZERO,
+    };
 }
 
 pub struct ButtonMaterials {
