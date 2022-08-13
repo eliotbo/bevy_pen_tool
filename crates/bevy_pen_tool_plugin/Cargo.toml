@@ -26,3 +26,7 @@ bevy_egui = "0.15"
 [[example]]
 name = "blank"
 path = "examples/blank.rs"
+
+[[example]]
+name = "move_test"
+path = "examples/move_test.rs"

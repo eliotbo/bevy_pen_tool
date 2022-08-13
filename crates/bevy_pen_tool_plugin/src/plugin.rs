@@ -1,4 +1,5 @@
 use crate::actions::*;
+use crate::pen::*;
 use crate::undo::*;
 
 use crate::moves::*;
@@ -7,22 +8,30 @@ use bevy_pen_tool_spawner::*;
 use bevy::prelude::*;
 use bevy::render::{render_graph::RenderGraph, RenderApp};
 
-pub struct PenPlugin;
+pub struct BevyPenToolPlugin;
 use bevy::window::{CreateWindow, WindowId};
 use bevy_inspector_egui::InspectorPlugin;
 
 use once_cell::sync::Lazy;
 // TODO
 
+// bug with latches and undos and delete
+//
+// there is a bug where after unlatching and relatching with undo redo, you
+// take an anchor edge and move it next to its previous latched partner, and
+// it relatches without pressing shift + ctrl
+
+// SEND FAKE SEQUENCES OF ACTIONS AS TESTS!!!
+// fix switch button (hold down spawn for example)
+// 0) undo/redo multiple steps at once
 // 1) undo/redo for groups
 // 2) remove UserState
-// 3) replace move_quad Anchor::All, by event
-// 4) Make "spawn" followed by "move end anchor" the same HistoryAction
 
-impl Plugin for PenPlugin {
+impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {
         app
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
+            .add_plugin(PenApiPlugin)
             .add_plugin(SpawnerPlugin)
             .add_plugin(InspectorPlugin::<History>::new())
             .add_plugin(InspectorPlugin::<HistoryInspector>::new().on_window(*SECOND_WINDOW_ID))
@@ -30,6 +39,7 @@ impl Plugin for PenPlugin {
             .add_event::<RemoveMovingQuadEvent>()
             .add_event::<GroupBoxEvent>()
             .add_event::<SpawningCurve>()
+            .add_event::<SpawnCurve>()
             .insert_resource(History::default())
             .insert_resource(HistoryInspector::default())
             .insert_resource(HistoryLenInspector::default())
@@ -257,3 +267,102 @@ fn debug(
     }
 }
 //////////////////////////// Debugging ////////////////////////////
+
+const P1: Vec2 = Vec2::new(0.0, 0.0);
+const P2: Vec2 = Vec2::new(0.0, 0.0);
+// const P3: Vec2 = Vec2::new(0.0, 0.0);
+// const P4: Vec2 = Vec2::new(0.0, 0.0);
+// const P5: Vec2 = Vec2::new(0.0, 0.0);
+// const P6: Vec2 = Vec2::new(0.0, 0.0);
+// const P7: Vec2 = Vec2::new(0.0, 0.0);
+// const P8: Vec2 = Vec2::new(0.0, 0.0);
+
+pub fn first_test() {
+    // Setup app
+    let mut app = App::new();
+
+    app.add_plugins(DefaultPlugins);
+    app.add_plugin(BevyPenToolPlugin);
+
+    // Add Score resource
+
+    // Add helper system to access bezier curves
+    // (can't access assets through world directly)
+    // app.add_system(update_bez);
+
+    // Run systems once
+    app.update();
+
+    // // TODO: here, we have to create related systems that will do the logic PenCommands,
+    // // but we can enter the actual values here inside the #[test]
+
+    let mut pen_commands = app.world.get_resource_mut::<PenCommandVec>().unwrap();
+    // initiate a BezierPositions
+    let mut positions1 = BezierPositions {
+        start: Vec2::new(200., -100.),
+        end: Vec2::new(100., 100.),
+        control_start: Vec2::new(0., 100.),
+        control_end: Vec2::new(100., 100.),
+    };
+
+    let id1 = pen_commands.spawn(positions1);
+
+    let positions2 = BezierPositions {
+        start: Vec2::ZERO,
+        end: Vec2::new(-100., -100.),
+        control_start: Vec2::new(0., -100.),
+        control_end: Vec2::new(100., -200.),
+    };
+
+    let id2 = pen_commands.spawn(positions2);
+
+    app.update();
+
+    let mut pen_commands = app.world.get_resource_mut::<PenCommandVec>().unwrap();
+    pen_commands.move_anchor(id1, Anchor::Start, Vec2::ZERO);
+
+    positions1 = BezierPositions {
+        start: Vec2::ZERO,
+        end: Vec2::new(100., 100.),
+        control_start: Vec2::new(0., 100.) - Vec2::new(200., -100.), // moves with start
+        control_end: Vec2::new(100., 100.),
+    };
+
+    pen_commands.latch(
+        CurveIdEdge {
+            id: id1,
+            anchor_edge: AnchorEdge::Start,
+        },
+        CurveIdEdge {
+            id: id2,
+            anchor_edge: AnchorEdge::Start,
+        },
+    );
+
+    pen_commands.unlatch(
+        CurveIdEdge {
+            id: id1,
+            anchor_edge: AnchorEdge::Start,
+        },
+        CurveIdEdge {
+            id: id2,
+            anchor_edge: AnchorEdge::Start,
+        },
+    );
+
+    let mut target_positions = app.world.get_resource_mut::<TargetPositions>().unwrap();
+
+    target_positions.0.insert(id1, positions1);
+    target_positions.0.insert(id2, positions2);
+
+    app.update();
+
+    // let bezier_curves = app.world.resource::<BezierTestHashed>();
+    // let target_positions = app.world.resource::<TargetPositions>();
+
+    // for (id, target_pos) in target_positions.0.iter() {
+    //     let bezier = bezier_curves.0.get(&id).unwrap();
+    //     let bezier_state = BezierState::from(bezier);
+    //     assert_eq!(&bezier_state.positions, target_pos);
+    // }
+}

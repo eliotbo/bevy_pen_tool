@@ -42,6 +42,7 @@ pub fn spawn_bezier_system(
     for SpawningCurve {
         bezier_hist: maybe_bezier_hist,
         maybe_bezier_id,
+        follow_mouse,
     } in spawn_curve_event_reader.iter()
     {
         let clearcolor = clearcolor_struct.0;
@@ -104,7 +105,8 @@ pub fn spawn_bezier_system(
 
         // if the spawn if sent from a redo action
         if let Some(bezier_hist) = maybe_bezier_hist {
-            do_send_to_history = false;
+            // do_send_to_history = false;
+            do_send_to_history = bezier_hist.do_send_to_history;
             bezier.positions = bezier_hist.positions.clone();
             bezier.latches = bezier_hist.latches.clone();
             bezier.color = bezier_hist.color.clone();
@@ -136,6 +138,7 @@ pub fn spawn_bezier_system(
             &mut add_to_history_event_writer,
             &maybe_bezier_id,
             do_send_to_history,
+            *follow_mouse,
         );
     }
 
@@ -163,6 +166,7 @@ pub fn spawn_bezier(
     add_to_history_event_writer: &mut EventWriter<HistoryAction>,
     maybe_bezier_id: &Option<BezierId>,
     do_send_to_history: bool,
+    follow_mouse: bool,
 ) -> (Entity, Handle<Bezier>) {
     bezier.compute_lut_walk(100);
 
@@ -285,7 +289,7 @@ pub fn spawn_bezier(
             add_to_history_event_writer.send(HistoryAction::Latched {
                 self_id: bezier.id.into(),
                 self_anchor: latch.self_edge,
-                partner_bezier_id: latch.latched_to_id.into(),
+                partner_id: latch.latched_to_id.into(),
                 partner_anchor: latch.partners_edge,
             });
         }
@@ -372,7 +376,7 @@ pub fn spawn_bezier(
             once: false,
             // follow mouse only if the spawn originate from a mouse click,
             // in which case an HistoryAction::SpawnedCurve is sent to the history
-            follow_mouse: do_send_to_history,
+            follow_mouse,
         })
         .insert(bezier_handle.clone())
         // .insert(shader_params_handle_bb.clone())

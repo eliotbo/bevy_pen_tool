@@ -16,9 +16,49 @@ use flo_curves::*;
 
 use bevy_inspector_egui::Inspectable;
 
+#[derive(Clone)]
+pub struct CurveVec(pub Vec<BezierId>);
+
+#[derive(Copy, Clone)]
+pub struct CurveIdEdge {
+    pub id: BezierId,
+    pub anchor_edge: AnchorEdge,
+}
+
+pub enum PenCommand {
+    Spawn {
+        positions: BezierPositions,
+        id: BezierId,
+    },
+    Move(MoveCommand),
+    Latch {
+        l1: CurveIdEdge,
+        l2: CurveIdEdge,
+    },
+    Unlatch {
+        l1: CurveIdEdge,
+        l2: CurveIdEdge,
+    },
+    Delete {
+        id: BezierId,
+    },
+}
+
+#[derive(Copy, Clone)]
+pub struct MoveCommand {
+    pub anchor: Anchor,
+    pub id: BezierId,
+    pub new_position: Vec2,
+}
+
+pub struct SpawnCurve {
+    pub positions: BezierPositions,
+}
+
 pub struct SpawningCurve {
     pub bezier_hist: Option<BezierHist>,
     pub maybe_bezier_id: Option<BezierId>,
+    pub follow_mouse: bool,
 }
 
 pub type BezierHistId = u64;
@@ -29,6 +69,7 @@ pub struct BezierHist {
     pub color: Option<Color>,
     pub latches: HashMap<AnchorEdge, LatchData>,
     pub id: BezierHistId,
+    pub do_send_to_history: bool,
 }
 
 impl From<&Bezier> for BezierHist {
@@ -38,6 +79,26 @@ impl From<&Bezier> for BezierHist {
             color: None,
             latches: bezier.latches.clone(),
             id: bezier.id.into(),
+            do_send_to_history: false,
+        }
+    }
+}
+
+impl BezierHist {
+    // API
+    // TODO: make most of the structs public(crate) and
+    // leave only the API public
+    //
+    // Programmatically generate a Bezier Curve (see examples)
+    pub fn new(positions: BezierPositions, id: u64) -> Self {
+        // generate a random id
+
+        Self {
+            positions,
+            color: None,
+            latches: HashMap::new(),
+            id,
+            do_send_to_history: true,
         }
     }
 }
@@ -94,13 +155,13 @@ pub enum HistoryAction {
     Latched {
         self_id: BezierHistId,
         self_anchor: AnchorEdge,
-        partner_bezier_id: BezierHistId,
+        partner_id: BezierHistId,
         partner_anchor: AnchorEdge,
     },
 
     Unlatched {
         self_id: BezierHistId,
-        partner_bezier_id: BezierHistId,
+        partner_id: BezierHistId,
         self_anchor: AnchorEdge,
         partner_anchor: AnchorEdge,
     },
@@ -893,7 +954,7 @@ impl Default for Globals {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Inspectable)]
+#[derive(Debug, Clone, Serialize, PartialEq, Deserialize, Inspectable)]
 pub struct LatchData {
     // #[inspectable(min = 0, max = 999999999999999999)]
     pub latched_to_id: BezierId,
@@ -1509,7 +1570,8 @@ pub fn update_latched_partner_position(
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Inspectable)]
+// leave this public
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Inspectable, PartialEq)]
 pub struct BezierPositions {
     pub start: Vec2,
     pub end: Vec2,
@@ -1887,6 +1949,36 @@ pub fn adjust_group_attributes(
                 }
             }
         }
+    }
+}
+
+pub fn move_anchor(
+    commands: &mut Commands,
+    move_command: MoveCommand,
+    mut bezier_curves: &mut ResMut<Assets<Bezier>>,
+    maps: &ResMut<Maps>,
+) {
+    // println!("undo: MovedAnchor");
+    let anchor = move_command.anchor;
+    let handle_entities = maps.bezier_map[&move_command.id.into()].clone();
+    let bezier = bezier_curves.get_mut(&handle_entities.handle).unwrap();
+
+    bezier.set_position(anchor, move_command.new_position);
+
+    // attaches MovingAnchor component to the entity
+    bezier.move_anchor(
+        commands,
+        true,  // one move for a single frame
+        false, // do not follow mouse
+        anchor,
+        maps.as_ref(),
+    );
+
+    let anchor_edge = anchor.to_edge_with_controls();
+    if let Some(_) = bezier.latches.get(&anchor_edge) {
+        let latch_info = bezier.get_anchor_latch_info(anchor);
+
+        update_latched_partner_position(&maps.bezier_map, &mut bezier_curves, latch_info);
     }
 }
 

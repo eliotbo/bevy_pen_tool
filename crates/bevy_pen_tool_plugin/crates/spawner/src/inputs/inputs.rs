@@ -528,6 +528,7 @@ pub fn spawn_curve_order_on_mouseclick(
             spawn_curve_event_writer.send(SpawningCurve {
                 bezier_hist: None,
                 maybe_bezier_id: None,
+                follow_mouse: true,
             });
             //
             if !is_latched {
@@ -550,6 +551,7 @@ pub fn spawn_curve_order_on_mouseclick(
             spawn_curve_event_writer.send(SpawningCurve {
                 bezier_hist: None,
                 maybe_bezier_id: None,
+                follow_mouse: true,
             });
         }
         _ => {}
