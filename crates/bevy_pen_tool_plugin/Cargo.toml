@@ -42,3 +42,23 @@ path = "examples/unlatch_test.rs"
 [[example]]
 name = "delete_test"
 path = "examples/delete_test.rs"
+
+[[example]]
+name = "complex_test1"
+path = "examples/complex_test1.rs"
+
+[[example]]
+name = "latch_then_delete_test"
+path = "examples/latch_then_delete_test.rs"
+
+[[example]]
+name = "undo_latch_test"
+path = "examples/undo_latch_test.rs"
+
+[[example]]
+name = "undo_move_test"
+path = "examples/undo_move_test.rs"
+
+[[example]]
+name = "undo_unlatch_test"
+path = "examples/undo_unlatch_test.rs"

@@ -73,6 +73,14 @@ impl PenCommandVec {
     pub fn unlatch(&mut self, l1: CurveIdEdge, l2: CurveIdEdge) {
         self.0.push(PenCommand::Unlatch { l1, l2 });
     }
+
+    pub fn undo(&mut self) {
+        self.0.push(PenCommand::Undo);
+    }
+
+    pub fn redo(&mut self) {
+        self.0.push(PenCommand::Redo);
+    }
 }
 
 pub struct PenApiPlugin;
@@ -177,6 +185,12 @@ fn direct_api_calls(
                     if let None = maps.bezier_map.remove(&id) {
                         info!("COULD NOT DELETE CURVE FROM MAP: {:?}", id);
                     }
+                }
+                PenCommand::Undo => {
+                    action_event_writer.send(Action::Undo);
+                }
+                PenCommand::Redo => {
+                    action_event_writer.send(Action::Redo);
                 }
             }
         }

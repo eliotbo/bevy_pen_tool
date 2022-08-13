@@ -42,6 +42,8 @@ pub enum PenCommand {
     Delete {
         id: BezierId,
     },
+    Undo,
+    Redo,
 }
 
 #[derive(Copy, Clone)]
