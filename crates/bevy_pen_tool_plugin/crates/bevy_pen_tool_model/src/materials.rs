@@ -2,7 +2,6 @@ use bevy::{prelude::*, reflect::TypeUuid, render::render_resource::*, sprite::Ma
 
 #[macro_export]
 macro_rules! make_mat {
-    // ($($value:expr, $ty_of_val:ty, ),*) => {{
     ($( $name_of_mat:ident, $gpu_name_of_mat:ident, $vert_shader:expr, $frag_shader:expr, $uuid:expr ),*) => {
 
         $(
@@ -37,12 +36,6 @@ macro_rules! make_mat {
                     }
                 }
             }
-
-            // #[derive(Clone)]
-            // pub struct $gpu_name_of_mat {
-            //     _buffer: Buffer,
-            //     // bind_group: BindGroup,
-            // }
 
             impl Material2d for $name_of_mat {
                 fn fragment_shader() -> ShaderRef {

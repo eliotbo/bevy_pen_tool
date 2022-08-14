@@ -1,10 +1,11 @@
 use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
-use crate::util::{
+use crate::materials::ButtonMat;
+use crate::model::util::Maps;
+use crate::model::{
     get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier,
-    BezierGrandParent, BezierId, BezierParent, ButtonMat, ColorButton, Globals, HistoryAction,
-    Maps, MoveAnchorEvent, MovingAnchor, OfficialLatch, SpawningCurve, UiAction, UiBoard,
-    UserState,
+    BezierGrandParent, BezierId, BezierParent, ColorButton, Globals, HistoryAction,
+    MoveAnchorEvent, MovingAnchor, OfficialLatch, SpawningCurve, UiAction, UiBoard, UserState,
 };
 
 use bevy::render::camera::OrthographicProjection;

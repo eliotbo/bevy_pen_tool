@@ -1,10 +1,11 @@
 use crate::inputs::{Cursor, Latch};
 
-use crate::util::{
-    AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierControlsMat, BezierEndsMat, BezierGrandParent,
-    BezierHandleEntity, BezierHist, BezierId, BezierMidMat, BezierParent, BezierPositions,
-    BoundingBoxQuad, ControlPointQuad, Globals, HistoryAction, LatchData, Maps, MiddlePointQuad,
-    MovingAnchor, SelectionMat, SpawnMids, SpawningCurve, UserState,
+use crate::materials::{BezierControlsMat, BezierEndsMat, BezierMidMat, SelectionMat};
+
+use crate::model::{
+    AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierGrandParent, BezierHandleEntity, BezierHist,
+    BezierId, BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, Globals,
+    HistoryAction, LatchData, Maps, MiddlePointQuad, MovingAnchor, SpawnMids, SpawningCurve,
 };
 
 use bevy::{asset::HandleId, prelude::*, sprite::MaterialMesh2dBundle};
@@ -25,15 +26,15 @@ pub fn spawn_bezier_system(
     mut globals: ResMut<Globals>,
     mut maps: ResMut<Maps>,
     mut latch_event_reader: EventReader<Latch>,
-    mut user_state: ResMut<UserState>,
+    // mut user_state: ResMut<UserState>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
     mut spawn_curve_event_reader: EventReader<SpawningCurve>,
     // mut move_quad_event_writer: EventWriter<MoveAnchorEvent>,
     // cam_query: Query<&Transform, With<OrthographicProjection>>,
 ) {
     let mut do_send_to_history = true;
-    let mut do_move_anchor = false;
-    let mut do_nothing = false;
+    // let mut do_move_anchor = false;
+    // let mut do_nothing = false;
     // if let UserState::SpawningCurve {
     //     bezier_hist: maybe_bezier_hist,
     //     maybe_bezier_id,
@@ -115,9 +116,9 @@ pub fn spawn_bezier_system(
             bezier.do_compute_lut = true;
             // the id part is done above
 
-            do_nothing = true;
+            // do_nothing = true;
         } else {
-            do_move_anchor = true;
+            // do_move_anchor = true;
         }
 
         bezier.update_previous_pos();

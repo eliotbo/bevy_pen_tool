@@ -1,5 +1,5 @@
+use bevy_pen_tool_model::model::*;
 use bevy_pen_tool_plugin::{BevyPenToolPlugin, Bezier, Globals};
-use bevy_pen_tool_spawner::util::*;
 
 // use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::{prelude::*, render::camera::OrthographicProjection};

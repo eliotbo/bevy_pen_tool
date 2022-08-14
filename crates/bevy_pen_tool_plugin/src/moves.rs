@@ -1,8 +1,9 @@
-use bevy_pen_tool_spawner::inputs::{Action, Cursor};
-use bevy_pen_tool_spawner::util::{
-    AchorEdgeQuad, AnchorEdge, Bezier, BezierGrandParent, BezierMidMat, BezierParent,
-    BoundingBoxQuad, ControlPointQuad, FollowBezierAnimation, Globals, Group, GroupMiddleQuad,
-    MiddlePointQuad, MovingAnchor, SelectionMat, TurnRoundAnimation, UiAction, UiBoard,
+use bevy_pen_tool_model::inputs::{Action, Cursor};
+use bevy_pen_tool_model::materials::{BezierMidMat, SelectionMat};
+use bevy_pen_tool_model::model::{
+    AchorEdgeQuad, AnchorEdge, Bezier, BezierGrandParent, BezierParent, BoundingBoxQuad,
+    ControlPointQuad, FollowBezierAnimation, Globals, Group, GroupMiddleQuad, MiddlePointQuad,
+    MovingAnchor, TurnRoundAnimation, UiAction, UiBoard,
 };
 
 use bevy::math::Vec3A;

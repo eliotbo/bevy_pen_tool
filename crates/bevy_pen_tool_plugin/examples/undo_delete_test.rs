@@ -1,5 +1,5 @@
+use bevy_pen_tool_model::model::*;
 use bevy_pen_tool_plugin::{pen::*, BevyPenToolPlugin, Bezier};
-use bevy_pen_tool_spawner::util::*;
 
 use bevy::prelude::*;
 use std::collections::HashMap;
@@ -24,7 +24,7 @@ fn main() {
     let mut pen_commands = app.world.get_resource_mut::<PenCommandVec>().unwrap();
     pen_commands.delete(id1);
 
-    // it takes six frames for the deletion to be processed.
+    // it takes around six frames for the deletion to be processed.
     // multiple events are involved
     app.update();
     app.update();

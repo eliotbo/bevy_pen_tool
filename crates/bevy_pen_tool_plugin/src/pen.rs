@@ -3,7 +3,7 @@
 use crate::undo::*;
 
 use bevy::prelude::*;
-use bevy_pen_tool_spawner::*;
+use bevy_pen_tool_model::*;
 
 use rand::prelude::*;
 

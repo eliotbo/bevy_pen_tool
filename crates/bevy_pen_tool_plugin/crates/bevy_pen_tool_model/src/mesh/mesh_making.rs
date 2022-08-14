@@ -1,5 +1,5 @@
 use crate::inputs::Action;
-use crate::util::*;
+use crate::model::*;
 use crate::RoadMesh2dMaterial;
 // use bevy::reflect::TypeUuid;
 // use bevy::render::mesh::Indices;

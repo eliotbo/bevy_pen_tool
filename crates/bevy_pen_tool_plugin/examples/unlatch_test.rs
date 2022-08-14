@@ -1,5 +1,5 @@
+use bevy_pen_tool_model::model::*;
 use bevy_pen_tool_plugin::{pen::*, BevyPenToolPlugin, Bezier};
-use bevy_pen_tool_spawner::util::*;
 
 use bevy::prelude::*;
 use std::collections::HashMap;

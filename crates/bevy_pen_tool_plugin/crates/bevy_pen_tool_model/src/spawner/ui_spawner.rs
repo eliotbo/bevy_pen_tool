@@ -1,8 +1,8 @@
 use crate::inputs::{ButtonInteraction, ButtonState, UiButton};
 // use crate::util::materials::*;
-use crate::util::{
-    BezierEndsMat, BezierGrandParent, ButtonMat, ColorButton, Globals, Icon, Maps, OnOffMaterial,
-    UiAction, UiBoard, UiMat,
+use crate::materials::{BezierEndsMat, ButtonMat, UiMat};
+use crate::model::{
+    BezierGrandParent, ColorButton, Globals, Icon, Maps, OnOffMaterial, UiAction, UiBoard,
 };
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};

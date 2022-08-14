@@ -1,18 +1,14 @@
-mod bezier_spawner;
 pub mod inputs;
-mod mesh_making;
-mod others_spawner;
-mod road_mesh;
-mod ui_spawner;
-pub mod util;
+pub mod materials;
+mod mesh;
+pub mod model;
+mod spawner;
 
-pub use bezier_spawner::*;
 pub use inputs::*;
-pub use mesh_making::*;
-pub use others_spawner::*;
-pub use road_mesh::*;
-pub use ui_spawner::*;
-pub use util::*;
+pub use materials::*;
+pub use mesh::*;
+pub use model::*;
+pub use spawner::*;
 
 use bevy::{prelude::*, sprite::Material2dPlugin};
 
@@ -35,9 +31,8 @@ impl Plugin for SpawnerPlugin {
             .add_event::<HistoryAction>()
             .add_event::<ComputeLut>()
             .add_event::<RedoDelete>()
-            // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(ColoredMesh2dPlugin) // mesh making
-            .add_plugin(RoadMesh2dPlugin) // mesh making
+            .add_plugin(RoadMesh2dPlugin)
             .add_plugin(Material2dPlugin::<SelectionMat>::default())
             .add_plugin(Material2dPlugin::<SelectingMat>::default())
             .add_plugin(Material2dPlugin::<ButtonMat>::default())
@@ -53,10 +48,10 @@ impl Plugin for SpawnerPlugin {
             .insert_resource(Selection::default())
             .insert_resource(Maps::default())
             .insert_resource(UserState::default())
-            .add_startup_system(setup.exclusive_system().at_start()) //.label("setup"))
-            .add_startup_system(spawn_selection_bounding_box) //.after("setup"))
-            .add_startup_system(spawn_ui) //.after("setup"))
-            .add_startup_system(spawn_selecting_bounding_box) //.after("setup"))
+            .add_startup_system(setup.exclusive_system().at_start())
+            .add_startup_system(spawn_selection_bounding_box)
+            .add_startup_system(spawn_ui)
+            .add_startup_system(spawn_selecting_bounding_box)
             //
             // Update controller
             .add_system_set(
@@ -96,7 +91,6 @@ impl Plugin for SpawnerPlugin {
                     .with_system(adjust_selecting_attributes)
                     .with_system(adjust_group_attributes)
                     .with_system(spawn_bezier_system)
-                    // .with_system(spawn_group_middle_quads)
                     .with_system(spawn_group_entities)
                     .label("view")
                     .after("model"),
@@ -104,13 +98,7 @@ impl Plugin for SpawnerPlugin {
     }
 }
 
-fn setup(
-    // mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut maps: ResMut<Maps>,
-    // audio: Res<Audio>,
-) {
+fn setup(asset_server: Res<AssetServer>, mut meshes: ResMut<Assets<Mesh>>, mut maps: ResMut<Maps>) {
     asset_server.watch_for_changes().unwrap();
 
     let latch_sound: Handle<AudioSource> = asset_server.load("sounds/latch.ogg");
@@ -169,43 +157,7 @@ fn setup(
     maps.mesh_handles.insert("icon", mesh_handle_icon.clone());
 
     let road_texture_handle: Handle<Image> = asset_server.load("textures/single_lane_road.png");
-    // print!("road_texture_handle: {:?}", road_texture_handle);
 
     maps.textures
         .insert("single_lane_road", road_texture_handle);
-
-    // thread::sleep(hundred_millis);
 }
-
-// fn setup(
-//     // mut commands: Commands,
-//     asset_server: Res<AssetServer>,
-//     mut meshes: ResMut<Assets<Mesh>>,
-//     // mut pipelines: ResMut<Assets<PipelineDescriptor>>,
-//     // mut render_graph: ResMut<RenderGraph>,
-//     // mut maps: ResMut<Maps>,
-//     mut commands: Commands,
-//     // mut meshes: ResMut<Assets<Mesh>>,
-//     // mut materials: ResMut<Assets<MyShader>>,
-// ) {
-//     let size = Vec2::new(300.0, 300.0);
-
-//     // let material = materials.add(MyShader::default());
-
-//     // // quad
-//     // commands.spawn().insert_bundle(MaterialMesh2dBundle {
-//     //     mesh: Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(size)))),
-//     //     material,
-//     //     ..Default::default()
-//     // });
-
-//     // commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-
-//     // asset_server.watch_for_changes().unwrap();
-// }
-
-// #[derive(Debug, Clone, TypeUuid, AsStd140)]
-// #[uuid = "da63852d-f82b-459d-9790-3e652f92eaf7"]
-// pub struct MyShader {
-//     pub color: Vec4,
-// }

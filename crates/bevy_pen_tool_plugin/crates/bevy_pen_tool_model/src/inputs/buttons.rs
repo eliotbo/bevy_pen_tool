@@ -1,5 +1,6 @@
 use crate::inputs::Cursor;
-use crate::util::{ButtonMat, Globals, OnOffMaterial, UiAction, UiBoard};
+use crate::materials::ButtonMat;
+use crate::model::{Globals, OnOffMaterial, UiAction, UiBoard};
 
 use bevy::prelude::*;
 

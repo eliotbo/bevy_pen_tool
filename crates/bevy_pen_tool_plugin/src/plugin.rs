@@ -3,7 +3,7 @@ use crate::pen::*;
 use crate::undo::*;
 
 use crate::moves::*;
-use bevy_pen_tool_spawner::*;
+use bevy_pen_tool_model::*;
 
 use bevy::prelude::*;
 use bevy::render::{render_graph::RenderGraph, RenderApp};

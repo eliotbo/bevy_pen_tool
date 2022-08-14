@@ -1,6 +1,7 @@
-use bevy_pen_tool_spawner::inputs::{Action, Cursor};
-use bevy_pen_tool_spawner::spawn_bezier;
-use bevy_pen_tool_spawner::util::*;
+use bevy_pen_tool_model::inputs::{Action, Cursor};
+use bevy_pen_tool_model::materials::*;
+use bevy_pen_tool_model::model::*;
+use bevy_pen_tool_model::spawn_bezier;
 
 use bevy::prelude::*;
 

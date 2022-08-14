@@ -1,5 +1,5 @@
 [package]
-name = "bevy_pen_tool_spawner"
+name = "bevy_pen_tool_model"
 version = "0.3.0"
 edition = "2021"
 

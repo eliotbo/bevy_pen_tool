@@ -1,6 +1,6 @@
-use bevy_pen_tool_spawner::inputs::Action;
+use bevy_pen_tool_model::inputs::Action;
 
-use bevy_pen_tool_spawner::util::*;
+use bevy_pen_tool_model::model::*;
 
 use crate::pen::*;
 
