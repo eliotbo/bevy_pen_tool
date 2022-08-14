@@ -2,6 +2,8 @@ use bevy_pen_tool_spawner::inputs::Action;
 
 use bevy_pen_tool_spawner::util::*;
 
+use crate::pen::*;
+
 use bevy::prelude::*;
 
 use bevy_inspector_egui::Inspectable;

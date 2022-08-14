@@ -16,43 +16,6 @@ use flo_curves::*;
 
 use bevy_inspector_egui::Inspectable;
 
-#[derive(Clone)]
-pub struct CurveVec(pub Vec<BezierId>);
-
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub struct CurveIdEdge {
-    pub id: BezierId,
-    pub anchor_edge: AnchorEdge,
-}
-
-pub enum PenCommand {
-    Spawn {
-        positions: BezierPositions,
-        id: BezierId,
-    },
-    Move(MoveCommand),
-    Latch {
-        l1: CurveIdEdge,
-        l2: CurveIdEdge,
-    },
-    Unlatch {
-        l1: CurveIdEdge,
-        l2: CurveIdEdge,
-    },
-    Delete {
-        id: BezierId,
-    },
-    Undo,
-    Redo,
-}
-
-#[derive(Copy, Clone)]
-pub struct MoveCommand {
-    pub anchor: Anchor,
-    pub id: BezierId,
-    pub new_position: Vec2,
-}
-
 pub struct SpawnCurve {
     pub positions: BezierPositions,
 }
@@ -88,7 +51,7 @@ impl From<&Bezier> for BezierHist {
 
 impl BezierHist {
     // API
-    // TODO: make most of the structs public(crate) and
+    // TODO: make most of the structs public  and
     // leave only the API public
     //
     // Programmatically generate a Bezier Curve (see examples)
@@ -208,6 +171,7 @@ impl Default for History {
     }
 }
 
+/// Either the start point or the end point of a Bezier curve.
 #[derive(PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize, Hash, Inspectable)]
 pub enum AnchorEdge {
     Start,
@@ -236,6 +200,7 @@ impl AnchorEdge {
     }
 }
 
+// TODO: get rid of this
 #[derive(Debug)]
 pub enum UserState {
     Idle,
@@ -326,6 +291,8 @@ pub struct FollowBezierAnimation {
     pub initial_direction: Vec3,
 }
 
+/// A Bezier curve is defined by four points: the start and end points (also called anchor edges throughout the crate)
+/// and two control points. The [`Anchor::All`] variant is used to refer to all four points.
 #[derive(
     PartialEq, Eq, Debug, Clone, Serialize, Deserialize, Copy, Inspectable, Hash, Component,
 )]
@@ -855,7 +822,7 @@ impl Default for Maps {
     }
 }
 
-// pub struct History {
+// pub  struct History {
 //     pub history: Vec<Handle<Bezier>>,
 // }
 
@@ -1000,6 +967,7 @@ impl Default for GroupId {
     }
 }
 
+/// Identifier for a Bezier curve. Collisions are possible but very unlikely.
 #[derive(Copy, Clone, Serialize, Deserialize, PartialEq, Hash, Eq, Inspectable)]
 pub struct BezierId(pub HandleId);
 
@@ -1573,6 +1541,7 @@ pub fn update_latched_partner_position(
 }
 
 // leave this public
+/// Holds information about the position of each anchor for a given Bezier curve.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, Inspectable, PartialEq)]
 pub struct BezierPositions {
     pub start: Vec2,
@@ -1960,36 +1929,6 @@ pub fn adjust_group_attributes(
                 }
             }
         }
-    }
-}
-
-pub fn move_anchor(
-    commands: &mut Commands,
-    move_command: MoveCommand,
-    mut bezier_curves: &mut ResMut<Assets<Bezier>>,
-    maps: &ResMut<Maps>,
-) {
-    // println!("undo: MovedAnchor");
-    let anchor = move_command.anchor;
-    let handle_entities = maps.bezier_map[&move_command.id.into()].clone();
-    let bezier = bezier_curves.get_mut(&handle_entities.handle).unwrap();
-
-    bezier.set_position(anchor, move_command.new_position);
-
-    // attaches MovingAnchor component to the entity
-    bezier.move_anchor(
-        commands,
-        true,  // one move for a single frame
-        false, // do not follow mouse
-        anchor,
-        maps.as_ref(),
-    );
-
-    let anchor_edge = anchor.to_edge_with_controls();
-    if let Some(_) = bezier.latches.get(&anchor_edge) {
-        let latch_info = bezier.get_anchor_latch_info(anchor);
-
-        update_latched_partner_position(&maps.bezier_map, &mut bezier_curves, latch_info);
     }
 }
 

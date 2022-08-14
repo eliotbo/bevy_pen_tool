@@ -4,6 +4,32 @@ use bevy_pen_tool_spawner::util::*;
 use bevy::prelude::*;
 use std::collections::HashMap;
 
+#[derive(Default, PartialEq)]
+// pub(crate) struct TestState(Vec<BezierState>);
+
+// #[derive(Default, PartialEq)]
+// pub(crate) struct BezierState {
+//     pub positions: BezierPositions,
+//     pub previous_positions: BezierPositions,
+//     pub id: BezierId,
+//     pub latches: HashMap<AnchorEdge, LatchData>,
+//     pub potential_latch: Option<LatchData>,
+//     pub group: Option<GroupId>,
+// }
+
+// impl From<&Bezier> for BezierState {
+//     fn from(bezier: &Bezier) -> Self {
+//         Self {
+//             positions: bezier.positions,
+//             previous_positions: bezier.previous_positions,
+//             id: bezier.id,
+//             latches: bezier.latches.clone(),
+//             potential_latch: bezier.potential_latch.clone(),
+//             group: bezier.group,
+//         }
+//     }
+// }
+
 pub struct TargetPositions(pub HashMap<BezierId, BezierPositions>);
 fn main() {
     let mut app = App::new();
@@ -93,8 +119,8 @@ fn main() {
 
     for (id, target_pos) in target_positions.0.iter() {
         let bezier = bezier_curves.0.get(&id).unwrap();
-        let bezier_state = BezierState::from(bezier);
-        assert_eq!(&bezier_state.positions, target_pos);
+        // let bezier_state = BezierState::from(bezier);
+        assert_eq!(&bezier.positions, target_pos);
     }
     println!("move_test passed");
 }

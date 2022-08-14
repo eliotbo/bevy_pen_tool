@@ -87,3 +87,8 @@ path = "examples/undo_delete_latched_test.rs"
 name = "redo_delete_latched_test"
 path = "examples/redo_delete_latched_test.rs"
 
+
+[[example]]
+name = "undo_latch_then_move_test"
+path = "examples/undo_latch_then_move_test.rs"
+

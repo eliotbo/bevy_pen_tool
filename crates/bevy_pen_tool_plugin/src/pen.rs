@@ -1,49 +1,60 @@
-use crate::actions::*;
+//! Small API for programmatically producing Bezier curves, moving anchors, attaching curves together, and more.
+
 use crate::undo::*;
 
-use crate::moves::*;
+use bevy::prelude::*;
 use bevy_pen_tool_spawner::*;
 
-use bevy::prelude::*;
-use bevy::render::{render_graph::RenderGraph, RenderApp};
-
-use bevy::window::{CreateWindow, WindowId};
-use bevy_inspector_egui::InspectorPlugin;
-
-use once_cell::sync::Lazy;
 use rand::prelude::*;
-use std::collections::HashMap;
-use std::collections::HashSet;
 
-#[derive(Default, PartialEq)]
-pub struct TestState(Vec<BezierState>);
+pub(crate) enum PenCommand {
+    Spawn {
+        positions: BezierPositions,
+        id: BezierId,
+    },
 
-#[derive(Default, PartialEq)]
-pub struct BezierState {
-    pub positions: BezierPositions,
-    pub previous_positions: BezierPositions,
+    Move(MoveCommand),
+
+    Latch {
+        l1: CurveIdEdge,
+        l2: CurveIdEdge,
+    },
+
+    Unlatch {
+        l1: CurveIdEdge,
+        l2: CurveIdEdge,
+    },
+
+    Delete {
+        id: BezierId,
+    },
+
+    Undo,
+    Redo,
+}
+
+/// Identifies a specific anchor edge (start or end point) of a specific Bezier curve.
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub struct CurveIdEdge {
     pub id: BezierId,
-    pub latches: HashMap<AnchorEdge, LatchData>,
-    pub potential_latch: Option<LatchData>,
-    pub group: Option<GroupId>,
+    pub anchor_edge: AnchorEdge,
 }
 
-impl From<&Bezier> for BezierState {
-    fn from(bezier: &Bezier) -> Self {
-        Self {
-            positions: bezier.positions,
-            previous_positions: bezier.previous_positions,
-            id: bezier.id,
-            latches: bezier.latches.clone(),
-            potential_latch: bezier.potential_latch.clone(),
-            group: bezier.group,
-        }
-    }
+/// Identifies the new position for a single anchor of a Bezier curve.
+#[derive(Copy, Clone)]
+pub struct MoveCommand {
+    pub anchor: Anchor,
+    pub id: BezierId,
+    pub new_position: Vec2,
 }
 
-pub struct PenCommandVec(pub Vec<PenCommand>);
+/// Commands that have effects over Bezier curves. Although sending simultaneous [`Move`] commands is supported,
+/// in general, sending simultaneous commands (in the same frame) is not supported: they may lead to a panic!
+/// It is recommended to separate successive method calls by about ten frames.
+pub struct PenCommandVec(Vec<PenCommand>);
 
 impl PenCommandVec {
+    /// Spawn a new Bezier curve with the given anchor positions.
     pub fn spawn(&mut self, positions: BezierPositions) -> BezierId {
         let mut rng = thread_rng();
         let id: u64 = rng.gen();
@@ -54,6 +65,7 @@ impl PenCommandVec {
         id.into()
     }
 
+    /// Move a single anchor of a given Bezier curve.
     pub fn move_anchor(&mut self, id: BezierId, anchor: Anchor, position: Vec2) {
         self.0.push(PenCommand::Move(MoveCommand {
             anchor,
@@ -62,52 +74,70 @@ impl PenCommandVec {
         }));
     }
 
+    /// Latch two Bezier curves together, given the two anchor edges.
     pub fn latch(&mut self, l1: CurveIdEdge, l2: CurveIdEdge) {
         self.0.push(PenCommand::Latch { l1, l2 });
     }
 
+    /// Delete a Bezier curve. This command will also unlatch any anchor that is connected to this curve.
     pub fn delete(&mut self, id: BezierId) {
         self.0.push(PenCommand::Delete { id });
     }
 
+    /// Unlatches two Bezier curves, given the two anchor edges that will be unlatched.
     pub fn unlatch(&mut self, l1: CurveIdEdge, l2: CurveIdEdge) {
         self.0.push(PenCommand::Unlatch { l1, l2 });
     }
 
+    /// Undo a command. Useful for internal tests, but not very useful for users of the API.
     pub fn undo(&mut self) {
         self.0.push(PenCommand::Undo);
     }
 
+    /// Redo a command. Useful for internal tests, but not very useful for users of the API.
     pub fn redo(&mut self) {
         self.0.push(PenCommand::Redo);
     }
 }
 
-pub struct PenApiPlugin;
+pub(crate) fn move_anchor(
+    commands: &mut Commands,
+    move_command: MoveCommand,
+    mut bezier_curves: &mut ResMut<Assets<Bezier>>,
+    maps: &ResMut<Maps>,
+) {
+    // println!("undo: MovedAnchor");
+    let anchor = move_command.anchor;
+    let handle_entities = maps.bezier_map[&move_command.id.into()].clone();
+    let bezier = bezier_curves.get_mut(&handle_entities.handle).unwrap();
 
-#[derive(Copy, Clone)]
-pub struct FrameNumber(pub i32);
+    bezier.set_position(anchor, move_command.new_position);
 
-impl Plugin for PenApiPlugin {
-    fn build(&self, app: &mut App) {
-        app
+    // attaches MovingAnchor component to the entity
+    bezier.move_anchor(
+        commands,
+        true,  // one move for a single frame
+        false, // do not follow mouse
+        anchor,
+        maps.as_ref(),
+    );
 
-            .insert_resource(PenCommandVec(Vec::new()))
-            .insert_resource(FrameNumber(0))
-            .insert_resource(CurveVec(Vec::new()))
-            // .add_startup_system(test.label("label"))
-            // .add_system(test2)
-            .add_system(direct_api_calls)
-            // .add_system(test2_assert)
-            // .add_system(test2)
-            ;
+    let anchor_edge = anchor.to_edge_with_controls();
+    if let Some(_) = bezier.latches.get(&anchor_edge) {
+        let latch_info = bezier.get_anchor_latch_info(anchor);
+
+        update_latched_partner_position(&maps.bezier_map, &mut bezier_curves, latch_info);
     }
 }
 
-// pub fn test(mut pen_commands: ResMut<PenCommandVec>, mut all_curves: ResMut<CurveVec>) {
-//     //
+pub(crate) struct PenApiPlugin;
 
-// }
+impl Plugin for PenApiPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(PenCommandVec(Vec::new()))
+            .add_system(direct_api_calls);
+    }
+}
 
 fn direct_api_calls(
     mut commands: Commands,
@@ -180,7 +210,7 @@ fn direct_api_calls(
                             .group
                             .insert((handle_entity.entity, handle_entity.handle.clone()));
                         action_event_writer.send(Action::Delete(false));
-                        info!("DELETING: {:?}", id);
+                        // info!("DELETING: {:?}", id);
                     }
                     if let None = maps.bezier_map.remove(&id) {
                         info!("COULD NOT DELETE CURVE FROM MAP: {:?}", id);
@@ -196,16 +226,4 @@ fn direct_api_calls(
         }
         pen_command_vec.0.clear();
     }
-
-    // for SpawnCurve { positions } in spawn_curve_event_reader.iter() {
-    //     use rand::prelude::*;
-    //     let mut rng = rand::thread_rng();
-    //     let id = rng.gen::<u64>();
-
-    //     spawning_curve_event_writer.send(SpawningCurve {
-    //         bezier_hist: Some(BezierHist::new(*positions, id)),
-    //         maybe_bezier_id: Some(id.into()),
-    //         follow_mouse: false,
-    //     });
-    // }
 }
