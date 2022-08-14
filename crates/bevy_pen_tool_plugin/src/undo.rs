@@ -235,10 +235,12 @@ pub fn undo(
                 let handle_entity_1 = maps.bezier_map[&bezier_id_1.into()].clone();
                 let bezier_1 = bezier_curves.get_mut(&handle_entity_1.handle).unwrap();
                 bezier_1.latches.remove(&anchor_1);
+                bezier_1.potential_latch = None;
 
                 let handle_entity_2 = maps.bezier_map[&bezier_id_2.into()].clone();
                 let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
                 bezier_2.latches.remove(&anchor_2);
+                bezier_2.potential_latch = None;
 
                 if globals.sound_on {
                     if let Some(sound) = maps.sounds.get("unlatch") {

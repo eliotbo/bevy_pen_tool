@@ -240,11 +240,12 @@ fn debug(
         // println!("group_handles: {:?}", maps.id_group_handle);
         // println!("'B' currently pressed");
         for handle in query.iter() {
-            let _bezier = bezier_curves.get_mut(handle).unwrap();
+            let bezier = bezier_curves.get_mut(handle).unwrap();
             action_event_writer.send(Action::ComputeLut);
 
             // println!("group id: {:?}", bezier.group);
-            // println!("latches: {:#?}", BezierPrint::from_bezier(bezier));
+            // println!("latches: {:#?}", BezierPrint::from_bezier(bezier).latches);
+            println!("potential latche: {:#?}", bezier.potential_latch);
         }
 
         // println!("mids: {:?}", mids_groups.iter().count());

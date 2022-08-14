@@ -75,26 +75,22 @@ fn main() {
     app.update();
     app.update();
 
+    let mut pen_commands = app.world.get_resource_mut::<PenCommandVec>().unwrap();
+    pen_commands.redo();
+
+    app.update();
+    app.update();
+    app.update();
+
     // let maps = app.world.resource::<Maps>();
     let bezier_curves = app.world.resource::<BezierTestHashed>();
     let bezier1 = bezier_curves.0.get(&id1).unwrap();
     let bezier2 = bezier_curves.0.get(&id2).unwrap();
 
-    let expected_latch_data1 = LatchData {
-        latched_to_id: id2,
-        partners_edge: AnchorEdge::Start,
-        self_edge: AnchorEdge::Start,
-    };
-    let expected_latch_data2 = LatchData {
-        latched_to_id: id1,
-        partners_edge: AnchorEdge::Start,
-        self_edge: AnchorEdge::Start,
-    };
+    assert!(bezier1.latches.is_empty());
+    assert!(bezier2.latches.is_empty());
 
-    assert_eq!(bezier1.latches[&AnchorEdge::Start], expected_latch_data1);
-    assert_eq!(bezier2.latches[&AnchorEdge::Start], expected_latch_data2);
-
-    println!("undo_unlatch_test passed");
+    println!("redo_unlatch_test passed");
 }
 
 pub struct BezierTestHashed(pub HashMap<BezierId, Bezier>);

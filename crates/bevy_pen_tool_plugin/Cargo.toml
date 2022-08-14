@@ -62,3 +62,28 @@ path = "examples/undo_move_test.rs"
 [[example]]
 name = "undo_unlatch_test"
 path = "examples/undo_unlatch_test.rs"
+
+[[example]]
+name = "redo_latch_test"
+path = "examples/redo_latch_test.rs"
+
+[[example]]
+name = "redo_delete_test"
+path = "examples/redo_delete_test.rs"
+
+[[example]]
+name = "redo_move_test"
+path = "examples/redo_move_test.rs"
+
+[[example]]
+name = "redo_unlatch_test"
+path = "examples/redo_unlatch_test.rs"
+
+[[example]]
+name = "undo_delete_latched_test"
+path = "examples/undo_delete_latched_test.rs"
+
+[[example]]
+name = "redo_delete_latched_test"
+path = "examples/redo_delete_latched_test.rs"
+

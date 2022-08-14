@@ -14,7 +14,6 @@ fn main() {
         .add_plugin(BevyPenToolPlugin)
         .add_system(update_bez);
 
-    // Run systems once
     app.update();
 
     let mut pen_commands = app.world.get_resource_mut::<PenCommandVec>().unwrap();
@@ -25,8 +24,6 @@ fn main() {
     let id1 = pen_commands.spawn(positions1);
     let id2 = pen_commands.spawn(positions2);
 
-    // the app needs some time to perform the tasks,
-    // since they are event and asset based
     app.update();
     app.update();
     app.update();
@@ -44,26 +41,6 @@ fn main() {
 
     pen_commands.latch(latch1, latch2);
 
-    // let mut target_latches = app.world.get_resource_mut::<TargetLatches>().unwrap();
-
-    // target_latches.0.insert(latch1, latch2);
-
-    app.update();
-    app.update();
-    app.update();
-
-    let mut pen_commands = app.world.get_resource_mut::<PenCommandVec>().unwrap();
-    pen_commands.unlatch(
-        CurveIdEdge {
-            id: id1,
-            anchor_edge: AnchorEdge::Start,
-        },
-        CurveIdEdge {
-            id: id2,
-            anchor_edge: AnchorEdge::Start,
-        },
-    );
-
     app.update();
     app.update();
     app.update();
@@ -74,27 +51,30 @@ fn main() {
     app.update();
     app.update();
     app.update();
+    app.update();
+    app.update();
+    app.update();
 
-    // let maps = app.world.resource::<Maps>();
     let bezier_curves = app.world.resource::<BezierTestHashed>();
-    let bezier1 = bezier_curves.0.get(&id1).unwrap();
-    let bezier2 = bezier_curves.0.get(&id2).unwrap();
 
-    let expected_latch_data1 = LatchData {
-        latched_to_id: id2,
-        partners_edge: AnchorEdge::Start,
-        self_edge: AnchorEdge::Start,
-    };
-    let expected_latch_data2 = LatchData {
-        latched_to_id: id1,
-        partners_edge: AnchorEdge::Start,
-        self_edge: AnchorEdge::Start,
-    };
+    for (_id, bezier) in bezier_curves.0.iter() {
+        assert!(bezier.latches.is_empty());
+    }
 
-    assert_eq!(bezier1.latches[&AnchorEdge::Start], expected_latch_data1);
-    assert_eq!(bezier2.latches[&AnchorEdge::Start], expected_latch_data2);
+    app.update();
+    app.update();
+    app.update();
 
-    println!("undo_unlatch_test passed");
+    let mut pen_commands = app.world.get_resource_mut::<PenCommandVec>().unwrap();
+    pen_commands.move_anchor(id2, Anchor::Start, Vec2::new(-100., -100.));
+    pen_commands.move_anchor(id1, Anchor::Start, Vec2::new(100., 100.));
+
+    let bezier_curves = app.world.resource::<BezierTestHashed>();
+    for (_id, bezier) in bezier_curves.0.iter() {
+        assert!(bezier.latches.is_empty());
+    }
+
+    println!("undo_latch_then_move_test passed!");
 }
 
 pub struct BezierTestHashed(pub HashMap<BezierId, Bezier>);
