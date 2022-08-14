@@ -134,7 +134,6 @@ pub fn bezier_anchor_order(
     globals: ResMut<Globals>,
     maps: ResMut<Maps>,
     mut move_anchor_event_reader: EventReader<MoveAnchorEvent>,
-    // mut move_event_reader: EventReader<MoveAnchorEvent>,
     audio: Res<Audio>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {

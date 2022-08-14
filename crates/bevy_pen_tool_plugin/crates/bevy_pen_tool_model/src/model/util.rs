@@ -58,10 +58,6 @@ impl Default for Maps {
     }
 }
 
-// pub  struct History {
-//     pub history: Vec<Handle<Bezier>>,
-// }
-
 pub struct Selection {
     pub selected: Group,
 }

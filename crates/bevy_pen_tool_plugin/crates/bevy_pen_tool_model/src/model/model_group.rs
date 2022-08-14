@@ -36,7 +36,6 @@ pub struct StandaloneLut {
 pub struct GroupSaveLoad {
     // the AnchorEdge corresponds to first anchor encountered when traversing the group
     pub lut: Vec<(Bezier, AnchorEdge, (f64, f64), LutDistance)>,
-    // pub standalone_lut: (f32, LutPosition),
     pub standalone_lut: StandaloneLut,
 }
 

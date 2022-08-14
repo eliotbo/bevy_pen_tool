@@ -269,8 +269,8 @@ fn debug(
 }
 //////////////////////////// Debugging ////////////////////////////
 
-const P1: Vec2 = Vec2::new(0.0, 0.0);
-const P2: Vec2 = Vec2::new(0.0, 0.0);
+// const P1: Vec2 = Vec2::new(0.0, 0.0);
+// const P2: Vec2 = Vec2::new(0.0, 0.0);
 // const P3: Vec2 = Vec2::new(0.0, 0.0);
 // const P4: Vec2 = Vec2::new(0.0, 0.0);
 // const P5: Vec2 = Vec2::new(0.0, 0.0);

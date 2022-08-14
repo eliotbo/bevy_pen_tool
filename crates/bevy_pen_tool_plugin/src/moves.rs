@@ -54,14 +54,6 @@ pub fn move_middle_quads(
                 let t_time = (t as f64 + time.seconds_since_startup() * 0.1) % 1.0;
                 shader_params.t = t_time as f32;
 
-                // let idx_f64 = t_time * (bezier.lut.len() - 1) as f64;
-                // let p1 = bezier.lut[(idx_f64 as usize)];
-                // let p2 = bezier.lut[idx_f64 as usize + 1];
-                // //
-                // // TODO: is the minus one useful here?
-                // let rem = (idx_f64 - 1.0) % 1.0;
-                // let t_distance = interpolate(p1, p2, rem);
-
                 use flo_curves::bezier::BezierCurve;
 
                 let t_distance = bezier.compute_real_distance(t_time);
@@ -70,9 +62,6 @@ pub fn move_middle_quads(
                 let z = transform.translation.z;
 
                 transform.translation = Vec3::new(pos.0 as f32, pos.1 as f32, z);
-
-                // transform.translation.x = pos.0 as f32;
-                // transform.translation.y = pos.1 as f32;
             }
         }
     }
@@ -110,8 +99,6 @@ pub fn move_group_middle_quads(
 
                 let mut shader_params = my_shader_params.get_mut(shader_params_handle).unwrap();
 
-                // println!("groups handle: {:?}", group_handle);
-
                 // TODO: this unwrap produces an error when two groups have been spawned and
                 // one gets despawned (ungrouped)
                 let group = groups.get(group_handle).unwrap();
@@ -121,13 +108,9 @@ pub fn move_group_middle_quads(
                 // println!("time: {:?}", t_time);
 
                 let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
-                // let pos = group.compute_position_with_lut(t_time as f32);
 
                 let z = transform.translation.z;
                 transform.translation = Vec3::new(pos.x, pos.y, z);
-
-                // transform.translation.x = pos.x;
-                // transform.translation.y = pos.y;
             }
         }
     }
