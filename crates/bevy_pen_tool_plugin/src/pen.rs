@@ -205,12 +205,15 @@ fn direct_api_calls(
                 }
                 PenCommand::Delete { id } => {
                     if let Some(handle_entity) = maps.bezier_map.get(&id) {
-                        selection
-                            .selected
+                        let mut new_group = Group::default();
+                        new_group
                             .group
                             .insert((handle_entity.entity, handle_entity.handle.clone()));
-                        action_event_writer.send(Action::Delete(false));
-                        // info!("DELETING: {:?}", id);
+
+                        selection.selected = Some(new_group);
+
+                        action_event_writer
+                            .send(Action::Delete(false /* do not add to history */));
                     }
                     if let None = maps.bezier_map.remove(&id) {
                         info!("COULD NOT DELETE CURVE FROM MAP: {:?}", id);

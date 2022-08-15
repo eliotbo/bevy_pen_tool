@@ -31,6 +31,7 @@ impl Plugin for SpawnerPlugin {
             .add_event::<HistoryAction>()
             .add_event::<ComputeLut>()
             .add_event::<RedoDelete>()
+            // .add_event::<StartSelectingEvent>()
             .add_plugin(ColoredMesh2dPlugin) // mesh making
             .add_plugin(RoadMesh2dPlugin)
             .add_plugin(Material2dPlugin::<SelectionMat>::default())
@@ -47,7 +48,7 @@ impl Plugin for SpawnerPlugin {
             .insert_resource(Globals::default())
             .insert_resource(Selection::default())
             .insert_resource(Maps::default())
-            .insert_resource(UserState::default())
+            // .insert_resource(UserState::default())
             .add_startup_system(setup.exclusive_system().at_start())
             .add_startup_system(spawn_selection_bounding_box)
             .add_startup_system(spawn_ui)

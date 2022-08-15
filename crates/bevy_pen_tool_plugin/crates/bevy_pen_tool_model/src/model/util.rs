@@ -5,6 +5,7 @@ use crate::model::model_group::*;
 
 use bevy::{asset::HandleId, prelude::*, sprite::Mesh2dHandle, utils::Uuid};
 
+// use rand::distributions::Open01;
 use serde::{Deserialize, Serialize};
 
 use rand::prelude::*;
@@ -12,6 +13,18 @@ use rand::prelude::*;
 use std::collections::HashMap;
 
 use bevy_inspector_egui::Inspectable;
+
+#[derive(Component)]
+pub struct CurrentlySelecting;
+
+// #[derive(Debug, Default, Clone)]
+// pub struct Selected {
+//     pub group: Option<Group>,
+// }
+
+// pub struct StartSelectingEvent {
+//     pub click_position: Vec2,
+// }
 
 #[derive(Debug)]
 pub struct Maps {
@@ -59,14 +72,12 @@ impl Default for Maps {
 }
 
 pub struct Selection {
-    pub selected: Group,
+    pub selected: Option<Group>,
 }
 
 impl Default for Selection {
     fn default() -> Self {
-        Self {
-            selected: Group::default(),
-        }
+        Self { selected: None }
     }
 }
 
@@ -484,37 +495,22 @@ pub fn get_close_still_anchor(
 
 // change the selection mesh according to the bounding box of the selected curves
 pub fn adjust_selection_attributes(
-    // mouse_button_input: Res<Input<MouseButton>>,
     mut my_shader_params: ResMut<Assets<SelectionMat>>,
     mut query: Query<&Mesh2dHandle, With<SelectedBoxQuad>>,
     shader_query: Query<&Handle<SelectionMat>, With<SelectedBoxQuad>>,
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    // globals: ResMut<Globals>,
     selection: ResMut<Selection>,
-    user_state: Res<UserState>,
-    mut group_box_event_reader: EventReader<GroupBoxEvent>,
 ) {
-    let mut do_adjust = false;
-
-    // if let UserState::MovingAnchor = user_state.as_ref() {
-    //     do_adjust = true;
-    // }
-
-    let us = user_state.as_ref();
-    if let UserState::Selected(_) = us {
-        do_adjust = true;
-    }
-
-    if do_adjust || group_box_event_reader.iter().next().is_some() {
-        // println!("adjusting selection!!!");
+    if let Some(group) = selection.selected.clone() {
         let (mut minx, mut maxx, mut miny, mut maxy) =
             (1000000.0f32, -1000000.0f32, 1000000.0f32, -1000000.0f32);
 
         // We set the mesh attributes as a function of the bounding box.
         // This could be done by removing the mesh from the mesh asset
-        // and adding a brand new mesh
-        for (_entity, selected_handle) in selection.selected.group.clone() {
+        // and adding a brand new  = mesh
+
+        for (_entity, selected_handle) in group.group.clone() {
             let bezier = bezier_curves.get(&selected_handle).unwrap();
 
             let (bound0, bound1) = bezier.bounding_box();
@@ -523,6 +519,8 @@ pub fn adjust_selection_attributes(
             miny = miny.min(bound0.y);
             maxy = maxy.max(bound1.y);
         }
+        // }
+
         let shader_handle = shader_query.single();
         let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
         let up_factor = 1.10;
@@ -556,16 +554,16 @@ pub fn adjust_selection_attributes(
 
 // change the selection mesh according to the bounding box of the selected curves
 pub fn adjust_selecting_attributes(
-    user_state: ResMut<UserState>,
     cursor: ResMut<Cursor>,
     mut my_shader_params: ResMut<Assets<SelectingMat>>,
-    mut query: Query<&Mesh2dHandle, With<SelectingBoxQuad>>,
+    mut query: Query<&Mesh2dHandle, (With<SelectingBoxQuad>, With<CurrentlySelecting>)>,
     shader_query: Query<&Handle<SelectingMat>, With<SelectingBoxQuad>>,
     mut meshes: ResMut<Assets<Mesh>>,
     globals: ResMut<Globals>,
 ) {
-    // TODO: make this system run only when necessary
-    if let UserState::Selecting(mut click_position) = user_state.as_ref() {
+    for mesh_handle in query.iter_mut() {
+        let mut click_position = cursor.last_click_position;
+
         let mouse_position = cursor.position * globals.scale;
         click_position *= globals.scale;
 
@@ -596,15 +594,13 @@ pub fn adjust_selecting_attributes(
         ];
         // println!("will attempt selecting");
 
-        for mesh_handle in query.iter_mut() {
-            let mesh = meshes.get_mut(&mesh_handle.0.clone()).unwrap();
-            let v_pos = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION);
+        let mesh = meshes.get_mut(&mesh_handle.0.clone()).unwrap();
+        let v_pos = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION);
 
-            if let Some(array2) = v_pos {
-                // println!("changed selecting");
-                *array2 =
-                    bevy::render::mesh::VertexAttributeValues::Float32x3(vertex_positions.clone());
-            }
+        if let Some(array2) = v_pos {
+            // println!("changed selecting");
+            *array2 =
+                bevy::render::mesh::VertexAttributeValues::Float32x3(vertex_positions.clone());
         }
     }
 }

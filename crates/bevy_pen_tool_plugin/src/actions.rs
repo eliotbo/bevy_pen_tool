@@ -12,39 +12,6 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 
-// // Computes look up table for all curves and groups
-// // Not very useful anymore. Delete?
-// pub fn recompute_all_lut(
-//     mut bezier_curves: ResMut<Assets<Bezier>>,
-//     mut query: Query<&Handle<Bezier>, With<BezierParent>>,
-//     query_group: Query<&Handle<Group>>,
-//     mut groups: ResMut<Assets<Group>>,
-//     mut action_event_reader: EventReader<Action>,
-//     globals: ResMut<Globals>,
-//     maps: ResMut<Maps>,
-// ) {
-//     if action_event_reader
-//         .iter()
-//         .any(|x| x == &Action::ComputeLut || x == &Action::Save)
-//     {
-//         for bezier_handle in query.iter_mut() {
-//             let mut bezier = bezier_curves.get_mut(bezier_handle).unwrap();
-
-//             // info!("recomputing LUT for {:?}", bezier_handle);
-//             bezier.compute_lut_walk(globals.group_lut_num_points as usize);
-
-//             bezier.do_compute_lut = false;
-//         }
-
-//         for group_handle in query_group.iter() {
-//             let group = groups.get_mut(group_handle).unwrap();
-//             let bezier_map = maps.bezier_map.clone();
-//             group.group_lut(&mut bezier_curves, bezier_map);
-//             group.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
-//         }
-//     }
-// }
-
 pub fn update_lut(
     mut bezier_assets: ResMut<Assets<Bezier>>,
     bezier_handles: Query<&Handle<Bezier>, (With<MovingAnchor>, With<AchorEdgeQuad>)>,
@@ -126,6 +93,11 @@ pub fn update_anchors(
     }
 }
 
+// TODO: separate into three separate systems:
+// 1) move anchor order
+// 2) unlatch anchor order
+// 3) move connected chain
+//
 // After a mouse click on an anchor, orders to move either an anchor or the whole curve.
 // The unlatch functionality is part of this function as well.
 pub fn bezier_anchor_order(
@@ -255,14 +227,14 @@ pub fn bezier_anchor_order(
             // if let Some(latch_local) = bezier.latches.get_mut(&latch.partners_edge) {
             if let Some(_) = bezier.latches.remove(&latch.partners_edge) {
                 bezier.potential_latch = None;
-                // println!("Unlatched secondary : {:?}", bezier.id);
+
                 add_to_history_event_writer.send(HistoryAction::Unlatched {
                     self_id: self_id.into(),
                     partner_id: latch.latched_to_id.into(),
                     self_anchor: latch.self_edge,
                     partner_anchor: latch.partners_edge,
                 });
-                // *latch_local = Vec::new();
+
                 if globals.sound_on {
                     if let Some(sound) = maps.sounds.get("unlatch") {
                         audio.play(sound.clone());
@@ -273,83 +245,39 @@ pub fn bezier_anchor_order(
     }
 }
 
-// // Select by clicking on anchors
-// pub fn selection(
-//     mut globals: ResMut<Globals>,
-//     mut selection: ResMut<Selection>,
-//     cursor: ResMut<Cursor>,
-//     bezier_curves: ResMut<Assets<Bezier>>,
-//     groups: ResMut<Assets<Group>>,
-//     mut visible_selection_query: Query<&mut Visibility, With<SelectedBoxQuad>>,
-//     group_query: Query<&Handle<Group>>,
-//     query: Query<(Entity, &Handle<Bezier>), With<BoundingBoxQuad>>,
-//     mut action_event_reader: EventReader<Action>,
-// ) {
-//     if let Some(Action::Select) = action_event_reader.iter().next() {
-//         println!("select");
-//         if let Some((_distance, _anchor, entity, selected_handle)) = get_close_anchor_entity(
-//             2.0 * globals.scale,
-//             cursor.position,
-//             &bezier_curves,
-//             &query,
-//             globals.scale,
-//         ) {
-//             // if the selected quad is part of a group, show group selection
-//             for group_handle in group_query.iter() {
-//                 let group = groups.get(group_handle).unwrap();
-//                 //
-//                 if group.handles.contains(&selected_handle) {
-//                     selection.selected = group.clone();
-//                     for mut visible in visible_selection_query.iter_mut() {
-//                         visible.is_visible = true;
-//                     }
-
-//                     return ();
-//                 }
-//             }
-
-//             let selected_entity = entity.clone();
-
-//             // add the selected quad to the selected group
-//             selection
-//                 .selected
-//                 .group
-//                 .insert((selected_entity.clone(), selected_handle.clone()));
-
-//             selection.selected.handles.insert(selected_handle.clone());
-
-//             // these will be computed when a group order has been emitted
-//             selection.selected.ends = None;
-//             selection.selected.lut = Vec::new();
-
-//             for mut visible in visible_selection_query.iter_mut() {
-//                 visible.is_visible = true;
-//             }
-//             // println!("selectd: {:?}", &globals.selected);
-//         }
-//     }
-// }
-
 // Select by dragging the edge of a box
 pub fn selection_box_init(
+    mut commands: Commands,
     globals: ResMut<Globals>,
-    mut user_state: ResMut<UserState>,
+
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
+    mut selection_box_query: Query<Entity, With<SelectingBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
+    // mut selecting_event_writer: EventWriter<StartSelectingEvent>,
     mut visible_selection_query: Query<&mut Visibility, With<SelectingBoxQuad>>,
 ) {
     if action_event_reader
         .iter()
         .any(|x| x == &Action::SelectionBox)
     {
+        info!("selection_box_init");
         if let Some((_distance, _anchor, _entity, _selected_handle)) =
             get_close_anchor_entity(2.0 * globals.scale, cursor.position, &bezier_curves, &query)
         {
         } else {
-            let us = user_state.as_mut();
-            *us = UserState::Selecting(cursor.position);
+            // let us = user_state.as_mut();
+            // *us = UserState::Selecting(cursor.position);
+
+            // selecting_event_writer.send(StartSelectingEvent {
+            //     click_position: cursor.position,
+            // });
+
+            // add CurrentlySelecting to the quad for the selection box
+            for entity in selection_box_query.iter() {
+                commands.entity(entity).insert(CurrentlySelecting);
+            }
 
             for mut visible in visible_selection_query.iter_mut() {
                 visible.is_visible = true;
@@ -361,7 +289,6 @@ pub fn selection_box_init(
 // inserts curves inside box in the Selection resource
 pub fn selection_final(
     mut selection: ResMut<Selection>,
-    mut user_state: ResMut<UserState>,
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
     groups: ResMut<Assets<Group>>,
@@ -374,77 +301,77 @@ pub fn selection_final(
     query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
     mut action_event_reader: EventReader<Action>,
     globals: Res<Globals>,
+
     mut group_box_event_writer: EventWriter<GroupBoxEvent>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Selected) {
-        // let mut changed_user_state = false;
         let mut selected = Group::default();
-        if let UserState::Selecting(click_position) = user_state.as_ref() {
-            // changed_user_state = true;
-            let release_position = cursor.position;
 
-            // check for anchors inside selection area
-            for (entity, bezier_handle) in query.iter() {
-                let bezier = bezier_curves.get(bezier_handle).unwrap();
-                let bs = bezier.positions.start * globals.scale;
-                let be = bezier.positions.end * globals.scale;
-                if (bs.x < click_position.x.max(release_position.x)
-                    && bs.x > click_position.x.min(release_position.x)
-                    && bs.y < click_position.y.max(release_position.y)
-                    && bs.y > click_position.y.min(release_position.y))
-                    || (be.x < click_position.x.max(release_position.x)
-                        && be.x > click_position.x.min(release_position.x)
-                        && be.y < click_position.y.max(release_position.y)
-                        && be.y > click_position.y.min(release_position.y))
-                {
-                    // if the selected quad is part of a group, show group selection and return
-                    // Cannot select more than one group
-                    // Cannot select a group and individual curves together
-                    for group_handle in group_query.iter() {
-                        let group = groups.get(group_handle).unwrap();
-                        //
-                        if group.bezier_handles.contains(&bezier_handle) {
-                            selected = group.clone();
+        let release_position = cursor.position;
+        let last_click_position = cursor.last_click_position;
 
-                            for mut visible in query_set.p1().iter_mut() {
-                                visible.is_visible = true;
-                                // println!("visible!!!");
-                            }
+        // check for anchors inside selection area
+        for (entity, bezier_handle) in query.iter() {
+            let bezier = bezier_curves.get(bezier_handle).unwrap();
+            let bs = bezier.positions.start * globals.scale;
+            let be = bezier.positions.end * globals.scale;
 
-                            for mut visible in query_set.p2().iter_mut() {
-                                visible.is_visible = true;
-                            }
-                            for mut visible_selecting in query_set.p0().iter_mut() {
-                                visible_selecting.is_visible = false;
-                            }
-                            selection.selected = selected;
-                            let us = user_state.as_mut();
-                            *us = UserState::Idle;
+            if (bs.x < last_click_position.x.max(release_position.x)
+                && bs.x > last_click_position.x.min(release_position.x)
+                && bs.y < last_click_position.y.max(release_position.y)
+                && bs.y > last_click_position.y.min(release_position.y))
+                || (be.x < last_click_position.x.max(release_position.x)
+                    && be.x > last_click_position.x.min(release_position.x)
+                    && be.y < last_click_position.y.max(release_position.y)
+                    && be.y > last_click_position.y.min(release_position.y))
+            {
+                // if the selected quad is part of a group, show group selection and return
+                // Cannot select more than one group
+                // Cannot select a group and individual curves together
+                for group_handle in group_query.iter() {
+                    let group = groups.get(group_handle).unwrap();
+                    //
+                    if group.bezier_handles.contains(&bezier_handle) {
+                        selected = group.clone();
 
-                            // send event to adjust_selection_attributes(..) so that the group selection
-                            // box is updated and shows on screen.
-                            group_box_event_writer.send(GroupBoxEvent);
-                            return ();
+                        for mut visible in query_set.p1().iter_mut() {
+                            visible.is_visible = true;
+                            // println!("visible!!!");
                         }
+
+                        for mut visible in query_set.p2().iter_mut() {
+                            visible.is_visible = true;
+                        }
+                        for mut visible_selecting in query_set.p0().iter_mut() {
+                            visible_selecting.is_visible = false;
+                        }
+                        selection.selected = Some(selected);
+                        // let us = user_state.as_mut();
+                        // *us = UserState::Idle;
+
+                        // send event to adjust_selection_attributes(..) so that the group selection
+                        // box is updated and shows on screen.
+                        group_box_event_writer.send(GroupBoxEvent);
+                        return ();
                     }
-
-                    selected
-                        .group
-                        .insert((entity.clone(), bezier_handle.clone()));
-                    selected.bezier_handles.insert(bezier_handle.clone());
                 }
-            }
-            selection.selected = selected.clone();
 
-            println!("selected: {:?}", &selection.selected);
+                selected
+                    .group
+                    .insert((entity.clone(), bezier_handle.clone()));
+
+                selected.bezier_handles.insert(bezier_handle.clone());
+            }
         }
 
-        // return the UserState to Idle when finished selecting
-        let us = user_state.as_mut();
-        *us = UserState::Selected(selected);
+        selection.selected = Some(selected);
 
         for mut visible_selected in query_set.p1().iter_mut() {
             visible_selected.is_visible = true;
+        }
+
+        for mut visible_group_box_quad in query_set.p2().iter_mut() {
+            visible_group_box_quad.is_visible = true;
         }
         for mut visible_selecting in query_set.p0().iter_mut() {
             visible_selecting.is_visible = false;
@@ -459,16 +386,9 @@ pub fn unselect(
         Or<(With<SelectedBoxQuad>, With<GroupBoxQuad>)>,
     >,
     mut action_event_reader: EventReader<Action>,
-    mut user_state: ResMut<UserState>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Unselect) {
-        selection.selected.group = HashSet::new();
-        selection.selected.bezier_handles = HashSet::new();
-        selection.selected.ends = None;
-        selection.selected.lut = Vec::new();
-
-        let us = user_state.as_mut();
-        *us = UserState::Idle;
+        selection.selected = None;
 
         for mut visible in visible_selection_query.iter_mut() {
             visible.is_visible = false;
@@ -507,69 +427,69 @@ pub fn groupy(
     if do_group {
         let id_handle_map: HashMap<BezierId, BezierHandleEntity> = maps.bezier_map.clone();
 
-        let mut selected = selection.selected.clone();
+        if let Some(mut selected) = selection.selected.clone() {
+            selected.find_connected_ends(&mut bezier_curves, id_handle_map.clone());
+            // println!("connected ends: {:?}, ", selected.ends);
 
-        selected.find_connected_ends(&mut bezier_curves, id_handle_map.clone());
-        // println!("connected ends: {:?}, ", selected.ends);
-
-        // abort grouping if the selection is not completely connected with latches
-        if selected.ends.is_none() {
-            println!("Cannot group. Select multiple latched curves to successfully group");
-            return;
-        }
-
-        // if the selected curves are already in a group, abort
-        for bez_handle in selected.bezier_handles.iter() {
-            let bez = bezier_curves.get(bez_handle).unwrap();
-            if bez.group.is_some() {
-                println!("Cannot group. Selected curves are already in a group");
+            // abort grouping if the selection is not completely connected with latches
+            if selected.ends.is_none() {
+                println!("Cannot group. Select multiple latched curves to successfully group");
                 return;
             }
-        }
 
-        // get rid of the middle point quads
-        for (entity, bezier_handle) in mid_bezier_query.iter() {
-            if selected.bezier_handles.contains(bezier_handle) {
-                commands.entity(entity).despawn();
-            }
-        }
-
-        if do_compute_lut {
-            selected.group_lut(&mut bezier_curves, id_handle_map.clone());
-            selected.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
-        }
-
-        if globals.sound_on {
-            if let Some(sound) = maps.sounds.get("group") {
-                audio.play(sound.clone());
-            }
-        }
-
-        // TODO: we must get rid of this to have more than one group allowed.
-        // get rid of the current group before making a new one
-        for (entity, group_handle) in group_query.iter() {
-            let group = groups.get(group_handle).unwrap();
-            for bezier_handle in group.bezier_handles.clone() {
-                if selected.bezier_handles.contains(&bezier_handle) {
-                    commands.entity(entity).despawn();
-                    break;
+            // if the selected curves are already in a group, abort
+            for bez_handle in selected.bezier_handles.iter() {
+                let bez = bezier_curves.get(bez_handle).unwrap();
+                if bez.group.is_some() {
+                    println!("Cannot group. Selected curves are already in a group");
+                    return;
                 }
             }
+
+            // get rid of the middle point quads
+            for (entity, bezier_handle) in mid_bezier_query.iter() {
+                if selected.bezier_handles.contains(bezier_handle) {
+                    commands.entity(entity).despawn();
+                }
+            }
+
+            if do_compute_lut {
+                selected.group_lut(&mut bezier_curves, id_handle_map.clone());
+                selected.compute_standalone_lut(&bezier_curves, globals.group_lut_num_points);
+            }
+
+            if globals.sound_on {
+                if let Some(sound) = maps.sounds.get("group") {
+                    audio.play(sound.clone());
+                }
+            }
+
+            // TODO: we must get rid of this to have more than one group allowed.
+            // get rid of the current group before making a new one
+            for (entity, group_handle) in group_query.iter() {
+                let group = groups.get(group_handle).unwrap();
+                for bezier_handle in group.bezier_handles.clone() {
+                    if selected.bezier_handles.contains(&bezier_handle) {
+                        commands.entity(entity).despawn();
+                        break;
+                    }
+                }
+            }
+
+            for bezier_handle in selected.bezier_handles.clone() {
+                let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
+                bezier.group = Some(selected.group_id);
+            }
+
+            let group_handle = groups.add(selected.clone());
+
+            maps.group_map
+                .insert(selected.group_id, group_handle.clone());
+
+            // spawn the middle quads and the bounding box
+
+            event_writer.send(group_handle.clone());
         }
-
-        for bezier_handle in selected.bezier_handles.clone() {
-            let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
-            bezier.group = Some(selected.group_id);
-        }
-
-        let group_handle = groups.add(selected.clone());
-
-        maps.group_map
-            .insert(selected.group_id, group_handle.clone());
-
-        // spawn the middle quads and the bounding box
-
-        event_writer.send(group_handle.clone());
     }
 }
 
@@ -762,97 +682,94 @@ pub fn ungroup(
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Ungroup) {
         // let group = &selection.selected;
-        let group_beziers = selection.selected.bezier_handles.clone();
+        if let Some(selected) = selection.selected.clone() {
+            let group_beziers = selected.bezier_handles.clone();
 
-        if group_beziers.is_empty() {
-            println!("Cannot ungroup. No curves selected");
-            return;
-        }
-
-        // let bezier_curve_hack = bezier_curves
-        //     .iter()
-        //     .map(|(s, x)| (s.clone(), x.clone()))
-        //     .collect::<HashMap<HandleId, Bezier>>();
-
-        let bezier_handles = group_beziers
-            .iter()
-            .cloned()
-            .collect::<Vec<Handle<Bezier>>>();
-
-        // Check if the handles are all connected
-        // bezier_handles is never empty at this point
-        let first_bezier_handle = bezier_handles.iter().next().unwrap();
-
-        let first_bezier = bezier_curves.get(first_bezier_handle).unwrap();
-
-        let mut bezier_chain =
-            find_connected_curves(first_bezier.id, &bezier_curves, &maps.bezier_map);
-
-        // first_bezier.find_connected_curves(bezier_curve_hack, &maps.bezier_map);
-
-        bezier_chain.push(first_bezier_handle.clone());
-
-        let bezier_chain_hashset = bezier_chain
-            .iter()
-            .cloned()
-            .collect::<HashSet<Handle<Bezier>>>();
-
-        // check if all curves are part of the same group
-        for handle in bezier_chain.iter() {
-            let bezier = bezier_curves.get(handle).unwrap();
-            if let Some(group_id) = bezier.group {
-                if group_id != selection.selected.group_id {
-                    println!("Cannot ungroup. Not all curves are part of the same group");
-                    return;
-                }
+            if group_beziers.is_empty() {
+                println!("Cannot ungroup. No curves selected");
+                return;
             }
-        }
 
-        // TODO: this is not needed right?
-        if group_beziers != bezier_chain_hashset {
-            println!("Cannot ungroup. Curves are not part of the same chain");
-            return;
-        }
+            let bezier_handles = group_beziers
+                .iter()
+                .cloned()
+                .collect::<Vec<Handle<Bezier>>>();
 
-        if let Some(id) = first_bezier.group {
-            // println!("id: {:?}", id);
-            // println!("maps.id_group_handle: {:?}", maps.id_group_handle.keys());
-            if let Some(group_handle) = maps.group_map.get(&id) {
-                // remove With
-                let _what = groups.remove(group_handle);
+            // Check if the handles are all connected
+            // bezier_handles is never empty at this point
+            let first_bezier_handle = bezier_handles.iter().next().unwrap();
 
-                for (entity, queried_group_handle) in query.iter() {
-                    if queried_group_handle == group_handle {
-                        commands.entity(entity).despawn_recursive();
-                        println!("Removed group");
+            let first_bezier = bezier_curves.get(first_bezier_handle).unwrap();
+
+            let mut bezier_chain =
+                find_connected_curves(first_bezier.id, &bezier_curves, &maps.bezier_map);
+
+            // first_bezier.find_connected_curves(bezier_curve_hack, &maps.bezier_map);
+
+            bezier_chain.push(first_bezier_handle.clone());
+
+            let bezier_chain_hashset = bezier_chain
+                .iter()
+                .cloned()
+                .collect::<HashSet<Handle<Bezier>>>();
+
+            // check if all curves are part of the same group
+            for handle in bezier_chain.iter() {
+                let bezier = bezier_curves.get(handle).unwrap();
+                if let Some(group_id) = bezier.group {
+                    if group_id != selected.group_id {
+                        println!("Cannot ungroup. Not all curves are part of the same group");
+                        return;
                     }
                 }
-            } else {
-                info!("Cannot delete group: wrong group id.")
             }
-            maps.group_map.remove(&id);
-        }
 
-        for bezier_handle in bezier_chain_hashset {
-            let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
+            // TODO: this is not needed right?
+            if group_beziers != bezier_chain_hashset {
+                println!("Cannot ungroup. Curves are not part of the same chain");
+                return;
+            }
 
-            bezier.group = None;
+            if let Some(id) = first_bezier.group {
+                // println!("id: {:?}", id);
+                // println!("maps.id_group_handle: {:?}", maps.id_group_handle.keys());
+                if let Some(group_handle) = maps.group_map.get(&id) {
+                    // remove With
+                    let _what = groups.remove(group_handle);
 
-            for (_bez_entity, bez_handle, parent) in bezier_query.iter() {
-                if let Some(chain_bezier_handle) = maps.bezier_map.get(&bezier.id) {
-                    if bez_handle == &chain_bezier_handle.handle {
-                        // spawn mid quads
-                        let spawn_mids = SpawnMids {
-                            color: bezier
-                                .color
-                                .unwrap_or(globals.picked_color.unwrap_or(Color::WHITE)),
-                            bezier_handle: bez_handle.clone(),
-                            parent_entity: **parent,
-                        };
-                        // spawn bezier middle quads for each bezier
-                        spawn_mids_event_writer.send(spawn_mids);
+                    for (entity, queried_group_handle) in query.iter() {
+                        if queried_group_handle == group_handle {
+                            commands.entity(entity).despawn_recursive();
+                            println!("Removed group");
+                        }
+                    }
+                } else {
+                    info!("Cannot delete group: wrong group id.")
+                }
+                maps.group_map.remove(&id);
+            }
 
-                        break;
+            for bezier_handle in bezier_chain_hashset {
+                let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
+
+                bezier.group = None;
+
+                for (_bez_entity, bez_handle, parent) in bezier_query.iter() {
+                    if let Some(chain_bezier_handle) = maps.bezier_map.get(&bezier.id) {
+                        if bez_handle == &chain_bezier_handle.handle {
+                            // spawn mid quads
+                            let spawn_mids = SpawnMids {
+                                color: bezier
+                                    .color
+                                    .unwrap_or(globals.picked_color.unwrap_or(Color::WHITE)),
+                                bezier_handle: bez_handle.clone(),
+                                parent_entity: **parent,
+                            };
+                            // spawn bezier middle quads for each bezier
+                            spawn_mids_event_writer.send(spawn_mids);
+
+                            break;
+                        }
                     }
                 }
             }
@@ -881,31 +798,33 @@ pub fn delete(
             let mut latched_partners: Vec<(BezierId, LatchData)> = Vec::new();
             for bezier_handle in query.iter() {
                 //
-                for (entity, handle) in selection.selected.group.clone() {
-                    //
-                    let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
-                    // println!("within DELETE ---> bezier: {:?}", bezier.id);
+                if let Some(selected) = selection.selected.clone() {
+                    for (entity, handle) in selected.group {
+                        //
+                        let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
+                        // println!("within DELETE ---> bezier: {:?}", bezier.id);
 
-                    // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
-                    if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
-                        latched_partners.push((bezier.id, latched_anchor.clone()));
-                    }
+                        // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
+                        if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
+                            latched_partners.push((bezier.id, latched_anchor.clone()));
+                        }
 
-                    // latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
-                    if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::End) {
-                        latched_partners.push((bezier.id, latched_anchor.clone()));
-                    }
+                        // latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
+                        if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::End) {
+                            latched_partners.push((bezier.id, latched_anchor.clone()));
+                        }
 
-                    if &handle == bezier_handle {
-                        delete_curve_events.push(HistoryAction::DeletedCurve {
-                            bezier: BezierHist::from(&bezier.clone()),
-                            bezier_id: bezier.id.into(),
-                        });
+                        if &handle == bezier_handle {
+                            delete_curve_events.push(HistoryAction::DeletedCurve {
+                                bezier: BezierHist::from(&bezier.clone()),
+                                bezier_id: bezier.id.into(),
+                            });
 
-                        commands.entity(entity).despawn_recursive();
-                        maps.bezier_map.remove(&bezier.id);
-                        if let Some(group_id) = bezier.group {
-                            maps.group_map.remove(&group_id);
+                            commands.entity(entity).despawn_recursive();
+                            maps.bezier_map.remove(&bezier.id);
+                            if let Some(group_id) = bezier.group {
+                                maps.group_map.remove(&group_id);
+                            }
                         }
                     }
                 }
@@ -914,9 +833,11 @@ pub fn delete(
             for group_handle in query2.iter() {
                 //
                 let group = groups.get(group_handle).unwrap();
-                for (entity, bezier_handle) in selection.selected.group.clone() {
-                    if group.bezier_handles.contains(&bezier_handle) {
-                        commands.entity(entity).despawn_recursive();
+                if let Some(selected) = selection.selected.clone() {
+                    for (entity, bezier_handle) in selected.group {
+                        if group.bezier_handles.contains(&bezier_handle) {
+                            commands.entity(entity).despawn_recursive();
+                        }
                     }
                 }
             }
@@ -969,8 +890,8 @@ pub fn delete(
             }
 
             // reset selection
-            selection.selected.group = HashSet::new();
-            selection.selected.bezier_handles = HashSet::new();
+            selection.selected = None;
+            // selection.selected.bezier_handles = HashSet::new();
 
             // send the delete events, provided they are not from a redo
             if !*is_from_redo {
@@ -1196,7 +1117,7 @@ pub fn load(
                 group.lut.push((handle.clone(), anchor, t_ends, local_lut));
             }
         }
-        selection.selected = group.clone();
+        selection.selected = Some(group.clone());
 
         // to create a group: select all the curves programmatically, and send a UiButton::Group event
         loaded_event_writer.send(Loaded);

@@ -352,10 +352,13 @@ pub fn redo_effects(
         // to delete a curve, we programmatically select the curve and send
         // an Action::Delete event
         if let Some(handle_entity) = maps.bezier_map.get(&redo_delete.bezier_id) {
-            selection
-                .selected
+            let mut new_group = Group::default();
+            new_group
                 .group
                 .insert((handle_entity.entity, handle_entity.handle.clone()));
+            selection.selected = Some(new_group);
+            //     .group
+            //     .insert((handle_entity.entity, handle_entity.handle.clone()));
             action_event_writer.send(Action::Delete(true));
         }
         if let None = maps.bezier_map.remove(&redo_delete.bezier_id) {

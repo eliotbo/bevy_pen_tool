@@ -11,11 +11,8 @@ use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
 pub fn spawn_selection_bounding_box(
     mut commands: Commands,
-
     mut meshes: ResMut<Assets<Mesh>>,
-
     globals: ResMut<Globals>,
-
     mut my_shader_params: ResMut<Assets<SelectionMat>>,
     clearcolor_struct: Res<ClearColor>,
 ) {

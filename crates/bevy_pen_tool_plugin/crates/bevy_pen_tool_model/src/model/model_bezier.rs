@@ -201,25 +201,25 @@ impl AnchorEdge {
     }
 }
 
-// TODO: get rid of this
-#[derive(Debug)]
-pub enum UserState {
-    Idle,
-    Selecting(Vec2),
-    Selected(Group),
-    // SpawningCurve {
-    //     bezier_hist: Option<BezierHist>,
-    //     maybe_bezier_id: Option<BezierId>,
-    // },
-    // MovingAnchor,
-    MovingWholeCurve,
-}
+// // TODO: get rid of this
+// #[derive(Debug)]
+// pub enum UserState {
+//     Idle,
+//     Selecting(Vec2),
+//     Selected(Group),
+//     // SpawningCurve {
+//     //     bezier_hist: Option<BezierHist>,
+//     //     maybe_bezier_id: Option<BezierId>,
+//     // },
+//     // MovingAnchor,
+//     MovingWholeCurve,
+// }
 
-impl Default for UserState {
-    fn default() -> Self {
-        Self::Idle
-    }
-}
+// impl Default for UserState {
+//     fn default() -> Self {
+//         Self::Idle
+//     }
+// }
 
 #[derive(Component)]
 pub struct BezierParent;

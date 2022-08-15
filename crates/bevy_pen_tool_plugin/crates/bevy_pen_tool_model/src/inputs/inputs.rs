@@ -4,8 +4,9 @@ use crate::materials::ButtonMat;
 use crate::model::util::Maps;
 use crate::model::{
     get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier,
-    BezierGrandParent, BezierId, BezierParent, ColorButton, Globals, HistoryAction,
-    MoveAnchorEvent, MovingAnchor, OfficialLatch, SpawningCurve, UiAction, UiBoard, UserState,
+    BezierGrandParent, BezierId, BezierParent, ColorButton, CurrentlySelecting, Globals,
+    HistoryAction, MoveAnchorEvent, MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve,
+    UiAction, UiBoard,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -596,12 +597,13 @@ pub fn mouse_release_actions(
     query: Query<(&Handle<Bezier>, &Anchor, &MovingAnchor)>,
     moving_query: Query<Entity, With<MovingAnchor>>,
     mut ui_query: Query<(&mut Transform, &mut UiBoard), With<BezierGrandParent>>,
-    mut user_state: ResMut<UserState>,
+    // mut user_state: ResMut<UserState>,
     mut cursor: ResMut<Cursor>,
     // mut history: ResMut<History>,
     mut action_event_writer: EventWriter<Action>,
     mut latch_event_writer: EventWriter<OfficialLatch>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
+    mut selecting_query: Query<Entity, (With<SelectingBoxQuad>, With<CurrentlySelecting>)>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         //
@@ -612,14 +614,6 @@ pub fn mouse_release_actions(
         }
 
         cursor.latch = Vec::new();
-        let user_state = user_state.as_mut();
-
-        match user_state {
-            UserState::Selected(_) | UserState::Selecting(_) => {}
-            _ => {
-                *user_state = UserState::Idle;
-            }
-        }
 
         // let go of all any moving quad upon mouse button release
         for (bezier_handle, anchor, moving_anchor) in query.iter() {
@@ -650,8 +644,6 @@ pub fn mouse_release_actions(
                                     .send(OfficialLatch(potential_latch, bezier_handle.clone()));
                             }
 
-                            // }
-
                             bezier.potential_latch = None;
                             // bezier.move_quad = Anchor::None;
                         }
@@ -666,6 +658,13 @@ pub fn mouse_release_actions(
             ui_board.previous_position = transform.translation.truncate();
         }
 
-        action_event_writer.send(Action::Selected)
+        // TODO: this may be is brittle.
+        // Possible bug: user clicks and releases within 2 frames. Then the CurrentlySelecting
+        // component is inserted, but the selecting_query query here does not find
+        // the CurrentlySelecting component
+        for entity in selecting_query.iter() {
+            commands.entity(entity).remove::<CurrentlySelecting>();
+            action_event_writer.send(Action::Selected)
+        }
     }
 }
