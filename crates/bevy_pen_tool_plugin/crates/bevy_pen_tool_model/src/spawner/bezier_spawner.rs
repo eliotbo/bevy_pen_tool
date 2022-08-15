@@ -55,7 +55,7 @@ pub fn spawn_bezier_system(
             default_spawner_id = bezier_hist.id.into();
         }
 
-        let mut start = cursor.position;
+        let mut start = cursor.last_click_position;
 
         // the control points cannot be exactly in the same positions as the anchors
         // because the algorithm for finding position along the curves fail in that case
@@ -106,19 +106,12 @@ pub fn spawn_bezier_system(
 
         // if the spawn if sent from a redo action
         if let Some(bezier_hist) = maybe_bezier_hist {
-            // do_send_to_history = false;
             do_send_to_history = bezier_hist.do_send_to_history;
             bezier.positions = bezier_hist.positions.clone();
             bezier.latches = bezier_hist.latches.clone();
             bezier.color = bezier_hist.color.clone();
-            // bezier.move_quad = Anchor::None;
             bezier.id = bezier_hist.id.into();
             bezier.do_compute_lut = true;
-            // the id part is done above
-
-            // do_nothing = true;
-        } else {
-            // do_move_anchor = true;
         }
 
         bezier.update_previous_pos();
@@ -205,10 +198,15 @@ pub fn spawn_bezier(
     let bb_size = bound1 - bound0;
     let bb_pos = (bound1 + bound0) / 2.0;
 
-    let mut start_pt_pos = bezier.positions.start - bb_pos;
-    let mut end_pt_pos = bezier.positions.end - bb_pos;
+    // let mut start_pt_pos = bezier.positions.start - bb_pos;
+    // let mut end_pt_pos = bezier.positions.end - bb_pos;
+
+    let mut start_pt_pos = bezier.positions.start;
+    let mut end_pt_pos = bezier.positions.end;
+
     let ctr0_pos = bezier.positions.control_start; // - bb_pos;
-    let ctr1_pos = bezier.positions.control_end - bb_pos;
+                                                   // let ctr1_pos = bezier.positions.control_end - bb_pos;
+    let ctr1_pos = bezier.positions.control_end;
 
     let mesh_handle_bb =
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(bigger_size))));
@@ -497,6 +495,7 @@ pub fn spawn_bezier(
 
     let mut z = 0.0;
     let mut x = -20.0;
+
     for _t in vrange {
         let mid_shader_params_handle = mid_params.add(BezierMidMat {
             color: color.into(),
@@ -515,7 +514,7 @@ pub fn spawn_bezier(
                 mesh: middle_mesh_handle.clone(),
                 visibility: visible.clone(),
                 // render_pipelines: render_piplines.clone(),
-                transform: Transform::from_xyz(0.0, 0.0, globals.z_pos.middles),
+                transform: Transform::from_translation(start_pt_pos.extend(globals.z_pos.middles)),
                 material: mid_shader_params_handle,
                 ..Default::default()
             })

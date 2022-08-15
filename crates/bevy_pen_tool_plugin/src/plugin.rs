@@ -1,31 +1,22 @@
 use crate::actions::*;
+use crate::moves::*;
 use crate::pen::*;
 use crate::undo::*;
 
-use crate::moves::*;
-use bevy_pen_tool_model::*;
-
 use bevy::prelude::*;
-use bevy::render::{render_graph::RenderGraph, RenderApp};
-
+use bevy_pen_tool_model::*;
 pub struct BevyPenToolPlugin;
-use bevy::window::{CreateWindow, WindowId};
-use bevy_inspector_egui::InspectorPlugin;
 
-use once_cell::sync::Lazy;
+// use bevy::render::{render_graph::RenderGraph, RenderApp};
+// use bevy::window::{CreateWindow, WindowId};
+// use bevy_inspector_egui::InspectorPlugin;
+// use once_cell::sync::Lazy;
+
 // TODO
-
-// bug with latches and undos and delete
-//
-// there is a bug where after unlatching and relatching with undo redo, you
-// take an anchor edge and move it next to its previous latched partner, and
-// it relatches without pressing shift + ctrl
-
-// SEND FAKE SEQUENCES OF ACTIONS AS TESTS!!!
-// fix switch button (hold down spawn for example)
-// 0) undo/redo multiple steps at once
-// 1) undo/redo for groups
-// 2) remove UserState
+// 1) use UI camera
+// 2) fix UI button ON indicator and color button hovering
+// 3) selecting/deleting meshes
+// 4) spawn meshes according to selected group
 
 impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {
@@ -33,37 +24,21 @@ impl Plugin for BevyPenToolPlugin {
             // .add_plugin(Material2dPlugin::<BezierMat>::default())
             .add_plugin(PenApiPlugin)
             .add_plugin(SpawnerPlugin)
-            .add_plugin(InspectorPlugin::<History>::new())
-            .add_plugin(InspectorPlugin::<HistoryInspector>::new().on_window(*SECOND_WINDOW_ID))
-            .add_plugin(InspectorPlugin::<HistoryLenInspector>::new().on_window(*SECOND_WINDOW_ID))
             .add_event::<RemoveMovingQuadEvent>()
             .add_event::<GroupBoxEvent>()
             .add_event::<SpawningCurve>()
             .add_event::<SpawnCurve>()
             .insert_resource(History::default())
-            .insert_resource(HistoryInspector::default())
-            .insert_resource(HistoryLenInspector::default())
             .add_startup_system(set_window_position)
-            .add_startup_system(create_new_window)
             //
             .add_system(debug)
-            .add_system(update_history_inspector)
             .add_system(remove_all_moving_quad)
-            //
-            // Update controller
-            .add_system_set(
-                SystemSet::on_update("ModelViewController")
-                    .with_system(rescale)
-                    .label("controller"),
-            )
             //
             // Update model
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
                     .with_system(groupy.label("group"))
                     .with_system(load.after("group"))
-                    // .with_system(recompute_all_lut.label("recompute_lut"))
-                    // .with_system(save.after("recompute_lut"))
                     .with_system(save)
                     .with_system(latchy)
                     .with_system(update_lut)
@@ -79,18 +54,13 @@ impl Plugin for BevyPenToolPlugin {
                     .with_system(redo)
                     .with_system(redo_effects)
                     .with_system(add_to_history)
-                    .label("model")
-                    .after("controller")
-                    .with_system(update_anchors.exclusive_system().at_end()),
+                    .with_system(update_anchors.exclusive_system().at_end())
+                    .label("model"),
             )
             //
             // Update view
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
-                    // TODO:
-                    // mouse_release_actions should be in the controller,
-                    // but there is a bug with the position of new latches when it's there
-                    //
                     .with_system(bezier_anchor_order)
                     .with_system(move_end_quads)
                     .with_system(move_middle_quads)
@@ -100,20 +70,31 @@ impl Plugin for BevyPenToolPlugin {
                     .with_system(move_ui)
                     .with_system(turn_round_animation)
                     .with_system(follow_bezier_group)
-                    // .with_system(spawn_group_middle_quads)
                     .label("view")
+                    // .with_system(rescale)
                     .after("model"),
             );
 
-        let render_app = app.sub_app_mut(RenderApp);
-        let mut graph = render_app.world.get_resource_mut::<RenderGraph>().unwrap();
-        bevy_egui::setup_pipeline(
-            &mut graph,
-            bevy_egui::RenderGraphConfig {
-                window_id: *SECOND_WINDOW_ID,
-                egui_pass: SECONDARY_EGUI_PASS,
-            },
-        );
+        // ///////////////////////// inspector
+
+        // app.add_plugin(InspectorPlugin::<History>::new())
+        //     .add_plugin(InspectorPlugin::<HistoryInspector>::new().on_window(*SECOND_WINDOW_ID))
+        //     .add_plugin(InspectorPlugin::<HistoryLenInspector>::new().on_window(*SECOND_WINDOW_ID))
+        //     .insert_resource(HistoryInspector::default())
+        //     .insert_resource(HistoryLenInspector::default())
+        //     .add_startup_system(create_new_window)
+        //     .add_system(update_history_inspector);
+
+        // let render_app = app.sub_app_mut(RenderApp);
+        // let mut graph = render_app.world.get_resource_mut::<RenderGraph>().unwrap();
+        // bevy_egui::setup_pipeline(
+        //     &mut graph,
+        //     bevy_egui::RenderGraphConfig {
+        //         window_id: *SECOND_WINDOW_ID,
+        //         egui_pass: SECONDARY_EGUI_PASS,
+        //     },
+        // );
+        // ///////////////////////// inspector
     }
 }
 
@@ -193,35 +174,35 @@ impl GroupPrint {
     }
 }
 
-static SECOND_WINDOW_ID: Lazy<WindowId> = Lazy::new(WindowId::new);
-const SECONDARY_EGUI_PASS: &str = "secondary_egui_pass";
+// static SECOND_WINDOW_ID: Lazy<WindowId> = Lazy::new(WindowId::new);
+// const SECONDARY_EGUI_PASS: &str = "secondary_egui_pass";
 
-fn update_history_inspector(
-    history: ResMut<History>,
-    mut history_inspector: ResMut<HistoryInspector>,
-    mut history_len_inspector: ResMut<HistoryLenInspector>,
-) {
-    if history.is_changed() {
-        *history_inspector = HistoryInspector::from(history.clone());
-        history_len_inspector.length = history_inspector.history.len();
-        history_len_inspector.index = history_inspector.index;
-    }
-}
+// fn update_history_inspector(
+//     history: ResMut<History>,
+//     mut history_inspector: ResMut<HistoryInspector>,
+//     mut history_len_inspector: ResMut<HistoryLenInspector>,
+// ) {
+//     if history.is_changed() {
+//         *history_inspector = HistoryInspector::from(history.clone());
+//         history_len_inspector.length = history_inspector.history.len();
+//         history_len_inspector.index = history_inspector.index;
+//     }
+// }
 
-fn create_new_window(mut create_window_events: EventWriter<CreateWindow>) {
-    let window_id = *SECOND_WINDOW_ID;
+// fn create_new_window(mut create_window_events: EventWriter<CreateWindow>) {
+//     let window_id = *SECOND_WINDOW_ID;
 
-    create_window_events.send(CreateWindow {
-        id: window_id,
-        descriptor: WindowDescriptor {
-            width: 800.,
-            height: 600.,
-            position: WindowPosition::At(Vec2::new(1350., 0.)),
-            title: "Second window".to_string(),
-            ..Default::default()
-        },
-    });
-}
+//     create_window_events.send(CreateWindow {
+//         id: window_id,
+//         descriptor: WindowDescriptor {
+//             width: 800.,
+//             height: 600.,
+//             position: WindowPosition::At(Vec2::new(1350., 0.)),
+//             title: "Second window".to_string(),
+//             ..Default::default()
+//         },
+//     });
+// }
 
 fn debug(
     keyboard_input: Res<Input<KeyCode>>,

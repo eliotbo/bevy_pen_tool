@@ -138,7 +138,6 @@ pub fn send_action(
     }
 
     // only used for pattern matching
-    // let _control_only = (false, true, false);
     let _pressed_g = keyboard_input.just_pressed(KeyCode::G);
     let _pressed_h = keyboard_input.just_pressed(KeyCode::H);
     let _pressed_s = keyboard_input.just_pressed(KeyCode::S);
@@ -153,9 +152,7 @@ pub fn send_action(
         keyboard_input.pressed(KeyCode::LControl),
         keyboard_input.pressed(KeyCode::Space),
     ) {
-        // (true, false, false) if mouse_just_pressed => action_event_writer.send(Action::SpawnCurve),
         (true, true, false) if mouse_pressed => action_event_writer.send(Action::Latch),
-        // (false, false, true) if mouse_just_pressed => action_event_writer.send(Action::Detach),
 
         // TODO: move to mouseclick event router
         // (false, true, false) if mouse_just_pressed => {
@@ -208,11 +205,6 @@ pub fn record_mouse_events_system(
         let cursor_vec4: Vec4 = cam_transform.compute_matrix()
             * screen_position.extend(0.0).extend(1.0 / (scale))
             * scale;
-
-        // println!("{:?}", cam_transform.compute_matrix());
-
-        // let cursor_vec4: Vec4 =
-        //     cam_transform.compute_matrix() * screen_position.extend(0.0).extend(1.0);
 
         let cursor_pos = Vec2::new(cursor_vec4.x, cursor_vec4.y);
         cursor_res.position = cursor_pos / globals.scale;
@@ -475,8 +467,6 @@ pub fn pick_color(
     mut globals: ResMut<Globals>,
     mut mouse_event_reader: EventReader<MouseClickEvent>,
 ) {
-    // if mouse_button_input.just_pressed(MouseButton::Left) {
-
     if let Some(MouseClickEvent::OnColorButton((color, shader_param_handle))) =
         mouse_event_reader.iter().next()
     {
@@ -495,19 +485,10 @@ pub fn pick_color(
         // send selected color to shaders so that it shows the selected color with a white contour
         let mut shader_params = my_shader_params.get_mut(shader_param_handle).unwrap();
         shader_params.t = 1.0;
-
-        // if ui_board.action == UiAction::None
-        //     && cursor.within_rect(
-        //         ui_transform.translation.truncate(),
-        //         ui_board.size * globals.scale,
-        //     )
-        // {
-        //     ui_board.action = UiAction::MovingUi;
-        // }
     }
 }
 
-pub fn spawn_curve_order_on_mouseclick(
+pub fn events_on_spawn_mouseclick(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut event_writer: EventWriter<Latch>,
     // mut user_state: ResMut<UserState>,
@@ -519,14 +500,6 @@ pub fn spawn_curve_order_on_mouseclick(
 
     match click_event {
         Some(MouseClickEvent::SpawnOnBezier((anchor_edge, bezier_id, is_latched))) => {
-            // this is too stateful, be more functional please. events please.
-
-            // let us = user_state.as_mut();
-            // *us = UserState::SpawningCurve {
-            //     bezier_hist: None,
-            //     maybe_bezier_id: None,
-            // };
-
             spawn_curve_event_writer.send(SpawningCurve {
                 bezier_hist: None,
                 maybe_bezier_id: None,
@@ -544,12 +517,6 @@ pub fn spawn_curve_order_on_mouseclick(
             }
         }
         Some(MouseClickEvent::SpawnOnCanvas) => {
-            // let us = user_state.as_mut();
-            // *us = UserState::SpawningCurve {
-            //     bezier_hist: None,
-            //     maybe_bezier_id: None,
-            // };
-
             spawn_curve_event_writer.send(SpawningCurve {
                 bezier_hist: None,
                 maybe_bezier_id: None,
@@ -560,7 +527,7 @@ pub fn spawn_curve_order_on_mouseclick(
     }
 }
 
-pub fn check_mouse_on_canvas(
+pub fn events_on_canvas_mouseclick(
     mut move_anchor_event_writer: EventWriter<MoveAnchorEvent>,
 
     // mut user_state: ResMut<UserState>,
@@ -590,7 +557,7 @@ pub fn check_mouse_on_canvas(
     }
 }
 
-pub fn mouse_release_actions(
+pub fn events_on_mouse_release(
     mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,

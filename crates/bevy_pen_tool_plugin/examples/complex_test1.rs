@@ -4,6 +4,23 @@ use bevy_pen_tool_plugin::{pen::*, BevyPenToolPlugin, Bezier};
 use bevy::prelude::*;
 use std::collections::HashMap;
 
+// cargo run --release --features bevy/dynamic --example delete_test
+// cargo run --release --features bevy/dynamic --example latch_test
+// cargo run --release --features bevy/dynamic --example latch_then_delete_test
+// cargo run --release --features bevy/dynamic --example move_test
+// cargo run --release --features bevy/dynamic --example redo_delete_latched_test
+// cargo run --release --features bevy/dynamic --example redo_delete_test
+// cargo run --release --features bevy/dynamic --example redo_latch_test
+// cargo run --release --features bevy/dynamic --example redo_move_test
+// cargo run --release --features bevy/dynamic --example redo_unlatch_test
+// cargo run --release --features bevy/dynamic --example undo_delete_latched_test
+// cargo run --release --features bevy/dynamic --example undo_delete_test
+// cargo run --release --features bevy/dynamic --example undo_latch_test
+// cargo run --release --features bevy/dynamic --example undo_latch_then_move_test
+// cargo run --release --features bevy/dynamic --example undo_move_test
+// cargo run --release --features bevy/dynamic --example undo_unlatch_test
+// cargo run --release --features bevy/dynamic --example unlatch_test
+
 fn main() {
     let mut app = App::new();
     app.insert_resource(BezierTestHashed(HashMap::new()))

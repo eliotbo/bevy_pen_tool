@@ -781,3 +781,49 @@ pub fn save_mesh(
         }
     }
 }
+
+// makes UI and quads bigger or smaller using Ctrl + mousewheel
+pub fn rescale(
+    mut grandparent_query: Query<
+        &mut Transform,
+        Or<(
+            With<BezierGrandParent>,
+            With<GroupParent>,
+            With<SelectedBoxQuad>,
+        )>,
+    >,
+    // shader_param_query: Query<&Handle<UiMat>>,
+    // mut my_shaders: ResMut<Assets<UiMat>>,
+    mut globals: ResMut<Globals>,
+    mut action_event_reader: EventReader<Action>,
+) {
+    for action in action_event_reader.iter() {
+        //
+        let mut pressed_rescale_button = false;
+        let mut zoom_direction = 0.0;
+        //
+        if action == &Action::ScaleUp {
+            pressed_rescale_button = true;
+            zoom_direction = 1.0;
+        } else if action == &Action::ScaleDown {
+            pressed_rescale_button = true;
+            zoom_direction = -1.0;
+        }
+        if pressed_rescale_button {
+            let zoom_factor = 1.0 + zoom_direction * 0.1;
+            globals.scale = globals.scale * zoom_factor;
+
+            // the bounding box, the ends and the control points share the same shader parameters
+            for mut transform in grandparent_query.iter_mut() {
+                transform.scale = Vec2::new(globals.scale, globals.scale).extend(1.0);
+            }
+
+            // // update the shader params for the middle quads (animated quads)
+            // for shader_handle in shader_param_query.iter() {
+            //     let shader_param = my_shaders.get_mut(shader_handle).unwrap();
+            //     shader_param.zoom = 0.15 / globals.scale;
+            //     shader_param.size *= 1.0 / zoom_factor;
+            // }
+        }
+    }
+}

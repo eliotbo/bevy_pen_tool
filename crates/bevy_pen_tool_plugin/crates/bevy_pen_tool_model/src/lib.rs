@@ -53,26 +53,33 @@ impl Plugin for SpawnerPlugin {
             .add_startup_system(spawn_ui)
             .add_startup_system(spawn_selecting_bounding_box)
             //
+            // Update spawner (conceptually part of view)
+            .add_system_set(
+                SystemSet::on_update("ModelViewController")
+                    .label("spawner")
+                    .with_system(spawn_middle_quads)
+                    .with_system(spawn_bezier_system)
+                    .with_system(spawn_group_entities)
+                    .with_system(spawn_heli),
+            )
+            //
             // Update controller
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
-                    .with_system(record_mouse_events_system.exclusive_system().at_start())
+                    .with_system(record_mouse_events_system)
                     .with_system(check_mouseclick_on_objects)
                     .with_system(check_mouse_on_ui)
                     .with_system(pick_color)
-                    .with_system(check_mouse_on_canvas)
-                    .with_system(spawn_curve_order_on_mouseclick)
-                    .with_system(spawn_middle_quads)
                     .with_system(button_system)
                     .with_system(toggle_ui_button)
-                    .with_system(send_action.exclusive_system().at_end())
-                    .label("controller"),
+                    .with_system(rescale)
+                    .label("controller")
+                    .after("spawner"),
             )
             //
             // Update model
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
-                    .with_system(spawn_heli)
                     .with_system(make_mesh)
                     .with_system(make_road)
                     .label("model")
@@ -82,19 +89,24 @@ impl Plugin for SpawnerPlugin {
             // Update view
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
-                    // TODO:
-                    // mouse_release_actions should be in the controller,
-                    // but there is a bug with the position of new latches when it's there
-                    .with_system(mouse_release_actions)
-                    //
                     .with_system(adjust_selection_attributes)
                     .with_system(adjust_selecting_attributes)
                     .with_system(adjust_group_attributes)
-                    .with_system(spawn_bezier_system)
-                    .with_system(spawn_group_entities)
                     .label("view")
                     .after("model"),
+            )
+            //
+            // Update controller events
+            .add_system_set(
+                SystemSet::on_update("ModelViewController")
+                    .label("controller_events")
+                    .after("view")
+                    .with_system(events_on_canvas_mouseclick)
+                    .with_system(events_on_spawn_mouseclick)
+                    .with_system(events_on_mouse_release.label("mouse_release"))
+                    .with_system(send_action.after("mouse_release")),
             );
+        // .add_system(mouse_release_actions.exclusive_system().at_end());
     }
 }
 
