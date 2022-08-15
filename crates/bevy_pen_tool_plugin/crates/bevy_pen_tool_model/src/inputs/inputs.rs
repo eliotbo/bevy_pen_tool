@@ -597,13 +597,11 @@ pub fn mouse_release_actions(
     query: Query<(&Handle<Bezier>, &Anchor, &MovingAnchor)>,
     moving_query: Query<Entity, With<MovingAnchor>>,
     mut ui_query: Query<(&mut Transform, &mut UiBoard), With<BezierGrandParent>>,
-    // mut user_state: ResMut<UserState>,
     mut cursor: ResMut<Cursor>,
-    // mut history: ResMut<History>,
     mut action_event_writer: EventWriter<Action>,
     mut latch_event_writer: EventWriter<OfficialLatch>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
-    mut selecting_query: Query<Entity, (With<SelectingBoxQuad>, With<CurrentlySelecting>)>,
+    selecting_query: Query<Entity, (With<SelectingBoxQuad>, With<CurrentlySelecting>)>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         //
@@ -645,7 +643,6 @@ pub fn mouse_release_actions(
                             }
 
                             bezier.potential_latch = None;
-                            // bezier.move_quad = Anchor::None;
                         }
                     }
                 }

@@ -48,7 +48,6 @@ impl Plugin for SpawnerPlugin {
             .insert_resource(Globals::default())
             .insert_resource(Selection::default())
             .insert_resource(Maps::default())
-            // .insert_resource(UserState::default())
             .add_startup_system(setup.exclusive_system().at_start())
             .add_startup_system(spawn_selection_bounding_box)
             .add_startup_system(spawn_ui)

@@ -100,6 +100,8 @@ pub fn update_anchors(
 //
 // After a mouse click on an anchor, orders to move either an anchor or the whole curve.
 // The unlatch functionality is part of this function as well.
+
+#[allow(dead_code)]
 pub fn bezier_anchor_order(
     mut commands: Commands,
     mut bezier_curves: ResMut<Assets<Bezier>>,
@@ -111,7 +113,7 @@ pub fn bezier_anchor_order(
 ) {
     let mut latch_partner: Option<(BezierId, LatchData)> = None;
 
-    let mut latched_chain_whole_curve: Vec<Handle<Bezier>> = Vec::new();
+    let mut latched_chain_whole_curve: Vec<Handle<Bezier>>; // = Vec::new();
 
     let mut latched_chain_whole_curve_set: HashSet<BezierId> = HashSet::new();
 
@@ -253,9 +255,8 @@ pub fn selection_box_init(
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
-    mut selection_box_query: Query<Entity, With<SelectingBoxQuad>>,
+    selection_box_query: Query<Entity, With<SelectingBoxQuad>>,
     mut action_event_reader: EventReader<Action>,
-    // mut selecting_event_writer: EventWriter<StartSelectingEvent>,
     mut visible_selection_query: Query<&mut Visibility, With<SelectingBoxQuad>>,
 ) {
     if action_event_reader
@@ -267,13 +268,6 @@ pub fn selection_box_init(
             get_close_anchor_entity(2.0 * globals.scale, cursor.position, &bezier_curves, &query)
         {
         } else {
-            // let us = user_state.as_mut();
-            // *us = UserState::Selecting(cursor.position);
-
-            // selecting_event_writer.send(StartSelectingEvent {
-            //     click_position: cursor.position,
-            // });
-
             // add CurrentlySelecting to the quad for the selection box
             for entity in selection_box_query.iter() {
                 commands.entity(entity).insert(CurrentlySelecting);
@@ -569,8 +563,6 @@ pub fn latchy(
                 };
 
                 partner_bezier.potential_latch = Some(partner_latch_data);
-
-                // event_writer.send(OfficialLatch(partner_latch_data, partner_handle.clone()));
             } else {
                 // if no partner is found, remove the potential latch
                 let bezier = bezier_curves.get(&mover_handle).unwrap().clone();
@@ -631,7 +623,7 @@ pub fn officiate_latch_partnership(
 
         bezier_1.latches.insert(latch.self_edge, latch.clone());
         bezier_1.compute_lut_walk(100); // TODO: is this useful? also, it should be dependent on a global var
-
+        bezier_1.potential_latch = None;
         let bezier_1_id = bezier_1.id;
 
         //
@@ -639,6 +631,7 @@ pub fn officiate_latch_partnership(
 
         let handle_entity_2 = maps.bezier_map[&latch.latched_to_id.into()].clone();
         let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
+        bezier_2.potential_latch = None;
 
         let latch_2 = LatchData {
             latched_to_id: bezier_1_id.into(),

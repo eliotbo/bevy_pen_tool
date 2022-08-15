@@ -120,7 +120,7 @@ pub fn latch_curves(
     l1: CurveIdEdge,
     l2: CurveIdEdge,
     maps: &ResMut<Maps>,
-    mut bezier_curves: &mut ResMut<Assets<Bezier>>,
+    bezier_curves: &mut ResMut<Assets<Bezier>>,
 ) {
     let bezier_id_1 = l1.id;
     let bezier_id_2 = l2.id;

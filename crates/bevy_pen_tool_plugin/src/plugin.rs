@@ -229,9 +229,9 @@ fn debug(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     groups: Res<Assets<Group>>,
     // mids_groups: Query<&GroupMiddleQuad>,
-    maps: Res<Maps>,
-    history: Res<History>,
-    mut action_event_writer: EventWriter<Action>,
+    // maps: Res<Maps>,
+    // history: Res<History>,
+    // mut action_event_writer: EventWriter<Action>,
 ) {
     if keyboard_input.just_pressed(KeyCode::B)
         && !keyboard_input.pressed(KeyCode::LShift)
@@ -241,7 +241,7 @@ fn debug(
         // println!("'B' currently pressed");
         for handle in query.iter() {
             let bezier = bezier_curves.get_mut(handle).unwrap();
-            action_event_writer.send(Action::ComputeLut);
+            // action_event_writer.send(Action::ComputeLut);
 
             // println!("group id: {:?}", bezier.group);
             // println!("latches: {:#?}", BezierPrint::from_bezier(bezier).latches);
@@ -250,10 +250,10 @@ fn debug(
 
         // println!("mids: {:?}", mids_groups.iter().count());
         // println!("history actions: {:#?}", history.actions);
-        println!("history actions len: {:#?}", history.actions.len());
-        println!("history index: {:?}", history.index);
-        println!("map: {:?}", maps.print_bezier_map());
-        println!("");
+        // println!("history actions len: {:#?}", history.actions.len());
+        // println!("history index: {:?}", history.index);
+        // println!("map: {:?}", maps.print_bezier_map());
+        // println!("");
     }
 
     if keyboard_input.just_pressed(KeyCode::G) {
