@@ -26,3 +26,24 @@ impl Material2d for RoadMesh2dMaterial {
         "shaders/road_mesh.wgsl".into()
     }
 }
+
+#[derive(AsBindGroup, TypeUuid, Debug, Clone, Component, Default)]
+#[uuid = "f690fdae-d598-45ab-1684-97e2a3f95a9a"]
+pub struct FillMesh2dMaterial {
+    #[uniform(0)]
+    pub color: Vec4,
+}
+
+pub struct FillMesh2dPlugin;
+
+impl Plugin for FillMesh2dPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugin(Material2dPlugin::<FillMesh2dMaterial>::default());
+    }
+}
+
+impl Material2d for FillMesh2dMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/fill_mesh.wgsl".into()
+    }
+}

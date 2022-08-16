@@ -51,14 +51,7 @@ impl From<&Bezier> for BezierHist {
 }
 
 impl BezierHist {
-    // API
-    // TODO: make most of the structs public  and
-    // leave only the API public
-    //
-    // Programmatically generate a Bezier Curve (see examples)
     pub fn new(positions: BezierPositions, id: u64) -> Self {
-        // generate a random id
-
         Self {
             positions,
             color: None,
@@ -200,26 +193,6 @@ impl AnchorEdge {
         }
     }
 }
-
-// // TODO: get rid of this
-// #[derive(Debug)]
-// pub enum UserState {
-//     Idle,
-//     Selecting(Vec2),
-//     Selected(Group),
-//     // SpawningCurve {
-//     //     bezier_hist: Option<BezierHist>,
-//     //     maybe_bezier_id: Option<BezierId>,
-//     // },
-//     // MovingAnchor,
-//     MovingWholeCurve,
-// }
-
-// impl Default for UserState {
-//     fn default() -> Self {
-//         Self::Idle
-//     }
-// }
 
 #[derive(Component)]
 pub struct BezierParent;

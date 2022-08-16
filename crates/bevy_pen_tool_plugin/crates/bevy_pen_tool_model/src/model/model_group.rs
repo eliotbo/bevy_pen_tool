@@ -411,4 +411,20 @@ impl Group {
         let position = interpolate_vec2(p1, p2, rem);
         return position;
     }
+
+    // compute the average position of the anchors making up the group
+    pub fn center_of_mass(&self, bezier_curves: &ResMut<Assets<Bezier>>) -> Vec2 {
+        let mut center_of_mass = Vec2::ZERO;
+        for (handle, anchor, _t_range, _lut) in &self.lut {
+            let bezier = bezier_curves.get(&handle.clone()).unwrap();
+            // center_of_mass += bezier.center_of_mass();
+            let pos = match anchor {
+                AnchorEdge::Start => bezier.positions.start,
+                AnchorEdge::End => bezier.positions.end,
+            };
+            center_of_mass += pos;
+        }
+        center_of_mass /= self.lut.len() as f32;
+        return center_of_mass;
+    }
 }

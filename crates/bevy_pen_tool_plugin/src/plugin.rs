@@ -16,8 +16,10 @@ pub struct BevyPenToolPlugin;
 // 1) use UI camera
 // 2) disable and hide color picking
 // 3) selecting/deleting meshes
-// 4) spawn meshes according to selected group
 // 5) disable shortcuts
+// 6) make most of the structs public(crate) and
+//     leave only the API public
+// 7) automatically group latched curves
 
 impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {

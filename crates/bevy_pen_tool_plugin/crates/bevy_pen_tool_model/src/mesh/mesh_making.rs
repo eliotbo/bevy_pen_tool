@@ -1,33 +1,11 @@
 use crate::inputs::Action;
 use crate::model::*;
-use crate::RoadMesh2dMaterial;
-// use bevy::reflect::TypeUuid;
-// use bevy::render::mesh::Indices;
-// use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
+use crate::{FillMesh2dMaterial, RoadMesh2dMaterial};
 
 use bevy::{
-    core_pipeline::core_2d::Transparent2d,
     prelude::*,
-    reflect::TypeUuid,
-    render::{
-        mesh::Indices,
-        render_asset::RenderAssets,
-        render_phase::{AddRenderCommand, DrawFunctions, RenderPhase, SetItemPipeline},
-        render_resource::{
-            BlendState, ColorTargetState, ColorWrites, Face, FragmentState, FrontFace,
-            MultisampleState, PipelineCache, PolygonMode, PrimitiveState, PrimitiveTopology,
-            RenderPipelineDescriptor, SpecializedRenderPipeline, SpecializedRenderPipelines,
-            TextureFormat, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
-        },
-        texture::BevyDefault,
-        view::VisibleEntities,
-        Extract, RenderApp, RenderStage,
-    },
-    sprite::{
-        DrawMesh2d, MaterialMesh2dBundle, Mesh2dHandle, Mesh2dPipeline, Mesh2dPipelineKey,
-        Mesh2dUniform, SetMesh2dBindGroup, SetMesh2dViewBindGroup,
-    },
-    utils::FloatOrd,
+    render::{mesh::Indices, render_resource::PrimitiveTopology},
+    sprite::{MaterialMesh2dBundle, Mesh2dHandle},
 };
 
 use lyon::tessellation::geometry_builder::simple_builder;
@@ -35,6 +13,26 @@ use lyon::tessellation::math::{point, Point};
 use lyon::tessellation::path::Path;
 use lyon::tessellation::{FillOptions, FillTessellator, VertexBuffers};
 
+use rand::{thread_rng, Rng};
+//
+//
+//
+//
+
+pub type RoadMeshId = u64;
+
+#[derive(Component)]
+pub struct RoadMesh(pub RoadMeshId);
+
+//
+pub type FillMeshId = u64;
+
+#[derive(Component)]
+pub struct FillMesh(pub RoadMeshId);
+
+// spawn a road along the selected group
+//
+//
 pub fn make_road(
     mut action_event_reader: EventReader<Action>,
     mut commands: Commands,
@@ -111,7 +109,6 @@ pub fn make_road(
             }
 
             let mut mesh_pos_attributes: Vec<[f32; 3]> = Vec::new();
-            let mut mesh_attr_normals: Vec<[f32; 3]> = Vec::new();
 
             // show points from look-up table
             let color = globals.picked_color.unwrap();
@@ -119,9 +116,7 @@ pub fn make_road(
             let mut normals = Vec::new();
 
             for position in mesh_contour {
-                // mesh_pos_attributes.push([position.x, position.y, 0.0]);
                 mesh_pos_attributes.push([position.x, position.y, 0.0]);
-                mesh_attr_normals.push([0.0, 0.0, 1.0]);
 
                 colors.push([color.r(), color.g(), color.b(), 1.0]);
                 normals.push([0.0, 0.0, 1.0]);
@@ -140,10 +135,6 @@ pub fn make_road(
 
             let texture_handle = maps.textures.get("single_lane_road").unwrap();
 
-            // use std::{thread, time};
-            // let hundred_millis = time::Duration::from_millis(200);
-            // thread::sleep(hundred_millis);
-
             let mat_handle = road_materials.add(RoadMesh2dMaterial {
                 road_texture: texture_handle.clone(),
             });
@@ -152,394 +143,170 @@ pub fn make_road(
                 Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.road));
             road_transform.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
-            commands.spawn_bundle(MaterialMesh2dBundle {
-                mesh: Mesh2dHandle(meshes.add(mesh)),
-                material: mat_handle,
-                transform: road_transform,
-                ..default()
-            });
+            let mut rng = thread_rng();
+
+            commands
+                .spawn_bundle(MaterialMesh2dBundle {
+                    mesh: Mesh2dHandle(meshes.add(mesh)),
+                    material: mat_handle,
+                    transform: road_transform,
+                    ..default()
+                })
+                .insert(RoadMesh(rng.gen()));
         }
     }
 }
 
-pub fn make_mesh(
+// generate a fill mesh inside of the group
+//
+//
+//
+pub fn make_fill_mesh(
     mut action_event_reader: EventReader<Action>,
     mut commands: Commands,
-    // mut materials: ResMut<Assets<StandardMaterial>>,
     globals: Res<Globals>,
-    groups: Res<Assets<Group>>,
+    mut curves: ResMut<Assets<Bezier>>,
+    mut fill_materials: ResMut<Assets<FillMesh2dMaterial>>,
+    selection: ResMut<Selection>,
     mut meshes: ResMut<Assets<Mesh>>,
     query: Query<Entity, With<GroupMesh>>,
+    maps: ResMut<Maps>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::MakeMesh) {
-        if groups.iter().next() == None {
-            return ();
-        }
-        let group = groups.iter().next().unwrap();
+        if let Some(mut group) = selection.selected.clone() {
+            group.find_connected_ends(&mut curves, maps.bezier_map.clone());
 
-        for entity in query.iter() {
-            commands.entity(entity).despawn();
-        }
+            group.group_lut(&mut curves, maps.bezier_map.clone());
+            group.compute_standalone_lut(&curves, globals.group_lut_num_points);
 
-        let mut path_builder = Path::builder();
+            let center_of_mass = group.center_of_mass(&curves);
 
-        let lut = group.1.standalone_lut.lut.clone();
-
-        let first = lut[0];
-        path_builder.begin(point(first.x, first.y));
-
-        let resto: Vec<Vec2> = lut[1..].to_vec();
-
-        for e in resto.iter() {
-            path_builder.line_to(point(e.x, e.y));
-        }
-
-        path_builder.end(true);
-        let path = path_builder.build();
-
-        // Create the destination vertex and index buffers.
-        let mut buffers: VertexBuffers<Point, u16> = VertexBuffers::new();
-
-        {
-            let mut vertex_builder = simple_builder(&mut buffers);
-
-            // Create the tessellator.
-            let mut tessellator = FillTessellator::new();
-
-            // Compute the tessellation.
-            let result =
-                tessellator.tessellate_path(&path, &FillOptions::default(), &mut vertex_builder);
-            assert!(result.is_ok());
-        }
-
-        let mut mesh_pos_attributes: Vec<[f32; 3]> = Vec::new();
-        let mut mesh_attr_uvs: Vec<[f32; 2]> = Vec::new();
-        let mut new_indices: Vec<u32> = Vec::new();
-
-        // show points from look-up table
-        let color = globals.picked_color.unwrap();
-        let mut colors = Vec::new();
-
-        for position in buffers.vertices[..].iter() {
-            mesh_pos_attributes.push([position.x, position.y, 0.0]);
-
-            colors.push([color.r(), color.g(), color.b(), 1.0]);
-        }
-
-        //////////////////////////// uvs ///////////////////////////////
-        let xs: Vec<f32> = mesh_pos_attributes.iter().map(|v| v[0]).collect();
-        let ys: Vec<f32> = mesh_pos_attributes.iter().map(|v| v[1]).collect();
-
-        use std::cmp::Ordering;
-
-        fn bounds(v: &Vec<f32>) -> (f32, f32) {
-            let max_v: &f32 = v
-                .iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-                .unwrap();
-
-            let min_v: &f32 = v
-                .iter()
-                .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-                .unwrap();
-
-            return (*min_v, *max_v);
-        }
-
-        let bounds_x = bounds(&xs);
-        let size_x = bounds_x.1 - bounds_x.0;
-        let bounds_y = bounds(&ys);
-        let size_y = bounds_y.1 - bounds_y.0;
-
-        for pos in &mesh_pos_attributes {
-            let (pos_x, pos_y) = (pos[0], pos[1]);
-
-            mesh_attr_uvs.push([
-                1.0 * (pos_x - bounds_x.0) / size_x,
-                1.0 * (pos_y - bounds_y.0) / size_y,
-            ]);
-        }
-
-        for ind in buffers.indices[..].iter().rev() {
-            new_indices.push(ind.clone() as u32);
-        }
-
-        // println!("making mesh: {:?}", "aah");
-
-        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-
-        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
-
-        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-
-        mesh.set_indices(Some(Indices::U32(new_indices)));
-
-        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, mesh_attr_uvs);
-
-        let mut fill_transform =
-            Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.fill));
-        fill_transform.scale = Vec3::new(globals.scale, globals.scale, 1.0);
-
-        // We can now spawn the entities for the star and the camera
-        commands.spawn_bundle((
-            ColoredMesh2d::default(),
-            Mesh2dHandle(meshes.add(mesh)),
-            // Transform::default(),
-            GlobalTransform::default(),
-            fill_transform,
-            Visibility::default(),
-            ComputedVisibility::default(),
-        ));
-    }
-}
-
-/// A marker component for colored 2d meshes
-#[derive(Component, Default)]
-pub struct ColoredMesh2d;
-
-/// Custom pipeline for 2d meshes with vertex colors
-pub struct ColoredMesh2dPipeline {
-    /// this pipeline wraps the standard [`Mesh2dPipeline`]
-    mesh2d_pipeline: Mesh2dPipeline,
-    // material_layout: BindGroupLayout,
-}
-
-impl FromWorld for ColoredMesh2dPipeline {
-    fn from_world(world: &mut World) -> Self {
-        let mesh2d_pipeline = Mesh2dPipeline::from_world(world).clone();
-        Self { mesh2d_pipeline }
-    }
-}
-
-// We implement `SpecializedPipeline` to customize the default rendering from `Mesh2dPipeline`
-impl SpecializedRenderPipeline for ColoredMesh2dPipeline {
-    type Key = Mesh2dPipelineKey;
-
-    fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
-        // Customize how to store the meshes' vertex attributes in the vertex buffer
-        // Our meshes only have position and color
-        let formats = vec![
-            // Position
-            VertexFormat::Float32x3,
-            VertexFormat::Float32x4,
-            // UV
-            VertexFormat::Float32x2,
-        ];
-
-        let vertex_layout =
-            VertexBufferLayout::from_vertex_formats(VertexStepMode::Vertex, formats);
-
-        // let vertex_attributes = vec![
-        //     // Position (GOTCHA! Vertex_Position isn't first in the buffer due to how Mesh sorts attributes (alphabetically))
-        //     VertexAttribute {
-        //         format: VertexFormat::Float32x3,
-        //         // this offset is the size of the color attribute, which is stored first
-        //         offset: 16,
-        //         // position is available at location 0 in the shader
-        //         shader_location: 0,
-        //     },
-        //     // Color
-        //     VertexAttribute {
-        //         format: VertexFormat::Float32x4,
-        //         offset: 0,
-        //         shader_location: 1,
-        //     },
-        //     // uv
-        //     VertexAttribute {
-        //         format: VertexFormat::Float32x2,
-        //         offset: 28,
-        //         shader_location: 2,
-        //     },
-        // ];
-        // // This is the sum of the size of position, color uv attributes (12 + 16 + 8 = 36)
-        // let vertex_array_stride = 36;
-
-        RenderPipelineDescriptor {
-            vertex: VertexState {
-                // Use our custom shader
-                shader: COLORED_MESH2D_SHADER_HANDLE.typed::<Shader>(),
-                entry_point: "vertex".into(),
-                shader_defs: Vec::new(),
-                // Use our custom vertex buffer
-                // buffers: vec![VertexBufferLayout {
-                //     array_stride: vertex_array_stride,
-                //     step_mode: VertexStepMode::Vertex,
-                //     attributes: vertex_attributes,
-                // }],
-                buffers: vec![vertex_layout],
-            },
-            fragment: Some(FragmentState {
-                // Use our custom shader
-                shader: COLORED_MESH2D_SHADER_HANDLE.typed::<Shader>(),
-                shader_defs: Vec::new(),
-                entry_point: "fragment".into(),
-                // targets: vec![ColorTargetState {
-                //     format: TextureFormat::bevy_default(),
-                //     blend: Some(BlendState::ALPHA_BLENDING),
-                //     write_mask: ColorWrites::ALL,
-                // }],
-                targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
-                    blend: Some(BlendState::ALPHA_BLENDING),
-                    write_mask: ColorWrites::ALL,
-                })],
-            }),
-            // Use the two standard uniforms for 2d meshes
-            layout: Some(vec![
-                // Bind group 0 is the view uniform
-                self.mesh2d_pipeline.view_layout.clone(),
-                // Bind group 1 is the mesh uniform
-                self.mesh2d_pipeline.mesh_layout.clone(),
-                // texture
-                // self.material_layout.clone(),
-            ]),
-            primitive: PrimitiveState {
-                front_face: FrontFace::Ccw,
-                cull_mode: Some(Face::Back),
-                unclipped_depth: false,
-                polygon_mode: PolygonMode::Fill,
-                conservative: false,
-                topology: key.primitive_topology(),
-                strip_index_format: None,
-            },
-            depth_stencil: None,
-            multisample: MultisampleState {
-                count: key.msaa_samples(),
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            label: Some("colored_mesh2d_pipeline".into()),
-        }
-    }
-}
-
-// This specifies how to render a colored 2d mesh
-type DrawColoredMesh2d = (
-    // Set the pipeline
-    SetItemPipeline,
-    // Set the view uniform as bind group 0
-    SetMesh2dViewBindGroup<0>,
-    // Set the mesh uniform as bind group 1
-    SetMesh2dBindGroup<1>,
-    // Draw the mesh
-    DrawMesh2d,
-);
-
-/// Plugin that renders [`ColoredMesh2d`]s
-pub struct ColoredMesh2dPlugin;
-
-/// Handle to the custom shader with a unique random ID
-pub const COLORED_MESH2D_SHADER_HANDLE: HandleUntyped =
-    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 13828845428412094821);
-
-pub struct ShaderHandle {
-    maybe_handle: Option<Handle<Shader>>,
-}
-
-impl Plugin for ColoredMesh2dPlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(ShaderHandle { maybe_handle: None })
-            .add_startup_system(setup_shader)
-            .add_system(finalize_setup_shader);
-
-        // Register our custom draw function and pipeline, and add our render systems
-        let render_app = app.get_sub_app_mut(RenderApp).unwrap();
-        render_app
-            .add_render_command::<Transparent2d, DrawColoredMesh2d>()
-            .init_resource::<ColoredMesh2dPipeline>()
-            .init_resource::<SpecializedRenderPipelines<ColoredMesh2dPipeline>>()
-            .add_system_to_stage(RenderStage::Extract, extract_colored_mesh2d)
-            .add_system_to_stage(RenderStage::Queue, queue_colored_mesh2d);
-    }
-}
-
-pub fn setup_shader(asset_server: Res<AssetServer>, mut shader_handle: ResMut<ShaderHandle>) {
-    let shader: Handle<Shader> = asset_server.load("shaders/fill_mesh.wgsl");
-    shader_handle.maybe_handle = Some(shader);
-
-    use std::{thread, time};
-    let hundred_millis = time::Duration::from_millis(100);
-    thread::sleep(hundred_millis);
-}
-
-pub fn finalize_setup_shader(
-    mut shaders: ResMut<Assets<Shader>>,
-    shader_handle: ResMut<ShaderHandle>,
-) {
-    let s = shaders
-        .get(&shader_handle.maybe_handle.clone().unwrap())
-        .unwrap()
-        .clone();
-
-    shaders.set_untracked(COLORED_MESH2D_SHADER_HANDLE, s);
-}
-
-/// Extract the [`ColoredMesh2d`] marker component into the render app
-pub fn extract_colored_mesh2d(
-    mut commands: Commands,
-    mut previous_len: Local<usize>,
-    query: Extract<Query<(Entity, &ComputedVisibility), With<ColoredMesh2d>>>,
-) {
-    let mut values = Vec::with_capacity(*previous_len);
-    for (entity, computed_visibility) in query.iter() {
-        if !computed_visibility.is_visible() {
-            continue;
-        }
-        values.push((entity, (ColoredMesh2d,)));
-    }
-    *previous_len = values.len();
-    commands.insert_or_spawn_batch(values);
-}
-
-/// Queue the 2d meshes marked with [`ColoredMesh2d`] using our custom pipeline and draw function
-#[allow(clippy::too_many_arguments)]
-pub fn queue_colored_mesh2d(
-    transparent_draw_functions: Res<DrawFunctions<Transparent2d>>,
-    colored_mesh2d_pipeline: Res<ColoredMesh2dPipeline>,
-    mut pipelines: ResMut<SpecializedRenderPipelines<ColoredMesh2dPipeline>>,
-    mut pipeline_cache: ResMut<PipelineCache>,
-    msaa: Res<Msaa>,
-    render_meshes: Res<RenderAssets<Mesh>>,
-    colored_mesh2d: Query<(&Mesh2dHandle, &Mesh2dUniform), With<ColoredMesh2d>>,
-    mut views: Query<(&VisibleEntities, &mut RenderPhase<Transparent2d>)>,
-) {
-    if colored_mesh2d.is_empty() {
-        return;
-    }
-    // Iterate each view (a camera is a view)
-    for (visible_entities, mut transparent_phase) in views.iter_mut() {
-        let draw_colored_mesh2d = transparent_draw_functions
-            .read()
-            .get_id::<DrawColoredMesh2d>()
-            .unwrap();
-
-        let mesh_key = Mesh2dPipelineKey::from_msaa_samples(msaa.samples);
-
-        // Queue all entities visible to that view
-        for visible_entity in &visible_entities.entities {
-            if let Ok((mesh2d_handle, mesh2d_uniform)) = colored_mesh2d.get(*visible_entity) {
-                // Get our specialized pipeline
-                let mut mesh2d_key = mesh_key;
-                if let Some(mesh) = render_meshes.get(&mesh2d_handle.0) {
-                    mesh2d_key |=
-                        Mesh2dPipelineKey::from_primitive_topology(mesh.primitive_topology);
-                }
-
-                let pipeline_id =
-                    pipelines.specialize(&mut pipeline_cache, &colored_mesh2d_pipeline, mesh2d_key);
-
-                let mesh_z = mesh2d_uniform.transform.w_axis.z;
-                transparent_phase.add(Transparent2d {
-                    entity: *visible_entity,
-                    draw_function: draw_colored_mesh2d,
-                    pipeline: pipeline_id,
-                    // The 2d render items are sorted according to their z value before rendering,
-                    // in order to get correct transparency
-                    sort_key: FloatOrd(mesh_z),
-                    // This material is not batched
-                    batch_range: None,
-                });
+            for entity in query.iter() {
+                commands.entity(entity).despawn();
             }
+
+            let mut path_builder = Path::builder();
+
+            let lut = group.standalone_lut.lut.clone();
+
+            let first = lut[0];
+            path_builder.begin(point(first.x, first.y));
+
+            let resto: Vec<Vec2> = lut[1..].to_vec();
+
+            for e in resto.iter() {
+                path_builder.line_to(point(e.x, e.y));
+            }
+
+            path_builder.end(true);
+            let path = path_builder.build();
+
+            // Create the destination vertex and index buffers.
+            let mut buffers: VertexBuffers<Point, u16> = VertexBuffers::new();
+
+            {
+                let mut vertex_builder = simple_builder(&mut buffers);
+
+                // Create the tessellator.
+                let mut tessellator = FillTessellator::new();
+
+                // Compute the tessellation.
+                let result = tessellator.tessellate_path(
+                    &path,
+                    &FillOptions::default(),
+                    &mut vertex_builder,
+                );
+                assert!(result.is_ok());
+            }
+
+            let mut mesh_pos_attributes: Vec<[f32; 3]> = Vec::new();
+            let mut mesh_attr_uvs: Vec<[f32; 2]> = Vec::new();
+            let mut new_indices: Vec<u32> = Vec::new();
+
+            // show points from look-up table
+            let color = globals.picked_color.unwrap();
+            let mut colors = Vec::new();
+
+            for position in buffers.vertices[..].iter() {
+                let pos_x = position.x - center_of_mass.x;
+                let pos_y = position.y - center_of_mass.y;
+                mesh_pos_attributes.push([pos_x, pos_y, 0.0]);
+
+                colors.push([color.r(), color.g(), color.b(), 1.0]);
+            }
+
+            //////////////////////////// uvs ///////////////////////////////
+            let xs: Vec<f32> = mesh_pos_attributes.iter().map(|v| v[0]).collect();
+            let ys: Vec<f32> = mesh_pos_attributes.iter().map(|v| v[1]).collect();
+
+            use std::cmp::Ordering;
+
+            fn bounds(v: &Vec<f32>) -> (f32, f32) {
+                let max_v: &f32 = v
+                    .iter()
+                    .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+                    .unwrap();
+
+                let min_v: &f32 = v
+                    .iter()
+                    .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+                    .unwrap();
+
+                return (*min_v, *max_v);
+            }
+
+            let bounds_x = bounds(&xs);
+            let size_x = bounds_x.1 - bounds_x.0;
+            let bounds_y = bounds(&ys);
+            let size_y = bounds_y.1 - bounds_y.0;
+
+            let mut normals = Vec::new();
+            for pos in &mesh_pos_attributes {
+                let (pos_x, pos_y) = (pos[0], pos[1]);
+
+                mesh_attr_uvs.push([
+                    1.0 * (pos_x - bounds_x.0) / size_x,
+                    1.0 * (pos_y - bounds_y.0) / size_y,
+                ]);
+
+                normals.push([0.0, 0.0, 1.0]);
+            }
+
+            for ind in buffers.indices[..].iter().rev() {
+                new_indices.push(ind.clone() as u32);
+            }
+
+            let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+
+            mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
+
+            mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+            mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+
+            mesh.set_indices(Some(Indices::U32(new_indices)));
+
+            mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, mesh_attr_uvs);
+
+            let mut fill_transform =
+                Transform::from_translation(center_of_mass.extend(globals.z_pos.fill));
+
+            fill_transform.scale = Vec3::new(globals.scale, globals.scale, 1.0);
+
+            let mut rng = thread_rng();
+
+            // Useless at the moment, but here for future use
+            let mat_handle = fill_materials.add(FillMesh2dMaterial {
+                color: color.into(),
+            });
+
+            commands
+                .spawn_bundle(MaterialMesh2dBundle {
+                    mesh: Mesh2dHandle(meshes.add(mesh)),
+                    material: mat_handle,
+                    transform: fill_transform,
+                    ..default()
+                })
+                .insert(FillMesh(rng.gen()));
         }
     }
 }

@@ -31,8 +31,9 @@ impl Plugin for SpawnerPlugin {
             .add_event::<HistoryAction>()
             .add_event::<ComputeLut>()
             .add_event::<RedoDelete>()
-            .add_plugin(ColoredMesh2dPlugin) // mesh making
+            // .add_plugin(ColoredMesh2dPlugin) // mesh making
             .add_plugin(RoadMesh2dPlugin)
+            .add_plugin(FillMesh2dPlugin)
             .add_plugin(Material2dPlugin::<SelectionMat>::default())
             .add_plugin(Material2dPlugin::<SelectingMat>::default())
             .add_plugin(Material2dPlugin::<ButtonMat>::default())
@@ -40,7 +41,7 @@ impl Plugin for SpawnerPlugin {
             .add_plugin(Material2dPlugin::<BezierEndsMat>::default())
             .add_plugin(Material2dPlugin::<BezierControlsMat>::default())
             .add_plugin(Material2dPlugin::<BezierMidMat>::default())
-            .add_plugin(Material2dPlugin::<FillMat>::default())
+            // .add_plugin(Material2dPlugin::<FillMat>::default())
             .add_state("ModelViewController")
             .insert_resource(ClearColor(Color::hex("6e7f80").unwrap()))
             .insert_resource(Cursor::default())
@@ -60,7 +61,7 @@ impl Plugin for SpawnerPlugin {
                     .with_system(spawn_bezier_system)
                     .with_system(spawn_group_entities)
                     .with_system(spawn_heli)
-                    .with_system(make_mesh)
+                    .with_system(make_fill_mesh)
                     .with_system(make_road),
             )
             //
