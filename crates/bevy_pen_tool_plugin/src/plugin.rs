@@ -14,9 +14,10 @@ pub struct BevyPenToolPlugin;
 
 // TODO
 // 1) use UI camera
-// 2) fix UI button ON indicator and color button hovering
+// 2) disable and hide color picking
 // 3) selecting/deleting meshes
 // 4) spawn meshes according to selected group
+// 5) disable shortcuts
 
 impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {

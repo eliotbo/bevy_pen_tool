@@ -339,7 +339,10 @@ pub fn selection_final(
                         for mut visible_selecting in query_set.p0().iter_mut() {
                             visible_selecting.is_visible = false;
                         }
+
+                        // println!("selected 11 {:?}", selected.lut);
                         selection.selected = Some(selected);
+
                         // let us = user_state.as_mut();
                         // *us = UserState::Idle;
 

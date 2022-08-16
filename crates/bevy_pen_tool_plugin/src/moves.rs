@@ -1,9 +1,9 @@
 use bevy_pen_tool_model::inputs::{Action, Cursor};
 use bevy_pen_tool_model::materials::{BezierMidMat, SelectionMat};
 use bevy_pen_tool_model::model::{
-    AchorEdgeQuad, AnchorEdge, Bezier, BezierGrandParent, BezierParent, BoundingBoxQuad,
-    ControlPointQuad, FollowBezierAnimation, Globals, Group, GroupMiddleQuad, MiddlePointQuad,
-    MovingAnchor, TurnRoundAnimation, UiAction, UiBoard,
+    AchorEdgeQuad, AnchorEdge, Bezier, BezierParent, BoundingBoxQuad, ControlPointQuad,
+    FollowBezierAnimation, Globals, Group, GroupMiddleQuad, MainUi, MiddlePointQuad, MovingAnchor,
+    TurnRoundAnimation, UiAction, UiBoard,
 };
 
 use bevy::math::Vec3A;
@@ -11,7 +11,7 @@ use bevy::prelude::*;
 
 pub fn move_ui(
     cursor: ResMut<Cursor>,
-    mut ui_query: Query<(&mut Transform, &mut UiBoard), With<BezierGrandParent>>,
+    mut ui_query: Query<(&mut Transform, &mut UiBoard), With<MainUi>>,
 ) {
     for (mut transform, ui_board) in ui_query.iter_mut() {
         //

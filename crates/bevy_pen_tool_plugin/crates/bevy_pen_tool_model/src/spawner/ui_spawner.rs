@@ -1,9 +1,7 @@
 use crate::inputs::{ButtonInteraction, ButtonState, UiButton};
 // use crate::util::materials::*;
 use crate::materials::{BezierEndsMat, ButtonMat, UiMat};
-use crate::model::{
-    BezierGrandParent, ColorButton, Globals, Icon, Maps, OnOffMaterial, UiAction, UiBoard,
-};
+use crate::model::{ColorButton, Globals, Icon, MainUi, Maps, OnOffMaterial, UiAction, UiBoard};
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
@@ -72,7 +70,7 @@ pub fn spawn_ui(
             material: ui_material,
             ..Default::default()
         })
-        .insert(BezierGrandParent)
+        .insert(MainUi)
         .insert(UiBoard {
             expanded: true,
             size: button_ui_size,

@@ -186,6 +186,23 @@ fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
         rect = mix(rect, rect_hover,  d);
     }
 
+    if (material.t > 0.5) {
+        let r = 0.3; // size
+        let w = 0.06; // contour width
+        var d = sdBox( uv_original, vec2<f32>(r,r) );
+        let c = 0.15; // contour roundness
+        let b = 0.03; // smoothing
+        let s1 = smoothstep(-b+w+c, b+w+c, d);
+        let s2 = smoothstep(-b-w+c, b-w+c, d);
+
+        d = (1.-s1) * (s2);
+   
+        rect = mix( white ,  other_color , 1. - d );
+        rect = mix(rect_memory, rect,  d);
+    }
+
+
+
     // rect = vec4<f32>(rect.xyz * 0.5, 1.0);
     // rect.w = 1.0;
 

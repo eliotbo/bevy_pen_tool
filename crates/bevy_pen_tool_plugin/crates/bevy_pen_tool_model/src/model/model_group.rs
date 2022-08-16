@@ -21,6 +21,11 @@ pub type LutDistance = Vec<f64>;
 // map from t-values (between 0 and 1) to point on Bezier curve
 type LutPosition = Vec<Vec2>;
 
+#[derive(Component)]
+pub struct GroupMiddleQuad(pub usize);
+
+pub struct GroupBoxEvent;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LutSaveLoad {
     pub lut: Vec<((f64, f64), LutDistance)>,
@@ -53,6 +58,7 @@ pub struct Group {
     // vec of each curve's look-up table
     // the tuple (f64, f64) represents (t_min, t_max), the min and max t-values for
     // the curve
+    // the AnchorEdge is the starting
     pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), LutDistance)>,
     pub standalone_lut: StandaloneLut,
     pub group_id: GroupId,
@@ -331,6 +337,7 @@ impl Group {
                 curve_index += 1;
             }
         }
+        let mut s = 1.0;
         if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
             let bezier = bezier_curves.get(&handle.clone()).unwrap();
 
@@ -340,6 +347,9 @@ impl Group {
 
             if anchor == &AnchorEdge::Start {
                 t_0_1 = 1.0 - t_0_1;
+
+                // this sign is important for road mesh generation
+                s = -1.0;
             }
 
             t_0_1 = t_0_1.clamp(0.00000000001, 0.9999);
@@ -355,7 +365,7 @@ impl Group {
 
             let normal_coord2 = curve.normal_at_pos(t_distance).to_unit_vector();
 
-            normal = Vec2::new(normal_coord2.x() as f32, normal_coord2.y() as f32);
+            normal = Vec2::new(normal_coord2.x() as f32, normal_coord2.y() as f32) * s;
         } else {
             panic!("couldn't get a curve at index: {}. ", curve_index);
         }
@@ -390,7 +400,6 @@ impl Group {
 
         self.standalone_lut = standalone_lut;
     }
-
     // this is now used inside the plugin, but this would be the function used in
     // an application where the look-up table (lut) would be loaded
     pub fn compute_position_with_lut(&self, t: f32) -> Vec2 {

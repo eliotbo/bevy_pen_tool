@@ -1,6 +1,6 @@
-use crate::inputs::Cursor;
+use crate::inputs::{Cursor, MouseClickEvent};
 use crate::materials::ButtonMat;
-use crate::model::{Globals, OnOffMaterial, UiAction, UiBoard};
+use crate::model::{Globals, MainUi, OnOffMaterial, UiAction, UiBoard};
 
 use bevy::prelude::*;
 
@@ -47,60 +47,74 @@ pub enum UiButton {
 
 pub fn check_mouse_on_ui(
     cursor: ResMut<Cursor>,
-    my_shader_params: ResMut<Assets<ButtonMat>>,
+    button_shader_params: ResMut<Assets<ButtonMat>>,
     mouse_button_input: Res<Input<MouseButton>>,
+    mut mouse_event_writer: EventWriter<MouseClickEvent>,
     mut query: Query<(
         &GlobalTransform,
         &Handle<ButtonMat>,
         &mut ButtonInteraction,
         &UiButton,
     )>,
-    mut ui_query: Query<(&Transform, &mut UiBoard)>,
+    mut ui_query: Query<(&Transform, &mut UiBoard), With<MainUi>>,
+
     globals: ResMut<Globals>,
 ) {
-    for (button_transform, shader_handle, mut button_interaction, _ui_button) in query.iter_mut() {
-        let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
-
-        // this looks incorrect, but it is due to buttons being children of the UI board
-        // print!("{:?}", globals.scale);
+    for (ui_transform, mut ui_board) in ui_query.iter_mut() {
+        //
+        // if mouseclick is within the ui_board, check if it's on a button
         if cursor.within_rect(
-            button_transform.translation().truncate() / globals.scale,
-            shader_params.size * 0.95,
+            ui_transform.translation.truncate() / globals.scale,
+            ui_board.size,
         ) {
-            let bi = button_interaction.deref_mut();
-            *bi = ButtonInteraction::Hovered;
+            for (button_transform, shader_handle, mut button_interaction, _ui_button) in
+                query.iter_mut()
+            {
+                let shader_params = button_shader_params.get(shader_handle).unwrap().clone();
 
-            // TODO: change to a match statement
+                if cursor.within_rect(
+                    button_transform.translation().truncate() / globals.scale,
+                    shader_params.size * 0.95,
+                ) {
+                    let bi = button_interaction.deref_mut();
+                    *bi = ButtonInteraction::Hovered;
 
-            // Disallow the UI board to be dragged upon click
-            if mouse_button_input.just_pressed(MouseButton::Left) {
-                *bi = ButtonInteraction::Clicked;
-                for (_t, mut ui_board) in ui_query.iter_mut() {
-                    ui_board.action = UiAction::PressedUiButton;
+                    // Disallow the UI board to be dragged upon click on button
+                    if mouse_button_input.just_pressed(MouseButton::Left) {
+                        *bi = ButtonInteraction::Clicked;
+                        ui_board.action = UiAction::PressedUiButton;
+
+                        return;
+                    }
+
+                    if mouse_button_input.pressed(MouseButton::Left) {
+                        *bi = ButtonInteraction::Pressed;
+                        return;
+                    }
+
+                    if mouse_button_input.just_released(MouseButton::Left) {
+                        *bi = ButtonInteraction::Released;
+                        ui_board.action = UiAction::None;
+                        return;
+                    }
+                } else {
+                    let bi = button_interaction.deref_mut();
+                    *bi = ButtonInteraction::None;
                 }
             }
 
-            if mouse_button_input.pressed(MouseButton::Left) {
-                *bi = ButtonInteraction::Pressed;
-            }
-
-            if mouse_button_input.just_released(MouseButton::Left) {
-                *bi = ButtonInteraction::Released;
-
-                // button_interaction.set_changed(); // probably not necessary
-                for (_t, mut ui_board) in ui_query.iter_mut() {
-                    ui_board.action = UiAction::None;
-                }
-            }
-        } else {
-            let bi = button_interaction.deref_mut();
-            *bi = ButtonInteraction::None;
+            // // if there is a left mouseclick and none of the buttons have been pressed,
+            // // send order to move the UI board
+            // if mouse_button_input.just_pressed(MouseButton::Left) {
+            //     mouse_event_writer.send(MouseClickEvent::OnUiBoard);
+            //     ui_board.action = UiAction::MovingUi;
+            // }
         }
     }
 }
 
 pub fn button_system(
-    mut my_shader_params: ResMut<Assets<ButtonMat>>,
+    mut button_shader_params: ResMut<Assets<ButtonMat>>,
     keyboard_input: Res<Input<KeyCode>>,
     mut interaction_query: Query<
         (
@@ -119,7 +133,7 @@ pub fn button_system(
     let mut ui_button_that_was_turned_on = UiButton::Undo;
     for (interaction, shader_handle, ui_button, button_state_option) in interaction_query.iter_mut()
     {
-        let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
+        let mut shader_params = button_shader_params.get_mut(shader_handle).unwrap();
 
         match *interaction {
             ButtonInteraction::Released => {
@@ -167,8 +181,10 @@ pub fn button_system(
                 (true, false, false) => {
                     if ui_button == &UiButton::SpawnCurve {
                         shader_params.t = 1.0;
+                        // shader_params.hovered = 0.95;
                     } else {
                         shader_params.t = 0.0;
+                        // shader_params.hovered = 0.0;
                         *button_state = ButtonState::Off;
                     }
                 }
@@ -229,7 +245,7 @@ pub fn button_system(
                 if let Some(mut button_state_mut) = button_state_option {
                     let button_state = button_state_mut.as_mut();
                     *button_state = ButtonState::Off;
-                    let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
+                    let mut shader_params = button_shader_params.get_mut(shader_handle).unwrap();
                     shader_params.t = 0.0;
                 }
             }
@@ -238,9 +254,7 @@ pub fn button_system(
 }
 
 pub fn toggle_ui_button(
-    // asset_server: Res<AssetServer>,
     mut globals: ResMut<Globals>,
-    // mut materials: ResMut<Assets<ColorMaterial>>,
     mut query: Query<(&mut Handle<Image>, &mut OnOffMaterial, &UiButton)>,
     mut event_reader: EventReader<UiButton>,
 ) {

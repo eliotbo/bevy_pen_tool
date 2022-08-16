@@ -31,7 +31,6 @@ impl Plugin for SpawnerPlugin {
             .add_event::<HistoryAction>()
             .add_event::<ComputeLut>()
             .add_event::<RedoDelete>()
-            // .add_event::<StartSelectingEvent>()
             .add_plugin(ColoredMesh2dPlugin) // mesh making
             .add_plugin(RoadMesh2dPlugin)
             .add_plugin(Material2dPlugin::<SelectionMat>::default())
@@ -60,7 +59,9 @@ impl Plugin for SpawnerPlugin {
                     .with_system(spawn_middle_quads)
                     .with_system(spawn_bezier_system)
                     .with_system(spawn_group_entities)
-                    .with_system(spawn_heli),
+                    .with_system(spawn_heli)
+                    .with_system(make_mesh)
+                    .with_system(make_road),
             )
             //
             // Update controller
@@ -76,16 +77,16 @@ impl Plugin for SpawnerPlugin {
                     .label("controller")
                     .after("spawner"),
             )
-            //
-            // Update model
-            .add_system_set(
-                SystemSet::on_update("ModelViewController")
-                    .with_system(make_mesh)
-                    .with_system(make_road)
-                    .label("model")
-                    .after("controller"),
-            )
-            //
+            // //
+            // // Update model
+            // .add_system_set(
+            //     SystemSet::on_update("ModelViewController")
+            //         .with_system(make_mesh)
+            //         .with_system(make_road)
+            //         .label("model")
+            //         .after("controller"),
+            // )
+            // //
             // Update view
             .add_system_set(
                 SystemSet::on_update("ModelViewController")

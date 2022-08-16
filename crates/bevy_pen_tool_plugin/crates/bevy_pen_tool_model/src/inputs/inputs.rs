@@ -3,10 +3,9 @@ use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 use crate::materials::ButtonMat;
 use crate::model::util::Maps;
 use crate::model::{
-    get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier,
-    BezierGrandParent, BezierId, BezierParent, ColorButton, CurrentlySelecting, Globals,
-    HistoryAction, MoveAnchorEvent, MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve,
-    UiAction, UiBoard,
+    get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierId,
+    BezierParent, ColorButton, CurrentlySelecting, Globals, HistoryAction, MainUi, MoveAnchorEvent,
+    MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve, UiAction, UiBoard,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -233,7 +232,7 @@ pub enum MouseClickEvent {
 pub fn check_mouseclick_on_objects(
     cursor: ResMut<Cursor>,
     keyboard_input: Res<Input<KeyCode>>,
-    my_shader_params: ResMut<Assets<ButtonMat>>,
+    button_shader_params: ResMut<Assets<ButtonMat>>,
     globals: ResMut<Globals>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut button_query: Query<(
@@ -244,7 +243,7 @@ pub fn check_mouseclick_on_objects(
         &UiButton,
     )>,
     color_button_query: Query<(&GlobalTransform, &Handle<ButtonMat>, &ColorButton)>,
-    mut ui_query: Query<(&Transform, &mut UiBoard), With<BezierGrandParent>>,
+    mut ui_query: Query<(&Transform, &mut UiBoard), With<MainUi>>,
     bezier_query: Query<(&Handle<Bezier>, &BezierParent)>,
     non_moving_edge_query: Query<(&Handle<Bezier>, &AchorEdgeQuad), Without<MovingAnchor>>,
     bezier_curves: ResMut<Assets<Bezier>>,
@@ -284,7 +283,7 @@ pub fn check_mouseclick_on_objects(
             button_query.iter_mut()
         {
             //
-            let shader_params = my_shader_params.get(shader_handle).unwrap().clone();
+            let shader_params = button_shader_params.get(shader_handle).unwrap().clone();
             //
             if cursor.within_rect(
                 button_transform.translation().truncate() / scale,
@@ -300,7 +299,7 @@ pub fn check_mouseclick_on_objects(
         //
         // check for mouseclick on color buttons
         for (transform, shader_param_handle, _color_button) in color_button_query.iter() {
-            let shader_params = my_shader_params
+            let shader_params = button_shader_params
                 .get(&shader_param_handle.clone())
                 .unwrap()
                 .clone();
@@ -460,10 +459,11 @@ pub fn check_mouseclick_on_objects(
     }
 }
 
+// TODO: check the button.wgsl to see how to highlight the selected color
 pub fn pick_color(
-    mut my_shader_params: ResMut<Assets<ButtonMat>>,
+    mut button_shader_params: ResMut<Assets<ButtonMat>>,
     query: Query<(&GlobalTransform, &Handle<ButtonMat>, &ColorButton)>,
-    mut ui_query: Query<(&Transform, &mut UiBoard), With<BezierGrandParent>>,
+    mut ui_query: Query<(&Transform, &mut UiBoard), With<MainUi>>,
     mut globals: ResMut<Globals>,
     mut mouse_event_reader: EventReader<MouseClickEvent>,
 ) {
@@ -475,16 +475,21 @@ pub fn pick_color(
 
         ui_board.action = UiAction::PickingColor;
 
+        // TODO:
         // This loops over all colors to deselect them. A more efficient way of deselecting
         // would be to store the color and the handle of the selected color as well
         for (_transform, other_shader_param_handle, _color_button) in query.iter() {
             //
-            let mut shader_params = my_shader_params.get_mut(other_shader_param_handle).unwrap();
+            let mut shader_params = button_shader_params
+                .get_mut(other_shader_param_handle)
+                .unwrap();
             shader_params.t = 0.0;
         }
         // send selected color to shaders so that it shows the selected color with a white contour
-        let mut shader_params = my_shader_params.get_mut(shader_param_handle).unwrap();
+        let mut shader_params = button_shader_params.get_mut(shader_param_handle).unwrap();
         shader_params.t = 1.0;
+
+        // println!("Picked color: {:?}", color);
     }
 }
 
@@ -563,7 +568,7 @@ pub fn events_on_mouse_release(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(&Handle<Bezier>, &Anchor, &MovingAnchor)>,
     moving_query: Query<Entity, With<MovingAnchor>>,
-    mut ui_query: Query<(&mut Transform, &mut UiBoard), With<BezierGrandParent>>,
+    mut ui_query: Query<(&mut Transform, &mut UiBoard), With<MainUi>>,
     mut cursor: ResMut<Cursor>,
     mut action_event_writer: EventWriter<Action>,
     mut latch_event_writer: EventWriter<OfficialLatch>,

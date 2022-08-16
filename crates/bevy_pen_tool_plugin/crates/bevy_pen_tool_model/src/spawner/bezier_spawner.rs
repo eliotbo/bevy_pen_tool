@@ -3,9 +3,9 @@ use crate::inputs::{Cursor, Latch};
 use crate::materials::{BezierControlsMat, BezierEndsMat, BezierMidMat, SelectionMat};
 
 use crate::model::{
-    AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierGrandParent, BezierHandleEntity, BezierHist,
-    BezierId, BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, Globals,
-    HistoryAction, LatchData, Maps, MiddlePointQuad, MovingAnchor, SpawnMids, SpawningCurve,
+    AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierHandleEntity, BezierHist, BezierId,
+    BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, Globals, HistoryAction,
+    LatchData, MainUi, Maps, MiddlePointQuad, MovingAnchor, SpawnMids, SpawningCurve,
 };
 
 use bevy::{asset::HandleId, prelude::*, sprite::MaterialMesh2dBundle};
@@ -259,7 +259,7 @@ pub fn spawn_bezier(
     let parent = commands
         .spawn_bundle((
             BezierParent,
-            BezierGrandParent,
+            MainUi,
             init_pos.clone(),
             Visibility { is_visible: true }, // visibility is inherited by all children
             global_init_pos,

@@ -17,14 +17,44 @@ use bevy_inspector_egui::Inspectable;
 #[derive(Component)]
 pub struct CurrentlySelecting;
 
-// #[derive(Debug, Default, Clone)]
-// pub struct Selected {
-//     pub group: Option<Group>,
-// }
+#[derive(Component)]
+pub struct OnOffMaterial {
+    pub material: Handle<Image>,
+}
 
-// pub struct StartSelectingEvent {
-//     pub click_position: Vec2,
-// }
+#[derive(Component)]
+pub struct FollowBezierAnimation {
+    pub animation_offset: f64,
+    pub initial_direction: Vec3,
+}
+
+// helicopter animation
+#[derive(Component)]
+pub struct TurnRoundAnimation;
+
+#[derive(Component)]
+pub struct GroupMesh(pub Color);
+
+#[derive(Component)]
+pub struct RoadMesh(pub Color);
+
+#[derive(Component)]
+pub struct MainUi;
+
+#[derive(Component)]
+pub struct Icon;
+
+#[derive(Debug, Component)]
+pub struct BoundingBoxQuad;
+
+#[derive(Component)]
+pub struct SelectedBoxQuad;
+
+#[derive(Component)]
+pub struct SelectingBoxQuad;
+
+#[derive(Component)]
+pub struct GroupBoxQuad;
 
 #[derive(Debug)]
 pub struct Maps {
@@ -786,11 +816,7 @@ pub fn save_mesh(
 pub fn rescale(
     mut grandparent_query: Query<
         &mut Transform,
-        Or<(
-            With<BezierGrandParent>,
-            With<GroupParent>,
-            With<SelectedBoxQuad>,
-        )>,
+        Or<(With<MainUi>, With<GroupParent>, With<SelectedBoxQuad>)>,
     >,
     // shader_param_query: Query<&Handle<UiMat>>,
     // mut my_shaders: ResMut<Assets<UiMat>>,

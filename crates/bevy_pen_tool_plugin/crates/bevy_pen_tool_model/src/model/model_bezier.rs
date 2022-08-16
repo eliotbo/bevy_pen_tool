@@ -230,23 +230,6 @@ pub struct GroupParent;
 pub struct Loaded;
 
 #[derive(Component)]
-pub struct GroupMesh(pub Color);
-
-#[derive(Component)]
-pub struct RoadMesh(pub Color);
-
-#[derive(Component)]
-pub struct BezierGrandParent;
-
-#[derive(Component)]
-pub struct Icon;
-
-#[derive(Component)]
-pub struct OnOffMaterial {
-    pub material: Handle<Image>,
-}
-
-#[derive(Component)]
 pub struct AchorEdgeQuad(pub AnchorEdge);
 
 #[derive(Component)]
@@ -255,41 +238,14 @@ pub struct ControlPointQuad(pub AnchorEdge);
 #[derive(Component)]
 pub struct MiddlePointQuad;
 
-#[derive(Component)]
-pub struct GroupMiddleQuad(pub usize);
-
-#[derive(Debug, Component)]
-pub struct BoundingBoxQuad;
-
-#[derive(Component)]
-pub struct SelectedBoxQuad;
-
-#[derive(Component)]
-pub struct SelectingBoxQuad;
-
-#[derive(Component)]
-pub struct GroupBoxQuad;
-
 #[derive(Debug)]
 pub struct OfficialLatch(pub LatchData, pub Handle<Bezier>);
-
-pub struct GroupBoxEvent;
 
 #[derive(Debug)]
 pub struct SpawnMids {
     pub color: Color,
     pub bezier_handle: Handle<Bezier>,
     pub parent_entity: Entity,
-}
-
-// helicopter animation
-#[derive(Component)]
-pub struct TurnRoundAnimation;
-
-#[derive(Component)]
-pub struct FollowBezierAnimation {
-    pub animation_offset: f64,
-    pub initial_direction: Vec3,
 }
 
 /// A Bezier curve is defined by four points: the start and end points (also called anchor edges throughout the crate)
