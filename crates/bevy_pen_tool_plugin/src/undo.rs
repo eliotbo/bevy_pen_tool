@@ -310,44 +310,15 @@ pub fn add_to_history(
 
         // move history head forward
         history.index += 1;
-
-        // match hist_event {
-        //     //
-        //     x @ HistoryAction::MovedAnchor { .. } => {
-        //         history.actions.push(x.clone());
-        //     }
-
-        //     x @ HistoryAction::SpawnedCurve { .. } => {
-        //         history.actions.push(x.clone());
-        //     }
-        //     x @ HistoryAction::DeletedCurve { .. } => {
-        //         // info!("pushing deleted curve");
-        //         history.actions.push(x.clone());
-        //     }
-        //     x @ HistoryAction::Latched { .. } => {
-        //         history.actions.push(x.clone());
-        //     }
-        //     x @ HistoryAction::Unlatched { .. } => {
-        //         history.actions.push(x.clone());
-        //     }
-        //     _ => {}
-        // }
     }
 }
 
 pub fn redo_effects(
-    // mut commands: Commands,
-    // mut lut_event_reader: EventReader<ComputeLut>,
     mut redo_delete_event_reader: EventReader<RedoDelete>,
     mut action_event_writer: EventWriter<Action>,
     mut selection: ResMut<Selection>,
     mut maps: ResMut<Maps>,
 ) {
-    // for _ in lut_event_reader.iter() {
-    //     // println!("compute_lut_sender");
-    //     action_event_writer.send(Action::ComputeLut);
-    // }
-
     for redo_delete in redo_delete_event_reader.iter() {
         // to delete a curve, we programmatically select the curve and send
         // an Action::Delete event
@@ -356,7 +327,7 @@ pub fn redo_effects(
             new_group
                 .group
                 .insert((handle_entity.entity, handle_entity.handle.clone()));
-            selection.selected = Some(new_group);
+            selection.selected = SelectionChoice::Group(new_group);
             //     .group
             //     .insert((handle_entity.entity, handle_entity.handle.clone()));
             action_event_writer.send(Action::Delete(true));
@@ -457,57 +428,6 @@ pub fn redo(
                 };
 
                 latch_curves(&mut commands, l1, l2, &maps, &mut bezier_curves);
-
-                // // info!("redoing latching");
-                // let handle_entity_1 = maps.bezier_map[&bezier_id_1.into()].clone();
-                // let bezier_1 = bezier_curves.get_mut(&handle_entity_1.handle).unwrap();
-
-                // let latch_1 = LatchData {
-                //     latched_to_id: bezier_id_2.into(),
-                //     self_edge: anchor_1,
-                //     partners_edge: anchor_2,
-                // };
-
-                // bezier_1.do_compute_lut = true;
-
-                // bezier_1.latches.insert(anchor_1, latch_1);
-
-                // // control point position must be opposite from partner's
-                // let bezier_2_control_pos = bezier_1.get_opposite_control(anchor_1);
-
-                // bezier_1.set_position(
-                //     anchor_1.to_anchor(),
-                //     bezier_1.get_position(anchor_1.to_anchor()),
-                // );
-
-                // bezier_1.move_anchor(
-                //     &mut commands,
-                //     true,  // one move for a single frame
-                //     false, // do not follow mouse
-                //     anchor_1.to_anchor(),
-                //     maps.as_ref(),
-                // );
-
-                // let handle_entity_2 = maps.bezier_map[&bezier_id_2.into()].clone();
-                // let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
-
-                // let latch_2 = LatchData {
-                //     latched_to_id: bezier_id_1.into(),
-                //     self_edge: anchor_2,
-                //     partners_edge: anchor_1,
-                // };
-
-                // bezier_2.do_compute_lut = true;
-                // bezier_2.latches.insert(anchor_2, latch_2);
-
-                // bezier_2.set_position(anchor_2.to_anchor().adjoint(), bezier_2_control_pos);
-                // bezier_2.move_anchor(
-                //     &mut commands,
-                //     true,  // one move for a single frame
-                //     false, // do not follow mouse
-                //     anchor_2.to_anchor().adjoint(),
-                //     maps.as_ref(),
-                // );
 
                 if globals.sound_on {
                     if let Some(sound) = maps.sounds.get("latch") {

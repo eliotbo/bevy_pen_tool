@@ -1,6 +1,9 @@
 use crate::inputs::{Cursor, MouseClickEvent};
 use crate::materials::ButtonMat;
-use crate::model::{Globals, MainUi, OnOffMaterial, UiAction, UiBoard};
+use crate::mesh::FillMesh2dMaterial;
+use crate::model::{
+    get_close_mesh, FillMesh, Globals, MainUi, OnOffMaterial, RoadMesh, UiAction, UiBoard,
+};
 
 use bevy::prelude::*;
 
@@ -43,6 +46,21 @@ pub enum UiButton {
     Helicopter,
     SpawnRoad,
     Delete,
+}
+
+pub fn check_mouse_on_meshes(
+    cursor: ResMut<Cursor>,
+    fill_query: Query<(&Transform, &Handle<FillMesh2dMaterial>, &FillMesh)>,
+    road_query: Query<(&Transform, &RoadMesh)>,
+    mut fill_mesh_materials: ResMut<Assets<FillMesh2dMaterial>>,
+) {
+    //
+    let mesh_id = get_close_mesh(
+        &fill_query,
+        &road_query,
+        &mut fill_mesh_materials,
+        cursor.position,
+    );
 }
 
 pub fn check_mouse_on_ui(

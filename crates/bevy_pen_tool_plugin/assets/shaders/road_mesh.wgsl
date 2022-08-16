@@ -5,6 +5,14 @@ var sprite_texture: texture_2d<f32>;
 @group(1) @binding(1)
 var sprite_sampler: sampler;
 
+struct RoadMat {
+    center_of_mass: vec2<f32>,
+};
+
+@group(1) @binding(2)
+var<uniform> uni: FillMat;
+
+
 @fragment
 fn fragment(
     @builtin(position) position: vec4<f32>,

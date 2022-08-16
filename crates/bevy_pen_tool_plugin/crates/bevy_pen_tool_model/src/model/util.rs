@@ -1,5 +1,6 @@
 use crate::inputs::*;
 use crate::materials::*;
+use crate::mesh::*;
 use crate::model::model_bezier::*;
 use crate::model::model_group::*;
 
@@ -31,12 +32,6 @@ pub struct FollowBezierAnimation {
 // helicopter animation
 #[derive(Component)]
 pub struct TurnRoundAnimation;
-
-#[derive(Component)]
-pub struct GroupMesh(pub Color);
-
-#[derive(Component)]
-pub struct RoadMesh(pub Color);
 
 #[derive(Component)]
 pub struct MainUi;
@@ -101,13 +96,30 @@ impl Default for Maps {
     }
 }
 
+pub type MeshId = u64;
+
+#[derive(Component, Clone, Debug)]
+pub struct RoadMesh(pub MeshId);
+
+#[derive(Component, Clone, Debug)]
+pub struct FillMesh(pub MeshId);
+
+#[derive(Clone, Debug)]
+pub enum SelectionChoice {
+    Group(Group),
+    Mesh(MeshId),
+    None,
+}
+
 pub struct Selection {
-    pub selected: Option<Group>,
+    pub selected: SelectionChoice,
 }
 
 impl Default for Selection {
     fn default() -> Self {
-        Self { selected: None }
+        Self {
+            selected: SelectionChoice::None,
+        }
     }
 }
 
@@ -416,6 +428,27 @@ pub fn get_close_anchor(
     return None;
 }
 
+pub fn get_close_mesh(
+    fill_query: &Query<(&Transform, &Handle<FillMesh2dMaterial>, &FillMesh)>,
+    road_query: &Query<(&Transform, &RoadMesh)>,
+    fill_mesh_materials: &mut ResMut<Assets<FillMesh2dMaterial>>,
+    position: Vec2,
+) -> Option<MeshId> {
+    for (transform, fill_handle, mesh) in fill_query.iter() {
+        let dist = (transform.translation.truncate() - position).length();
+        let mut fill_mesh_material = fill_mesh_materials.get_mut(fill_handle).unwrap();
+
+        if dist < 20.0 {
+            println!("Close fill mesh: {:?}", mesh);
+            fill_mesh_material.show_com = 1.;
+            return Some(mesh.0);
+        } else {
+            fill_mesh_material.show_com = 0.;
+        }
+    }
+    return None;
+}
+
 pub fn get_close_anchor_entity(
     max_dist: f32,
     position: Vec2,
@@ -532,7 +565,7 @@ pub fn adjust_selection_attributes(
     mut meshes: ResMut<Assets<Mesh>>,
     selection: ResMut<Selection>,
 ) {
-    if let Some(group) = selection.selected.clone() {
+    if let SelectionChoice::Group(group) = selection.selected.clone() {
         let (mut minx, mut maxx, mut miny, mut maxy) =
             (1000000.0f32, -1000000.0f32, 1000000.0f32, -1000000.0f32);
 

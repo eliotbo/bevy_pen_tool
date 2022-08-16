@@ -11,6 +11,8 @@ pub struct RoadMesh2dMaterial {
     #[texture(0)]
     #[sampler(1)]
     pub road_texture: Handle<Image>,
+    #[uniform(2)]
+    pub center_of_mass: Vec2,
 }
 
 pub struct RoadMesh2dPlugin;
@@ -32,6 +34,10 @@ impl Material2d for RoadMesh2dMaterial {
 pub struct FillMesh2dMaterial {
     #[uniform(0)]
     pub color: Vec4,
+    #[uniform(0)]
+    pub center_of_mass: Vec2,
+    #[uniform(0)]
+    pub show_com: f32,
 }
 
 pub struct FillMesh2dPlugin;

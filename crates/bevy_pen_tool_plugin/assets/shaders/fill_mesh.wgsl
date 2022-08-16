@@ -5,6 +5,8 @@
 // fill meshes
 struct FillMat {
     color: vec4<f32>, 
+    center_of_mass: vec2<f32>,
+    show_com: f32,
 };
 
 @group(1) @binding(0)
@@ -24,5 +26,10 @@ fn fragment(
     @builtin(position) position: vec4<f32>,
     #import bevy_sprite::mesh2d_vertex_output
 ) -> @location(0) vec4<f32> {
+    if length(world_position.xy - uni.center_of_mass) < 10.0 && uni.show_com > 0.5 {
+        let selector_color = vec4<f32>(0.0, 0.0, 0.0, 0.5);
+        let mixed_color = mix(color, selector_color, 0.2);
+        return mixed_color;
+    }
     return toLinear(color);
 }

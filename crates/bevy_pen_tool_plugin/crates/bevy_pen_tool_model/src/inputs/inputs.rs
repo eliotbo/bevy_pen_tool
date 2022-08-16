@@ -4,8 +4,9 @@ use crate::materials::ButtonMat;
 use crate::model::util::Maps;
 use crate::model::{
     get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierId,
-    BezierParent, ColorButton, CurrentlySelecting, Globals, HistoryAction, MainUi, MoveAnchorEvent,
-    MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve, UiAction, UiBoard,
+    BezierParent, ColorButton, CurrentlySelecting, Globals, HistoryAction, MainUi, MeshId,
+    MoveAnchorEvent, MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve, UiAction,
+    UiBoard,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -154,9 +155,6 @@ pub fn send_action(
         (true, true, false) if mouse_pressed => action_event_writer.send(Action::Latch),
 
         // TODO: move to mouseclick event router
-        // (false, true, false) if mouse_just_pressed => {
-        //     action_event_writer.send(Action::SelectionBox);
-        // }
         (false, true, false) if _pressed_g => action_event_writer.send(Action::Group),
         (true, true, false) if _pressed_g => action_event_writer.send(Action::Ungroup),
         (false, true, false) if _pressed_h => action_event_writer.send(Action::HideAnchors),
@@ -226,6 +224,7 @@ pub enum MouseClickEvent {
     OnAnchorEdge((AnchorEdge, BezierId, IsLatched)),
     OnWholeBezier((BezierId, IsLatched)),
     SpawnOnBezier((AnchorEdge, BezierId, IsLatched)),
+    OnMesh(MeshId),
     SpawnOnCanvas,
 }
 
@@ -273,6 +272,7 @@ pub fn check_mouseclick_on_objects(
         // 1. OnUiButton / OnColorButton
         // 2. OnUiBoard
         // 3. OnBezier / OnAnchorEdge
+        // 4. OnMesh
 
         //
         // check for mouseclick on UI buttons

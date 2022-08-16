@@ -281,7 +281,7 @@ pub fn selection_box_init(
 }
 
 // inserts curves inside box in the Selection resource
-pub fn selection_final(
+pub fn selection_area_finalize(
     mut selection: ResMut<Selection>,
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
@@ -299,7 +299,7 @@ pub fn selection_final(
     mut group_box_event_writer: EventWriter<GroupBoxEvent>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Selected) {
-        let mut selected = Group::default();
+        let mut selected_group = Group::default();
 
         let release_position = cursor.position;
         let last_click_position = cursor.last_click_position;
@@ -326,7 +326,7 @@ pub fn selection_final(
                     let group = groups.get(group_handle).unwrap();
                     //
                     if group.bezier_handles.contains(&bezier_handle) {
-                        selected = group.clone();
+                        selected_group = group.clone();
 
                         for mut visible in query_set.p1().iter_mut() {
                             visible.is_visible = true;
@@ -341,7 +341,7 @@ pub fn selection_final(
                         }
 
                         // println!("selected 11 {:?}", selected.lut);
-                        selection.selected = Some(selected);
+                        selection.selected = SelectionChoice::Group(selected_group);
 
                         // let us = user_state.as_mut();
                         // *us = UserState::Idle;
@@ -353,15 +353,15 @@ pub fn selection_final(
                     }
                 }
 
-                selected
+                selected_group
                     .group
                     .insert((entity.clone(), bezier_handle.clone()));
 
-                selected.bezier_handles.insert(bezier_handle.clone());
+                selected_group.bezier_handles.insert(bezier_handle.clone());
             }
         }
 
-        selection.selected = Some(selected);
+        selection.selected = SelectionChoice::Group(selected_group);
 
         for mut visible_selected in query_set.p1().iter_mut() {
             visible_selected.is_visible = true;
@@ -385,7 +385,7 @@ pub fn unselect(
     mut action_event_reader: EventReader<Action>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Unselect) {
-        selection.selected = None;
+        selection.selected = SelectionChoice::None;
 
         for mut visible in visible_selection_query.iter_mut() {
             visible.is_visible = false;
@@ -424,7 +424,7 @@ pub fn groupy(
     if do_group {
         let id_handle_map: HashMap<BezierId, BezierHandleEntity> = maps.bezier_map.clone();
 
-        if let Some(mut selected) = selection.selected.clone() {
+        if let SelectionChoice::Group(mut selected) = selection.selected.clone() {
             selected.find_connected_ends(&mut bezier_curves, id_handle_map.clone());
             // println!("connected ends: {:?}, ", selected.ends);
 
@@ -678,7 +678,7 @@ pub fn ungroup(
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Ungroup) {
         // let group = &selection.selected;
-        if let Some(selected) = selection.selected.clone() {
+        if let SelectionChoice::Group(selected) = selection.selected.clone() {
             let group_beziers = selected.bezier_handles.clone();
 
             if group_beziers.is_empty() {
@@ -794,7 +794,7 @@ pub fn delete(
             let mut latched_partners: Vec<(BezierId, LatchData)> = Vec::new();
             for bezier_handle in query.iter() {
                 //
-                if let Some(selected) = selection.selected.clone() {
+                if let SelectionChoice::Group(selected) = selection.selected.clone() {
                     for (entity, handle) in selected.group {
                         //
                         let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
@@ -829,7 +829,7 @@ pub fn delete(
             for group_handle in query2.iter() {
                 //
                 let group = groups.get(group_handle).unwrap();
-                if let Some(selected) = selection.selected.clone() {
+                if let SelectionChoice::Group(selected) = selection.selected.clone() {
                     for (entity, bezier_handle) in selected.group {
                         if group.bezier_handles.contains(&bezier_handle) {
                             commands.entity(entity).despawn_recursive();
@@ -886,7 +886,7 @@ pub fn delete(
             }
 
             // reset selection
-            selection.selected = None;
+            selection.selected = SelectionChoice::None;
             // selection.selected.bezier_handles = HashSet::new();
 
             // send the delete events, provided they are not from a redo
@@ -935,10 +935,10 @@ pub fn hide_control_points(
 pub fn save(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     group_query: Query<&Handle<Group>, With<GroupParent>>,
-    mesh_query: Query<(&Handle<Mesh>, &GroupMesh)>,
-    road_mesh_query: Query<(&Handle<Mesh>, &RoadMesh)>,
+    // // mesh_query: Query<(&Handle<Mesh>, &GroupMesh)>,
+    // road_mesh_query: Query<(&Handle<Mesh>, &RoadMesh)>,
     mut groups: ResMut<Assets<Group>>,
-    meshes: Res<Assets<Mesh>>,
+    // meshes: Res<Assets<Mesh>>,
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
 ) {
@@ -995,21 +995,21 @@ pub fn save(
         ////////////// end. Save group and look-up table
         //
 
-        ////////////// start. Save mesh in obj format
-        if let Some((mesh_handle, GroupMesh(_color))) = mesh_query.iter().next() {
-            let mesh_dialog_result = open_file_dialog("my_mesh", "meshes", ".obj");
-            save_mesh(mesh_handle, &meshes, mesh_dialog_result);
+        // ////////////// start. Save mesh in obj format
+        // if let Some((mesh_handle, GroupMesh(_color))) = mesh_query.iter().next() {
+        //     let mesh_dialog_result = open_file_dialog("my_mesh", "meshes", ".obj");
+        //     save_mesh(mesh_handle, &meshes, mesh_dialog_result);
 
-            ////////////// end. Save mesh in obj format
-        }
+        //     ////////////// end. Save mesh in obj format
+        // }
 
-        ////////////// start. Save road in obj format
-        if let Some((road_mesh_handle, RoadMesh(_color))) = road_mesh_query.iter().next() {
-            let road_dialog_result = open_file_dialog("my_road", "meshes", ".obj");
-            save_mesh(road_mesh_handle, &meshes, road_dialog_result);
+        // ////////////// start. Save road in obj format
+        // if let Some((road_mesh_handle, RoadMesh(_color))) = road_mesh_query.iter().next() {
+        //     let road_dialog_result = open_file_dialog("my_road", "meshes", ".obj");
+        //     save_mesh(road_mesh_handle, &meshes, road_dialog_result);
 
-            ////////////// end. Save road in obj format
-        }
+        //     ////////////// end. Save road in obj format
+        // }
     }
 }
 
@@ -1113,7 +1113,7 @@ pub fn load(
                 group.lut.push((handle.clone(), anchor, t_ends, local_lut));
             }
         }
-        selection.selected = Some(group.clone());
+        selection.selected = SelectionChoice::Group(group.clone());
 
         // to create a group: select all the curves programmatically, and send a UiButton::Group event
         loaded_event_writer.send(Loaded);

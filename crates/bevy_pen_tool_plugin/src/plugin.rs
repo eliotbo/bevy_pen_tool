@@ -20,12 +20,12 @@ pub struct BevyPenToolPlugin;
 // 6) make most of the structs public(crate) and
 //     leave only the API public
 // 7) automatically group latched curves
+// 8) fix save mesh
+// 9) move structs in correct files (ex: RoadMesh, FillMesh in mesh)
 
 impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {
-        app
-            // .add_plugin(Material2dPlugin::<BezierMat>::default())
-            .add_plugin(PenApiPlugin)
+        app.add_plugin(PenApiPlugin)
             .add_plugin(SpawnerPlugin)
             .add_event::<RemoveMovingQuadEvent>()
             .add_event::<GroupBoxEvent>()
@@ -36,6 +36,7 @@ impl Plugin for BevyPenToolPlugin {
             //
             .add_system(debug)
             .add_system(remove_all_moving_quad)
+            .add_system(check_mouse_on_meshes)
             //
             // Update model
             .add_system_set(
@@ -47,7 +48,7 @@ impl Plugin for BevyPenToolPlugin {
                     .with_system(update_lut)
                     .with_system(officiate_latch_partnership)
                     .with_system(selection_box_init)
-                    .with_system(selection_final)
+                    .with_system(selection_area_finalize)
                     .with_system(hide_anchors)
                     .with_system(delete)
                     .with_system(hide_control_points)

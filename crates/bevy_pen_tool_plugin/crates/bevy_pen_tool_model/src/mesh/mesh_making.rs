@@ -19,17 +19,6 @@ use rand::{thread_rng, Rng};
 //
 //
 
-pub type RoadMeshId = u64;
-
-#[derive(Component)]
-pub struct RoadMesh(pub RoadMeshId);
-
-//
-pub type FillMeshId = u64;
-
-#[derive(Component)]
-pub struct FillMesh(pub RoadMeshId);
-
 // spawn a road along the selected group
 //
 //
@@ -40,20 +29,18 @@ pub fn make_road(
     globals: Res<Globals>,
     selection: ResMut<Selection>,
     mut meshes: ResMut<Assets<Mesh>>,
-    query: Query<Entity, With<RoadMesh>>,
+
     mut road_materials: ResMut<Assets<RoadMesh2dMaterial>>,
     maps: ResMut<Maps>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::SpawnRoad) {
-        if let Some(mut group) = selection.selected.clone() {
+        if let SelectionChoice::Group(mut group) = selection.selected.clone() {
             group.find_connected_ends(&mut curves, maps.bezier_map.clone());
 
             group.group_lut(&mut curves, maps.bezier_map.clone());
             group.compute_standalone_lut(&curves, globals.group_lut_num_points);
 
-            for entity in query.iter() {
-                commands.entity(entity).despawn();
-            }
+            let center_of_mass = group.center_of_mass(&curves);
 
             let num_points = globals.group_lut_num_points;
 
@@ -65,7 +52,7 @@ pub fn make_road(
             let mut mesh_contour: Vec<Vec3> = Vec::new();
 
             for t in t_range {
-                let position = group.compute_position_with_lut(t);
+                let position = group.compute_position_with_lut(t) - center_of_mass;
                 let normal = group
                     .compute_normal_with_bezier(&curves, t as f64)
                     .normalize();
@@ -137,10 +124,14 @@ pub fn make_road(
 
             let mat_handle = road_materials.add(RoadMesh2dMaterial {
                 road_texture: texture_handle.clone(),
+                center_of_mass: center_of_mass,
             });
 
-            let mut road_transform =
-                Transform::from_translation(Vec3::new(0.0, 0.0, globals.z_pos.road));
+            let mut road_transform = Transform::from_translation(Vec3::new(
+                center_of_mass.x,
+                center_of_mass.y,
+                globals.z_pos.road,
+            ));
             road_transform.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
             let mut rng = thread_rng();
@@ -169,21 +160,16 @@ pub fn make_fill_mesh(
     mut fill_materials: ResMut<Assets<FillMesh2dMaterial>>,
     selection: ResMut<Selection>,
     mut meshes: ResMut<Assets<Mesh>>,
-    query: Query<Entity, With<GroupMesh>>,
     maps: ResMut<Maps>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::MakeMesh) {
-        if let Some(mut group) = selection.selected.clone() {
+        if let SelectionChoice::Group(mut group) = selection.selected.clone() {
             group.find_connected_ends(&mut curves, maps.bezier_map.clone());
 
             group.group_lut(&mut curves, maps.bezier_map.clone());
             group.compute_standalone_lut(&curves, globals.group_lut_num_points);
 
             let center_of_mass = group.center_of_mass(&curves);
-
-            for entity in query.iter() {
-                commands.entity(entity).despawn();
-            }
 
             let mut path_builder = Path::builder();
 
@@ -297,6 +283,8 @@ pub fn make_fill_mesh(
             // Useless at the moment, but here for future use
             let mat_handle = fill_materials.add(FillMesh2dMaterial {
                 color: color.into(),
+                center_of_mass: center_of_mass,
+                show_com: 0.0,
             });
 
             commands
