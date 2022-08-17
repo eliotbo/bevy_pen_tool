@@ -1,13 +1,13 @@
+use bevy::math::Vec3A;
+use bevy::prelude::*;
 use bevy_pen_tool_model::inputs::{Action, Cursor};
 use bevy_pen_tool_model::materials::{BezierMidMat, SelectionMat};
+use bevy_pen_tool_model::mesh::{FillMesh2dMaterial, RoadMesh2dMaterial, StartMovingMesh};
 use bevy_pen_tool_model::model::{
     AchorEdgeQuad, AnchorEdge, Bezier, BezierParent, BoundingBoxQuad, ControlPointQuad,
     FollowBezierAnimation, Globals, Group, GroupMiddleQuad, MainUi, MiddlePointQuad, MovingAnchor,
     TurnRoundAnimation, UiAction, UiBoard,
 };
-
-use bevy::math::Vec3A;
-use bevy::prelude::*;
 
 pub fn move_ui(
     cursor: ResMut<Cursor>,
@@ -275,6 +275,45 @@ pub fn move_control_quads(
                 commands.entity(entity).remove::<MovingAnchor>();
             }
         }
+    }
+}
+
+// system that moves the fill mesh and the road mesh with mouse
+pub fn move_mesh(
+    cursor: ResMut<Cursor>,
+    mut query: ParamSet<(
+        Query<(
+            &mut Transform,
+            &StartMovingMesh,
+            &Handle<FillMesh2dMaterial>,
+        )>,
+        Query<(
+            &mut Transform,
+            &StartMovingMesh,
+            &Handle<RoadMesh2dMaterial>,
+        )>,
+    )>,
+    mut fill_mesh_materials: ResMut<Assets<FillMesh2dMaterial>>,
+    mut road_mesh_materials: ResMut<Assets<RoadMesh2dMaterial>>,
+) {
+    for (mut transform, start_move, mesh_mat_handle) in query.p0().iter_mut() {
+        //
+        let new_pos = cursor.pos_relative_to_click + start_move.start_position;
+
+        transform.translation = new_pos.extend(transform.translation.z);
+
+        let mut mesh_mat = fill_mesh_materials.get_mut(mesh_mat_handle).unwrap();
+        mesh_mat.center_of_mass = new_pos;
+    }
+
+    for (mut transform, start_move, mesh_mat_handle) in query.p1().iter_mut() {
+        //
+        let new_pos = cursor.pos_relative_to_click + start_move.start_position;
+
+        transform.translation = new_pos.extend(transform.translation.z);
+
+        let mut mesh_mat = road_mesh_materials.get_mut(mesh_mat_handle).unwrap();
+        mesh_mat.center_of_mass = new_pos;
     }
 }
 

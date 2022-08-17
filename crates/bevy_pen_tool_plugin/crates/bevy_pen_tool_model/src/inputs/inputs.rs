@@ -1,12 +1,14 @@
 use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::materials::ButtonMat;
-use crate::mesh::{MeshId, StartMovingMesh};
+
+use crate::mesh::{FillMesh2dMaterial, MeshId, PenMesh, RoadMesh2dMaterial, StartMovingMesh};
 use crate::model::util::Maps;
 use crate::model::{
-    get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierId,
-    BezierParent, ColorButton, CurrentlySelecting, Globals, HistoryAction, MainUi, MoveAnchorEvent,
-    MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve, UiAction, UiBoard,
+    get_close_anchor, get_close_mesh, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge,
+    Bezier, BezierId, BezierParent, ColorButton, CurrentlySelecting, Globals, HistoryAction,
+    MainUi, MoveAnchorEvent, MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve,
+    UiAction, UiBoard,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -30,16 +32,17 @@ impl Default for Cursor {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Latch {
-    pub position: Vec2,
-    pub control_point: Vec2,
-    pub latchee_id: BezierId,
-    pub latcher_id: BezierId,
-    pub latchee_edge: AnchorEdge,
-}
-
 impl Cursor {
+    pub fn anchor_is_within_selection_box(&self, pos: Vec2) -> bool {
+        let release_position = self.position;
+        let last_click_position = self.last_click_position;
+
+        pos.x < last_click_position.x.max(release_position.x)
+            && pos.x > last_click_position.x.min(release_position.x)
+            && pos.y < last_click_position.y.max(release_position.y)
+            && pos.y > last_click_position.y.min(release_position.y)
+    }
+
     pub fn within_rect(&self, position: Vec2, size: Vec2) -> bool {
         if self.position.x < position.x + size.x / 2.0
             && self.position.x > position.x - size.x / 2.0
@@ -50,6 +53,15 @@ impl Cursor {
         }
         return false;
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Latch {
+    pub position: Vec2,
+    pub control_point: Vec2,
+    pub latchee_id: BezierId,
+    pub latcher_id: BezierId,
+    pub latchee_edge: AnchorEdge,
 }
 
 #[derive(PartialEq, Debug)]
@@ -490,6 +502,37 @@ pub fn pick_color(
         shader_params.t = 1.0;
 
         // println!("Picked color: {:?}", color);
+    }
+}
+
+pub fn check_mouse_on_meshes(
+    mut commands: Commands,
+    cursor: ResMut<Cursor>,
+    mouse_button_input: Res<Input<MouseButton>>,
+    fill_query: Query<(Entity, &Transform, &Handle<FillMesh2dMaterial>, &PenMesh)>,
+    road_query: Query<(Entity, &Transform, &Handle<RoadMesh2dMaterial>, &PenMesh)>,
+    mut fill_mesh_materials: ResMut<Assets<FillMesh2dMaterial>>,
+    mut road_mesh_materials: ResMut<Assets<RoadMesh2dMaterial>>,
+    globals: Res<Globals>,
+    // mut start_moving_mesh_event: EventWriter<StartMovingMesh>,
+) {
+    //
+    // let max_dist = 20.;
+    let maybe_mesh_id_translation = get_close_mesh(
+        globals.anchor_clicking_dist * 2.0,
+        &fill_query,
+        &road_query,
+        &mut fill_mesh_materials,
+        &mut road_mesh_materials,
+        cursor.position,
+    );
+
+    if let Some((entity, _mesh_id, translation)) = maybe_mesh_id_translation {
+        if mouse_button_input.just_pressed(MouseButton::Left) {
+            commands.entity(entity).insert(StartMovingMesh {
+                start_position: translation,
+            });
+        }
     }
 }
 

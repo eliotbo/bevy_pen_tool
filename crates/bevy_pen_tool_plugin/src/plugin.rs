@@ -22,6 +22,7 @@ pub struct BevyPenToolPlugin;
 // 7) automatically group latched curves
 // 8) fix save mesh
 // 9) move structs in correct files (ex: RoadMesh, FillMesh in mesh)
+// 10) wrong unselect when moving a selected mesh
 
 impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {
@@ -72,6 +73,7 @@ impl Plugin for BevyPenToolPlugin {
                     .with_system(move_control_quads)
                     .with_system(move_bb_quads)
                     .with_system(move_ui)
+                    .with_system(move_mesh)
                     .with_system(turn_round_animation)
                     .with_system(follow_bezier_group)
                     .label("view")
@@ -98,6 +100,7 @@ impl Plugin for BevyPenToolPlugin {
         //         egui_pass: SECONDARY_EGUI_PASS,
         //     },
         // );
+
         // ///////////////////////// inspector
     }
 }

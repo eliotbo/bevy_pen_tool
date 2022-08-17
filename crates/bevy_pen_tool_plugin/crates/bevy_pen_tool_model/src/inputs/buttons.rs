@@ -1,6 +1,6 @@
 use crate::inputs::{Cursor, MouseClickEvent};
 use crate::materials::ButtonMat;
-use crate::mesh::{FillMesh, FillMesh2dMaterial, RoadMesh, RoadMesh2dMaterial, StartMovingMesh};
+use crate::mesh::{FillMesh2dMaterial, PenMesh, RoadMesh2dMaterial, StartMovingMesh};
 use crate::model::{get_close_mesh, Globals, MainUi, OnOffMaterial, UiAction, UiBoard};
 
 use bevy::prelude::*;
@@ -46,80 +46,11 @@ pub enum UiButton {
     Delete,
 }
 
-pub fn check_mouse_on_meshes(
-    mut commands: Commands,
-    cursor: ResMut<Cursor>,
-    mouse_button_input: Res<Input<MouseButton>>,
-    fill_query: Query<(Entity, &Transform, &Handle<FillMesh2dMaterial>, &FillMesh)>,
-    road_query: Query<(Entity, &Transform, &Handle<RoadMesh2dMaterial>, &RoadMesh)>,
-    mut fill_mesh_materials: ResMut<Assets<FillMesh2dMaterial>>,
-    mut road_mesh_materials: ResMut<Assets<RoadMesh2dMaterial>>,
-    mut start_moving_mesh_event: EventWriter<StartMovingMesh>,
-) {
-    //
-    let max_dist = 20.;
-    let maybe_mesh_id_translation = get_close_mesh(
-        max_dist,
-        &fill_query,
-        &road_query,
-        &mut fill_mesh_materials,
-        &mut road_mesh_materials,
-        cursor.position,
-    );
-
-    if let Some((entity, mesh_id, translation)) = maybe_mesh_id_translation {
-        if mouse_button_input.just_pressed(MouseButton::Left) {
-            // start_moving_mesh_event.send(StartMovingMesh {
-            //     id: mesh_id,
-            //     start_position: translation,
-            //     entity: entity,
-            // });
-            commands.entity(entity).insert(StartMovingMesh {
-                start_position: translation,
-            });
-            //     id: mesh_id,
-            //     start_position: translation,
-            //     entity: entity,
-            // })
-        }
-    }
-    // if mouse_button_input.just_pressed(MouseButton::Left) {
-
-    //     start_moving_mesh_event.send(StartMovingMesh { id: mesh_id, start_position:  });
-    // }
-}
-
-// tODO: move to moves
-// system that moves the fill mesh
-pub fn move_fill_mesh(
-    cursor: ResMut<Cursor>,
-    // mut start_moving_mesh_event_reader: EventReader<StartMovingMesh>,
-    mut fill_query: Query<(
-        &mut Transform,
-        &StartMovingMesh,
-        &Handle<FillMesh2dMaterial>,
-    )>,
-    mut fill_mesh_materials: ResMut<Assets<FillMesh2dMaterial>>,
-    // mut road_query: Query<(&mut Transform, &RoadMesh)>,
-    // mut fill_mesh_materials: ResMut<Assets<FillMesh2dMaterial>>,
-    // mut road_mesh_materials: ResMut<Assets<RoadMesh2dMaterial>>,
-) {
-    for (mut transform, start_move, mesh_mat_handle) in fill_query.iter_mut() {
-        //
-        let new_pos = cursor.pos_relative_to_click + start_move.start_position;
-
-        transform.translation = new_pos.extend(transform.translation.z);
-
-        let mut mesh_mat = fill_mesh_materials.get_mut(mesh_mat_handle).unwrap();
-        mesh_mat.center_of_mass = new_pos;
-    }
-}
-
 pub fn check_mouse_on_ui(
     cursor: ResMut<Cursor>,
     button_shader_params: ResMut<Assets<ButtonMat>>,
     mouse_button_input: Res<Input<MouseButton>>,
-    mut mouse_event_writer: EventWriter<MouseClickEvent>,
+    // mut mouse_event_writer: EventWriter<MouseClickEvent>,
     mut query: Query<(
         &GlobalTransform,
         &Handle<ButtonMat>,

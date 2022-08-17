@@ -57,6 +57,7 @@ pub struct Maps {
     // pub pipeline_handles: HashMap<&'static str, Handle<PipelineDescriptor>>,
     pub bezier_map: HashMap<BezierId, BezierHandleEntity>,
     pub group_map: HashMap<GroupId, Handle<Group>>,
+    pub mesh_map: HashMap<MeshId, Entity>,
     pub sounds: HashMap<&'static str, Handle<AudioSource>>,
     pub textures: HashMap<&'static str, Handle<Image>>,
 }
@@ -88,6 +89,7 @@ impl Default for Maps {
         Maps {
             mesh_handles: HashMap::new(),
             // pipeline_handles: HashMap::new(),
+            mesh_map: HashMap::new(),
             bezier_map: HashMap::new(),
             group_map: HashMap::new(),
             sounds: HashMap::new(),
@@ -99,7 +101,7 @@ impl Default for Maps {
 #[derive(Clone, Debug)]
 pub enum SelectionChoice {
     Group(Group),
-    Mesh(MeshId),
+    Mesh(PenMesh, Vec2), // Vec2 is translation
     None,
 }
 
@@ -115,6 +117,7 @@ impl Default for Selection {
     }
 }
 
+/// Holds Z position information. Important for drawing order. Contained within [`Globals`].
 #[derive(Clone, Debug)]
 pub struct ZPos {
     pub bezier_parent: f32,
@@ -150,7 +153,7 @@ impl Default for ZPos {
             group_bouding_box: 0.33,
             group_middles: 0.33,
             selecting_box: 0.33,
-            selection_box: 0.33,
+            selection_box: 0.53,
             bounding_box: 0.33,
             road: 0.35,
             fill: 0.33,
@@ -165,6 +168,7 @@ impl Default for ZPos {
     }
 }
 
+/// Global parameters for the plugin
 #[derive(Clone, Debug)]
 pub struct Globals {
     pub do_hide_anchors: bool,
@@ -420,10 +424,11 @@ pub fn get_close_anchor(
     return None;
 }
 
+// TODO: scale?
 pub fn get_close_mesh(
     max_dist: f32,
-    fill_query: &Query<(Entity, &Transform, &Handle<FillMesh2dMaterial>, &FillMesh)>,
-    road_query: &Query<(Entity, &Transform, &Handle<RoadMesh2dMaterial>, &RoadMesh)>,
+    fill_query: &Query<(Entity, &Transform, &Handle<FillMesh2dMaterial>, &PenMesh)>,
+    road_query: &Query<(Entity, &Transform, &Handle<RoadMesh2dMaterial>, &PenMesh)>,
     fill_mesh_materials: &mut ResMut<Assets<FillMesh2dMaterial>>,
     road_mesh_materials: &mut ResMut<Assets<RoadMesh2dMaterial>>,
     position: Vec2,
@@ -445,7 +450,7 @@ pub fn get_close_mesh(
 
         if dist < max_dist {
             road_mesh_material.show_com = 1.;
-            return Some((entity, mesh.0, transform.translation.truncate()));
+            return Some((entity, mesh.id, transform.translation.truncate()));
         } else {
             road_mesh_material.show_com = 0.;
         }
@@ -569,53 +574,93 @@ pub fn adjust_selection_attributes(
     mut meshes: ResMut<Assets<Mesh>>,
     selection: ResMut<Selection>,
 ) {
-    if let SelectionChoice::Group(group) = selection.selected.clone() {
-        let (mut minx, mut maxx, mut miny, mut maxy) =
-            (1000000.0f32, -1000000.0f32, 1000000.0f32, -1000000.0f32);
+    match selection.selected.clone() {
+        SelectionChoice::Group(group) => {
+            let (mut minx, mut maxx, mut miny, mut maxy) =
+                (1000000.0f32, -1000000.0f32, 1000000.0f32, -1000000.0f32);
 
-        // We set the mesh attributes as a function of the bounding box.
-        // This could be done by removing the mesh from the mesh asset
-        // and adding a brand new  = mesh
+            // We set the mesh attributes as a function of the bounding box.
+            // This could be done by removing the mesh from the mesh asset
+            // and adding a brand new  = mesh
 
-        for (_entity, selected_handle) in group.group.clone() {
-            let bezier = bezier_curves.get(&selected_handle).unwrap();
+            for (_entity, selected_handle) in group.group.clone() {
+                let bezier = bezier_curves.get(&selected_handle).unwrap();
 
-            let (bound0, bound1) = bezier.bounding_box();
-            minx = minx.min(bound0.x);
-            maxx = maxx.max(bound1.x);
-            miny = miny.min(bound0.y);
-            maxy = maxy.max(bound1.y);
-        }
-        // }
+                let (bound0, bound1) = bezier.bounding_box();
+                minx = minx.min(bound0.x);
+                maxx = maxx.max(bound1.x);
+                miny = miny.min(bound0.y);
+                maxy = maxy.max(bound1.y);
+            }
 
-        let shader_handle = shader_query.single();
-        let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
-        let up_factor = 1.10;
-        let x_pos = (maxx + minx) / 2.0;
-        let y_pox = (maxy + miny) / 2.0;
-        let x_width = (maxx - minx) * up_factor / 2.0;
-        let y_width = (maxy - miny) * up_factor / 2.0;
+            let shader_handle = shader_query.single();
+            let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
+            let up_factor = 1.10;
+            let x_pos = (maxx + minx) / 2.0;
+            let y_pox = (maxy + miny) / 2.0;
+            let x_width = (maxx - minx) * up_factor / 2.0;
+            let y_width = (maxy - miny) * up_factor / 2.0;
 
-        // send correct width to shader that will adjust the thickness of the box accordingly
-        // let scale = globals.scale / 0.5;
-        shader_params.size = Vec2::new(x_width, y_width) / 5.0;
+            // send correct width to shader that will adjust the thickness of the box accordingly
+            // let scale = globals.scale / 0.5;
+            shader_params.size = Vec2::new(x_width, y_width) / 5.0;
 
-        let vertex_positions = vec![
-            [x_pos - x_width, y_pox - y_width, 0.0],
-            [x_pos - x_width, y_pox + y_width, 0.0],
-            [x_pos + x_width, y_pox + y_width, 0.0],
-            [x_pos + x_width, y_pox - y_width, 0.0],
-        ];
+            let vertex_positions = vec![
+                [x_pos - x_width, y_pox - y_width, 0.0],
+                [x_pos - x_width, y_pox + y_width, 0.0],
+                [x_pos + x_width, y_pox + y_width, 0.0],
+                [x_pos + x_width, y_pox - y_width, 0.0],
+            ];
 
-        for mesh_handle in query.iter_mut() {
-            let mesh = meshes.get_mut(&mesh_handle.0.clone()).unwrap();
-            let v_pos = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION);
+            for mesh_handle in query.iter_mut() {
+                let mesh = meshes.get_mut(&mesh_handle.0.clone()).unwrap();
+                let v_pos = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION);
 
-            if let Some(array2) = v_pos {
-                *array2 =
-                    bevy::render::mesh::VertexAttributeValues::Float32x3(vertex_positions.clone());
+                if let Some(array2) = v_pos {
+                    *array2 = bevy::render::mesh::VertexAttributeValues::Float32x3(
+                        vertex_positions.clone(),
+                    );
+                }
             }
         }
+        SelectionChoice::Mesh(pen_mesh, translation) => {
+            let (minx, maxx, miny, maxy) = (
+                pen_mesh.bounding_box.0.x + translation.x,
+                pen_mesh.bounding_box.1.x + translation.x,
+                pen_mesh.bounding_box.0.y + translation.y,
+                pen_mesh.bounding_box.1.y + translation.y,
+            );
+            let shader_handle = shader_query.single();
+            let mut shader_params = my_shader_params.get_mut(shader_handle).unwrap();
+            let up_factor = 1.10;
+            let x_pos = (maxx + minx) / 2.0;
+            let y_pox = (maxy + miny) / 2.0;
+            let x_width = (maxx - minx) * up_factor / 2.0;
+            let y_width = (maxy - miny) * up_factor / 2.0;
+
+            // send correct width to shader that will adjust the thickness of the box accordingly
+            // let scale = globals.scale / 0.5;
+            shader_params.size = Vec2::new(x_width, y_width) / 5.0;
+
+            let vertex_positions = vec![
+                [x_pos - x_width, y_pox - y_width, 0.0],
+                [x_pos - x_width, y_pox + y_width, 0.0],
+                [x_pos + x_width, y_pox + y_width, 0.0],
+                [x_pos + x_width, y_pox - y_width, 0.0],
+            ];
+
+            for mesh_handle in query.iter_mut() {
+                let mesh = meshes.get_mut(&mesh_handle.0.clone()).unwrap();
+                let v_pos = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION);
+
+                if let Some(array2) = v_pos {
+                    *array2 = bevy::render::mesh::VertexAttributeValues::Float32x3(
+                        vertex_positions.clone(),
+                    );
+                }
+            }
+        }
+        _ => {}
     }
 }
 

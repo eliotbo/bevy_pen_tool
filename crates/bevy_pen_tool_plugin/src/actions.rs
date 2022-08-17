@@ -1,5 +1,6 @@
 use bevy_pen_tool_model::inputs::{Action, Cursor};
 use bevy_pen_tool_model::materials::*;
+use bevy_pen_tool_model::mesh::PenMesh;
 use bevy_pen_tool_model::model::*;
 use bevy_pen_tool_model::spawn_bezier;
 
@@ -292,32 +293,33 @@ pub fn selection_area_finalize(
         Query<&mut Visibility, With<GroupBoxQuad>>,
     )>,
     group_query: Query<&Handle<Group>>,
-    query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
+    bezier_query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
+    mesh_query: Query<(&Transform, &PenMesh)>,
     mut action_event_reader: EventReader<Action>,
     globals: Res<Globals>,
 
     mut group_box_event_writer: EventWriter<GroupBoxEvent>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Selected) {
-        let mut selected_group = Group::default();
+        // check for meshes within the selection area
+        for (transform, pen_mesh) in mesh_query.iter() {
+            if cursor
+                .anchor_is_within_selection_box(transform.translation.truncate() * globals.scale)
+            {
+                selection.selected =
+                    SelectionChoice::Mesh(pen_mesh.clone(), transform.translation.truncate());
+            }
+        }
 
-        let release_position = cursor.position;
-        let last_click_position = cursor.last_click_position;
+        let mut selected_group = Group::default();
+        let mut found_anchor_in_box = false;
 
         // check for anchors inside selection area
-        for (entity, bezier_handle) in query.iter() {
+        for (entity, bezier_handle) in bezier_query.iter() {
             let bezier = bezier_curves.get(bezier_handle).unwrap();
-            let bs = bezier.positions.start * globals.scale;
-            let be = bezier.positions.end * globals.scale;
 
-            if (bs.x < last_click_position.x.max(release_position.x)
-                && bs.x > last_click_position.x.min(release_position.x)
-                && bs.y < last_click_position.y.max(release_position.y)
-                && bs.y > last_click_position.y.min(release_position.y))
-                || (be.x < last_click_position.x.max(release_position.x)
-                    && be.x > last_click_position.x.min(release_position.x)
-                    && be.y < last_click_position.y.max(release_position.y)
-                    && be.y > last_click_position.y.min(release_position.y))
+            if cursor.anchor_is_within_selection_box(bezier.positions.start * globals.scale)
+                || cursor.anchor_is_within_selection_box(bezier.positions.end * globals.scale)
             {
                 // if the selected quad is part of a group, show group selection and return
                 // Cannot select more than one group
@@ -339,19 +341,15 @@ pub fn selection_area_finalize(
                         for mut visible_selecting in query_set.p0().iter_mut() {
                             visible_selecting.is_visible = false;
                         }
-
-                        // println!("selected 11 {:?}", selected.lut);
-                        selection.selected = SelectionChoice::Group(selected_group);
-
-                        // let us = user_state.as_mut();
-                        // *us = UserState::Idle;
+                        // selection.selected = SelectionChoice::Group(selected_group);
 
                         // send event to adjust_selection_attributes(..) so that the group selection
                         // box is updated and shows on screen.
-                        group_box_event_writer.send(GroupBoxEvent);
+                        // group_box_event_writer.send(GroupBoxEvent);
                         return ();
                     }
                 }
+                found_anchor_in_box = true;
 
                 selected_group
                     .group
@@ -361,7 +359,9 @@ pub fn selection_area_finalize(
             }
         }
 
-        selection.selected = SelectionChoice::Group(selected_group);
+        if found_anchor_in_box {
+            selection.selected = SelectionChoice::Group(selected_group);
+        }
 
         for mut visible_selected in query_set.p1().iter_mut() {
             visible_selected.is_visible = true;
@@ -792,38 +792,55 @@ pub fn delete(
             let mut delete_curve_events = Vec::new();
 
             let mut latched_partners: Vec<(BezierId, LatchData)> = Vec::new();
-            for bezier_handle in query.iter() {
-                //
-                if let SelectionChoice::Group(selected) = selection.selected.clone() {
-                    for (entity, handle) in selected.group {
-                        //
-                        let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
-                        // println!("within DELETE ---> bezier: {:?}", bezier.id);
 
-                        // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
-                        if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
-                            latched_partners.push((bezier.id, latched_anchor.clone()));
-                        }
+            //
+            match selection.selected.clone() {
+                // if let SelectionChoice::Group(selected) = selection.selected.clone() {
+                SelectionChoice::Group(selected) => {
+                    for bezier_handle in query.iter() {
+                        for (entity, handle) in &selected.group {
+                            //
+                            let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
+                            // println!("within DELETE ---> bezier: {:?}", bezier.id);
 
-                        // latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
-                        if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::End) {
-                            latched_partners.push((bezier.id, latched_anchor.clone()));
-                        }
+                            // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
+                            if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
+                                latched_partners.push((bezier.id, latched_anchor.clone()));
+                            }
 
-                        if &handle == bezier_handle {
-                            delete_curve_events.push(HistoryAction::DeletedCurve {
-                                bezier: BezierHist::from(&bezier.clone()),
-                                bezier_id: bezier.id.into(),
-                            });
+                            // latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
+                            if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::End) {
+                                latched_partners.push((bezier.id, latched_anchor.clone()));
+                            }
 
-                            commands.entity(entity).despawn_recursive();
-                            maps.bezier_map.remove(&bezier.id);
-                            if let Some(group_id) = bezier.group {
-                                maps.group_map.remove(&group_id);
+                            if handle == bezier_handle {
+                                delete_curve_events.push(HistoryAction::DeletedCurve {
+                                    bezier: BezierHist::from(&bezier.clone()),
+                                    bezier_id: bezier.id.into(),
+                                });
+
+                                commands.entity(*entity).despawn_recursive();
+                                maps.bezier_map.remove(&bezier.id);
+                                if let Some(group_id) = bezier.group {
+                                    maps.group_map.remove(&group_id);
+                                }
                             }
                         }
                     }
                 }
+                SelectionChoice::Mesh(
+                    PenMesh {
+                        id,
+                        bounding_box: _,
+                    },
+                    _pos,
+                ) => {
+                    //
+                    let entity = maps.mesh_map.get(&id).unwrap();
+                    commands.entity(*entity).despawn();
+                    maps.mesh_map.remove(&id);
+                }
+                _ => {}
             }
 
             for group_handle in query2.iter() {

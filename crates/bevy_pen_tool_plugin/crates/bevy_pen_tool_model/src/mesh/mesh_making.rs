@@ -22,7 +22,10 @@ use rand::{thread_rng, Rng};
 pub type MeshId = u64;
 
 #[derive(Component, Clone, Debug)]
-pub struct RoadMesh(pub MeshId);
+pub struct PenMesh {
+    pub id: MeshId,
+    pub bounding_box: (Vec2, Vec2),
+}
 
 pub struct MinsMaxes {
     pub min_x: f32,
@@ -34,10 +37,10 @@ pub struct MinsMaxes {
 impl Default for MinsMaxes {
     fn default() -> Self {
         MinsMaxes {
-            min_x: f32::MIN,
-            min_y: f32::MIN,
-            max_x: f32::MAX,
-            max_y: f32::MAX,
+            min_x: f32::MAX,
+            min_y: f32::MAX,
+            max_x: f32::MIN,
+            max_y: f32::MIN,
         }
     }
 }
@@ -58,17 +61,15 @@ impl MinsMaxes {
     }
 }
 
-#[derive(Component, Clone, Debug)]
-pub struct FillMesh {
-    pub id: MeshId,
-    pub bounding_box: (Vec2, Vec2),
-}
+// #[derive(Component, Clone, Debug)]
+// pub struct FillMesh {
+//     pub id: MeshId,
+//     pub bounding_box: (Vec2, Vec2),
+// }
 
 #[derive(Component, Clone, Debug)]
 pub struct StartMovingMesh {
-    // pub id: MeshId,
     pub start_position: Vec2,
-    // pub entity: Entity,
 }
 
 // spawn a road along the selected group
@@ -83,7 +84,7 @@ pub fn make_road(
     mut meshes: ResMut<Assets<Mesh>>,
 
     mut road_materials: ResMut<Assets<RoadMesh2dMaterial>>,
-    maps: ResMut<Maps>,
+    mut maps: ResMut<Maps>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::SpawnRoad) {
         if let SelectionChoice::Group(mut group) = selection.selected.clone() {
@@ -154,11 +155,15 @@ pub fn make_road(
             let mut colors = Vec::new();
             let mut normals = Vec::new();
 
+            let mut mins_maxes = MinsMaxes::default();
+
             for position in mesh_contour {
                 mesh_pos_attributes.push([position.x, position.y, 0.0]);
 
                 colors.push([color.r(), color.g(), color.b(), 1.0]);
                 normals.push([0.0, 0.0, 1.0]);
+
+                mins_maxes.update(Vec2::new(position.x, position.y));
             }
 
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
@@ -188,15 +193,22 @@ pub fn make_road(
             road_transform.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
             let mut rng = thread_rng();
+            let id = rng.gen::<u64>();
 
-            commands
+            let entity = commands
                 .spawn_bundle(MaterialMesh2dBundle {
                     mesh: Mesh2dHandle(meshes.add(mesh)),
                     material: mat_handle,
                     transform: road_transform,
                     ..default()
                 })
-                .insert(RoadMesh(rng.gen()));
+                .insert(PenMesh {
+                    id,
+                    bounding_box: mins_maxes.to_vec2_pair(),
+                })
+                .id();
+
+            maps.mesh_map.insert(id, entity);
         }
     }
 }
@@ -213,7 +225,7 @@ pub fn make_fill_mesh(
     mut fill_materials: ResMut<Assets<FillMesh2dMaterial>>,
     selection: ResMut<Selection>,
     mut meshes: ResMut<Assets<Mesh>>,
-    maps: ResMut<Maps>,
+    mut maps: ResMut<Maps>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::MakeMesh) {
         if let SelectionChoice::Group(mut group) = selection.selected.clone() {
@@ -338,20 +350,24 @@ pub fn make_fill_mesh(
             let mat_handle = fill_materials.add(FillMesh2dMaterial {
                 color: color.into(),
                 center_of_mass: center_of_mass,
-                show_com: 0.0,
+                show_com: 0.0, // show center of mass
             });
 
-            commands
+            let id = rng.gen::<u64>();
+            let entity = commands
                 .spawn_bundle(MaterialMesh2dBundle {
                     mesh: Mesh2dHandle(meshes.add(mesh)),
                     material: mat_handle,
                     transform: fill_transform,
                     ..default()
                 })
-                .insert(FillMesh {
-                    id: rng.gen(),
+                .insert(PenMesh {
+                    id,
                     bounding_box: mins_maxes.to_vec2_pair(), // bounding box relative to center of mass
-                });
+                })
+                .id();
+
+            maps.mesh_map.insert(id, entity);
         }
     }
 }
