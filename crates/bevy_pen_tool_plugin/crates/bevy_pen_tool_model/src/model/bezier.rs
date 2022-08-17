@@ -419,7 +419,7 @@ impl Bezier {
     pub fn to_curve(&self) -> Curve<Coord2> {
         let bezier_c0 = self.to_coord2();
 
-        return bezier::Curve::from_points(
+        return flo_curves::bezier::Curve::from_points(
             bezier_c0.start,
             bezier_c0.control_points,
             bezier_c0.end,
@@ -762,7 +762,7 @@ impl Bezier {
     pub fn bounding_box(&self) -> (Vec2, Vec2) {
         let bezier_coord = self.to_coord2();
 
-        let curve0 = bezier::Curve::from_points(
+        let curve0 = flo_curves::bezier::Curve::from_points(
             bezier_coord.start,
             bezier_coord.control_points,
             bezier_coord.end,

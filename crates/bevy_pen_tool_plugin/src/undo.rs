@@ -327,7 +327,7 @@ pub fn redo_effects(
             new_group
                 .group
                 .insert((handle_entity.entity, handle_entity.handle.clone()));
-            selection.selected = SelectionChoice::Group(new_group);
+            selection.selected = vec![SelectionChoice::Group(new_group)];
             //     .group
             //     .insert((handle_entity.entity, handle_entity.handle.clone()));
             action_event_writer.send(Action::Delete(true));

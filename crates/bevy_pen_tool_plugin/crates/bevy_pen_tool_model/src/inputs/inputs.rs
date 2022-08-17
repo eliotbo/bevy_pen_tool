@@ -505,6 +505,7 @@ pub fn pick_color(
     }
 }
 
+// TODO: add scaling
 pub fn check_mouse_on_meshes(
     mut commands: Commands,
     cursor: ResMut<Cursor>,
@@ -519,7 +520,7 @@ pub fn check_mouse_on_meshes(
     //
     // let max_dist = 20.;
     let maybe_mesh_id_translation = get_close_mesh(
-        globals.anchor_clicking_dist * 2.0,
+        globals.anchor_clicking_dist * 3.0,
         &fill_query,
         &road_query,
         &mut fill_mesh_materials,

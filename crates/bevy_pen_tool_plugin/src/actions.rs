@@ -301,13 +301,16 @@ pub fn selection_area_finalize(
     mut group_box_event_writer: EventWriter<GroupBoxEvent>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Selected) {
+        selection.selected.clear();
         // check for meshes within the selection area
         for (transform, pen_mesh) in mesh_query.iter() {
             if cursor
                 .anchor_is_within_selection_box(transform.translation.truncate() * globals.scale)
             {
-                selection.selected =
-                    SelectionChoice::Mesh(pen_mesh.clone(), transform.translation.truncate());
+                selection.selected.push(SelectionChoice::Mesh(
+                    pen_mesh.clone(),
+                    transform.translation.truncate(),
+                ));
             }
         }
 
@@ -360,7 +363,9 @@ pub fn selection_area_finalize(
         }
 
         if found_anchor_in_box {
-            selection.selected = SelectionChoice::Group(selected_group);
+            selection
+                .selected
+                .push(SelectionChoice::Group(selected_group));
         }
 
         for mut visible_selected in query_set.p1().iter_mut() {
@@ -385,7 +390,7 @@ pub fn unselect(
     mut action_event_reader: EventReader<Action>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Unselect) {
-        selection.selected = SelectionChoice::None;
+        selection.selected = vec![];
 
         for mut visible in visible_selection_query.iter_mut() {
             visible.is_visible = false;
@@ -421,10 +426,11 @@ pub fn groupy(
         do_group = true;
     }
 
-    if do_group {
+    if do_group && selection.selected.iter().count() == 1 {
+        let selected = selection.selected[0].clone();
         let id_handle_map: HashMap<BezierId, BezierHandleEntity> = maps.bezier_map.clone();
 
-        if let SelectionChoice::Group(mut selected) = selection.selected.clone() {
+        if let SelectionChoice::Group(mut selected) = selected.clone() {
             selected.find_connected_ends(&mut bezier_curves, id_handle_map.clone());
             // println!("connected ends: {:?}, ", selected.ends);
 
@@ -678,93 +684,96 @@ pub fn ungroup(
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Ungroup) {
         // let group = &selection.selected;
-        if let SelectionChoice::Group(selected) = selection.selected.clone() {
-            let group_beziers = selected.bezier_handles.clone();
+        if selection.selected.iter().count() == 1 {
+            let selected = selection.selected.iter().next().unwrap();
+            if let SelectionChoice::Group(selected) = selected.clone() {
+                let group_beziers = selected.bezier_handles.clone();
 
-            if group_beziers.is_empty() {
-                println!("Cannot ungroup. No curves selected");
-                return;
-            }
-
-            let bezier_handles = group_beziers
-                .iter()
-                .cloned()
-                .collect::<Vec<Handle<Bezier>>>();
-
-            // Check if the handles are all connected
-            // bezier_handles is never empty at this point
-            let first_bezier_handle = bezier_handles.iter().next().unwrap();
-
-            let first_bezier = bezier_curves.get(first_bezier_handle).unwrap();
-
-            let mut bezier_chain =
-                find_connected_curves(first_bezier.id, &bezier_curves, &maps.bezier_map);
-
-            // first_bezier.find_connected_curves(bezier_curve_hack, &maps.bezier_map);
-
-            bezier_chain.push(first_bezier_handle.clone());
-
-            let bezier_chain_hashset = bezier_chain
-                .iter()
-                .cloned()
-                .collect::<HashSet<Handle<Bezier>>>();
-
-            // check if all curves are part of the same group
-            for handle in bezier_chain.iter() {
-                let bezier = bezier_curves.get(handle).unwrap();
-                if let Some(group_id) = bezier.group {
-                    if group_id != selected.group_id {
-                        println!("Cannot ungroup. Not all curves are part of the same group");
-                        return;
-                    }
+                if group_beziers.is_empty() {
+                    println!("Cannot ungroup. No curves selected");
+                    return;
                 }
-            }
 
-            // TODO: this is not needed right?
-            if group_beziers != bezier_chain_hashset {
-                println!("Cannot ungroup. Curves are not part of the same chain");
-                return;
-            }
+                let bezier_handles = group_beziers
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<Handle<Bezier>>>();
 
-            if let Some(id) = first_bezier.group {
-                // println!("id: {:?}", id);
-                // println!("maps.id_group_handle: {:?}", maps.id_group_handle.keys());
-                if let Some(group_handle) = maps.group_map.get(&id) {
-                    // remove With
-                    let _what = groups.remove(group_handle);
+                // Check if the handles are all connected
+                // bezier_handles is never empty at this point
+                let first_bezier_handle = bezier_handles.iter().next().unwrap();
 
-                    for (entity, queried_group_handle) in query.iter() {
-                        if queried_group_handle == group_handle {
-                            commands.entity(entity).despawn_recursive();
-                            println!("Removed group");
+                let first_bezier = bezier_curves.get(first_bezier_handle).unwrap();
+
+                let mut bezier_chain =
+                    find_connected_curves(first_bezier.id, &bezier_curves, &maps.bezier_map);
+
+                // first_bezier.find_connected_curves(bezier_curve_hack, &maps.bezier_map);
+
+                bezier_chain.push(first_bezier_handle.clone());
+
+                let bezier_chain_hashset = bezier_chain
+                    .iter()
+                    .cloned()
+                    .collect::<HashSet<Handle<Bezier>>>();
+
+                // check if all curves are part of the same group
+                for handle in bezier_chain.iter() {
+                    let bezier = bezier_curves.get(handle).unwrap();
+                    if let Some(group_id) = bezier.group {
+                        if group_id != selected.group_id {
+                            println!("Cannot ungroup. Not all curves are part of the same group");
+                            return;
                         }
                     }
-                } else {
-                    info!("Cannot delete group: wrong group id.")
                 }
-                maps.group_map.remove(&id);
-            }
 
-            for bezier_handle in bezier_chain_hashset {
-                let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
+                // TODO: this is not needed right?
+                if group_beziers != bezier_chain_hashset {
+                    println!("Cannot ungroup. Curves are not part of the same chain");
+                    return;
+                }
 
-                bezier.group = None;
+                if let Some(id) = first_bezier.group {
+                    // println!("id: {:?}", id);
+                    // println!("maps.id_group_handle: {:?}", maps.id_group_handle.keys());
+                    if let Some(group_handle) = maps.group_map.get(&id) {
+                        // remove With
+                        let _what = groups.remove(group_handle);
 
-                for (_bez_entity, bez_handle, parent) in bezier_query.iter() {
-                    if let Some(chain_bezier_handle) = maps.bezier_map.get(&bezier.id) {
-                        if bez_handle == &chain_bezier_handle.handle {
-                            // spawn mid quads
-                            let spawn_mids = SpawnMids {
-                                color: bezier
-                                    .color
-                                    .unwrap_or(globals.picked_color.unwrap_or(Color::WHITE)),
-                                bezier_handle: bez_handle.clone(),
-                                parent_entity: **parent,
-                            };
-                            // spawn bezier middle quads for each bezier
-                            spawn_mids_event_writer.send(spawn_mids);
+                        for (entity, queried_group_handle) in query.iter() {
+                            if queried_group_handle == group_handle {
+                                commands.entity(entity).despawn_recursive();
+                                println!("Removed group");
+                            }
+                        }
+                    } else {
+                        info!("Cannot delete group: wrong group id.")
+                    }
+                    maps.group_map.remove(&id);
+                }
 
-                            break;
+                for bezier_handle in bezier_chain_hashset {
+                    let bezier = bezier_curves.get_mut(&bezier_handle).unwrap();
+
+                    bezier.group = None;
+
+                    for (_bez_entity, bez_handle, parent) in bezier_query.iter() {
+                        if let Some(chain_bezier_handle) = maps.bezier_map.get(&bezier.id) {
+                            if bez_handle == &chain_bezier_handle.handle {
+                                // spawn mid quads
+                                let spawn_mids = SpawnMids {
+                                    color: bezier
+                                        .color
+                                        .unwrap_or(globals.picked_color.unwrap_or(Color::WHITE)),
+                                    bezier_handle: bez_handle.clone(),
+                                    parent_entity: **parent,
+                                };
+                                // spawn bezier middle quads for each bezier
+                                spawn_mids_event_writer.send(spawn_mids);
+
+                                break;
+                            }
                         }
                     }
                 }
@@ -789,129 +798,133 @@ pub fn delete(
     for action in action_event_reader.iter() {
         if let Action::Delete(is_from_redo) = action {
             // list of partners that need to be unlatched
-            let mut delete_curve_events = Vec::new();
-
-            let mut latched_partners: Vec<(BezierId, LatchData)> = Vec::new();
 
             //
-            match selection.selected.clone() {
-                // if let SelectionChoice::Group(selected) = selection.selected.clone() {
-                SelectionChoice::Group(selected) => {
-                    for bezier_handle in query.iter() {
-                        for (entity, handle) in &selected.group {
-                            //
-                            let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
-                            // println!("within DELETE ---> bezier: {:?}", bezier.id);
+            for selected in selection.selected.iter() {
+                let mut delete_curve_events = Vec::new();
 
-                            // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
-                            if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start) {
-                                latched_partners.push((bezier.id, latched_anchor.clone()));
-                            }
+                let mut latched_partners: Vec<(BezierId, LatchData)> = Vec::new();
+                match selected.clone() {
+                    // if let SelectionChoice::Group(selected) = selection.selected.clone() {
+                    SelectionChoice::Group(selected) => {
+                        for bezier_handle in query.iter() {
+                            for (entity, handle) in &selected.group {
+                                //
+                                let bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
+                                // println!("within DELETE ---> bezier: {:?}", bezier.id);
 
-                            // latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
-                            if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::End) {
-                                latched_partners.push((bezier.id, latched_anchor.clone()));
-                            }
+                                // latched_partners.push(bezier.latches[&AnchorEdge::Start].clone());
+                                if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::Start)
+                                {
+                                    latched_partners.push((bezier.id, latched_anchor.clone()));
+                                }
 
-                            if handle == bezier_handle {
-                                delete_curve_events.push(HistoryAction::DeletedCurve {
-                                    bezier: BezierHist::from(&bezier.clone()),
-                                    bezier_id: bezier.id.into(),
-                                });
+                                // latched_partners.push(bezier.latches[&AnchorEdge::End].clone());
+                                if let Some(latched_anchor) = bezier.latches.get(&AnchorEdge::End) {
+                                    latched_partners.push((bezier.id, latched_anchor.clone()));
+                                }
 
-                                commands.entity(*entity).despawn_recursive();
-                                maps.bezier_map.remove(&bezier.id);
-                                if let Some(group_id) = bezier.group {
-                                    maps.group_map.remove(&group_id);
+                                if handle == bezier_handle {
+                                    delete_curve_events.push(HistoryAction::DeletedCurve {
+                                        bezier: BezierHist::from(&bezier.clone()),
+                                        bezier_id: bezier.id.into(),
+                                    });
+
+                                    commands.entity(*entity).despawn_recursive();
+                                    maps.bezier_map.remove(&bezier.id);
+                                    if let Some(group_id) = bezier.group {
+                                        maps.group_map.remove(&group_id);
+                                    }
                                 }
                             }
                         }
                     }
+                    SelectionChoice::Mesh(
+                        PenMesh {
+                            id,
+                            bounding_box: _,
+                        },
+                        _pos,
+                    ) => {
+                        //
+                        let entity = maps.mesh_map.get(&id).unwrap();
+                        commands.entity(*entity).despawn();
+                        maps.mesh_map.remove(&id);
+                    }
+                    _ => {}
                 }
-                SelectionChoice::Mesh(
-                    PenMesh {
-                        id,
-                        bounding_box: _,
-                    },
-                    _pos,
-                ) => {
-                    //
-                    let entity = maps.mesh_map.get(&id).unwrap();
-                    commands.entity(*entity).despawn();
-                    maps.mesh_map.remove(&id);
-                }
-                _ => {}
-            }
 
-            for group_handle in query2.iter() {
-                //
-                let group = groups.get(group_handle).unwrap();
-                if let SelectionChoice::Group(selected) = selection.selected.clone() {
-                    for (entity, bezier_handle) in selected.group {
-                        if group.bezier_handles.contains(&bezier_handle) {
-                            commands.entity(entity).despawn_recursive();
+                for group_handle in query2.iter() {
+                    //
+                    let group = groups.get(group_handle).unwrap();
+                    if let SelectionChoice::Group(selected) = selected.clone() {
+                        for (entity, bezier_handle) in selected.group {
+                            if group.bezier_handles.contains(&bezier_handle) {
+                                commands.entity(entity).despawn_recursive();
+                            }
                         }
                     }
                 }
-            }
 
-            // unlatch partners of deleted curves
-            let mut unlatched_pairs: Vec<HashSet<BezierId>> = Vec::new();
-            for (self_id, latch_data) in latched_partners {
-                //
-                // if let Some(latch) = latch_vec {
-                //
-                if let Some(handle_entity) = maps.bezier_map.get(&latch_data.latched_to_id) {
+                // unlatch partners of deleted curves
+                let mut unlatched_pairs: Vec<HashSet<BezierId>> = Vec::new();
+                for (self_id, latch_data) in latched_partners {
                     //
-                    let partner_bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
+                    // if let Some(latch) = latch_vec {
+                    //
+                    if let Some(handle_entity) = maps.bezier_map.get(&latch_data.latched_to_id) {
+                        //
+                        let partner_bezier = bezier_curves.get_mut(&handle_entity.handle).unwrap();
 
-                    // important to send the Unlatched to history before the DeletedCurve
+                        // important to send the Unlatched to history before the DeletedCurve
 
-                    let mut unlatched_pair = HashSet::new();
-                    unlatched_pair.insert(partner_bezier.id);
-                    unlatched_pair.insert(self_id);
+                        let mut unlatched_pair = HashSet::new();
+                        unlatched_pair.insert(partner_bezier.id);
+                        unlatched_pair.insert(self_id);
 
-                    // send Unlatched only once per pair
-                    // if !*is_from_redo && !unlatched_pairs.contains(&unlatched_pair) {
-                    if !*is_from_redo {
-                        unlatched_pairs.push(unlatched_pair);
+                        // send Unlatched only once per pair
+                        // if !*is_from_redo && !unlatched_pairs.contains(&unlatched_pair) {
+                        if !*is_from_redo {
+                            unlatched_pairs.push(unlatched_pair);
 
-                        // from the point of view of the deleted curve's partner
+                            // from the point of view of the deleted curve's partner
 
-                        let unlatched = HistoryAction::Unlatched {
-                            self_id: self_id.into(),
-                            partner_id: latch_data.latched_to_id.into(),
-                            self_anchor: latch_data.self_edge,
-                            partner_anchor: latch_data.partners_edge,
-                        };
+                            let unlatched = HistoryAction::Unlatched {
+                                self_id: self_id.into(),
+                                partner_id: latch_data.latched_to_id.into(),
+                                self_anchor: latch_data.self_edge,
+                                partner_anchor: latch_data.partners_edge,
+                            };
 
-                        // info!("unlatched: {:?}", unlatched);
-                        add_to_history_event_writer.send(unlatched);
+                            // info!("unlatched: {:?}", unlatched);
+                            add_to_history_event_writer.send(unlatched);
+                        }
+                        info!("unlatching partner: {:?}", partner_bezier.id);
+
+                        partner_bezier.latches.remove(&latch_data.partners_edge);
                     }
-                    info!("unlatching partner: {:?}", partner_bezier.id);
 
-                    partner_bezier.latches.remove(&latch_data.partners_edge);
+                    // maps.id_handle_map.remove(&latch_data.latched_to_id);
+                    // }
                 }
 
-                // maps.id_handle_map.remove(&latch_data.latched_to_id);
-                // }
-            }
+                // make the group box quad invisible
+                for mut visible in visible_query.iter_mut() {
+                    visible.is_visible = false;
+                }
 
-            // make the group box quad invisible
-            for mut visible in visible_query.iter_mut() {
-                visible.is_visible = false;
-            }
+                // reset selection
+                // selection.selected = SelectionChoice::None;
+                // selection.selected.bezier_handles = HashSet::new();
 
-            // reset selection
-            selection.selected = SelectionChoice::None;
-            // selection.selected.bezier_handles = HashSet::new();
-
-            // send the delete events, provided they are not from a redo
-            if !*is_from_redo {
-                for e in delete_curve_events.iter() {
-                    add_to_history_event_writer.send(e.clone());
+                // send the delete events, provided they are not from a redo
+                if !*is_from_redo {
+                    for e in delete_curve_events.iter() {
+                        add_to_history_event_writer.send(e.clone());
+                    }
                 }
             }
+            selection.selected.clear();
         }
     }
 }
@@ -946,194 +959,5 @@ pub fn hide_control_points(
         for mut visible in query_control.iter_mut() {
             visible.is_visible = !globals.hide_control_points;
         }
-    }
-}
-
-pub fn save(
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    group_query: Query<&Handle<Group>, With<GroupParent>>,
-    // // mesh_query: Query<(&Handle<Mesh>, &GroupMesh)>,
-    // road_mesh_query: Query<(&Handle<Mesh>, &RoadMesh)>,
-    mut groups: ResMut<Assets<Group>>,
-    // meshes: Res<Assets<Mesh>>,
-    globals: ResMut<Globals>,
-    mut action_event_reader: EventReader<Action>,
-) {
-    if action_event_reader.iter().any(|x| x == &Action::Save) {
-        //
-
-        //
-        // ////////////// start.  Save individual Bezier curves
-        // let mut vec: Vec<Bezier> = Vec::new();
-        // for bezier_handle in query.iter() {
-        //     let bezier = bezier_curves.get(bezier_handle).unwrap();
-        //     let mut bezier_clone = bezier.clone();
-        //     bezier_clone.lut = Vec::new();
-        //     vec.push(bezier_clone);
-        // }
-
-        // let serialized = serde_json::to_string_pretty(&vec).unwrap();
-
-        // let path = "curves.txt";
-        // let mut output = File::create(path).unwrap();
-        // let _result = output.write(serialized.as_bytes());
-        // ////////////// end.  Save individual Bezier curves
-        //
-
-        ////////////// start. Save Group and save Group look-up table
-        if let Some(group_handle) = group_query.iter().next() {
-            let mut group_vec = Vec::new();
-            // for group_handle in group_query.iter() {
-            let group = groups.get_mut(group_handle).unwrap();
-            //
-            ////////////// start. Save Group look-up table
-            let lut_dialog_result = open_file_dialog("my_group", "look_up_tables", ".lut");
-            if let Some(lut_path) = lut_dialog_result {
-                group.compute_standalone_lut(&mut bezier_curves, globals.group_lut_num_points);
-                let lut_serialized = serde_json::to_string_pretty(&group.standalone_lut).unwrap();
-                // let lut_path = "assets/lut/my_group_lut.txt";
-                let mut lut_output = File::create(&lut_path).unwrap();
-                let _lut_write_result = lut_output.write(lut_serialized.as_bytes());
-            }
-
-            ////////////// start. Save Group
-            let group_dialog_result = open_file_dialog("my_group", "groups", ".group");
-            if let Some(group_path) = group_dialog_result {
-                group_vec.push(group.into_group_save(&mut bezier_curves).clone());
-                // }
-
-                let serialized = serde_json::to_string_pretty(&group_vec).unwrap();
-
-                // let path = "curve_groups.txt";
-                let mut output = File::create(group_path).unwrap();
-                let _group_write_result = output.write(serialized.as_bytes());
-            }
-        }
-        ////////////// end. Save group and look-up table
-        //
-
-        // ////////////// start. Save mesh in obj format
-        // if let Some((mesh_handle, GroupMesh(_color))) = mesh_query.iter().next() {
-        //     let mesh_dialog_result = open_file_dialog("my_mesh", "meshes", ".obj");
-        //     save_mesh(mesh_handle, &meshes, mesh_dialog_result);
-
-        //     ////////////// end. Save mesh in obj format
-        // }
-
-        // ////////////// start. Save road in obj format
-        // if let Some((road_mesh_handle, RoadMesh(_color))) = road_mesh_query.iter().next() {
-        //     let road_dialog_result = open_file_dialog("my_road", "meshes", ".obj");
-        //     save_mesh(road_mesh_handle, &meshes, road_dialog_result);
-
-        //     ////////////// end. Save road in obj format
-        // }
-    }
-}
-
-// only loads groups
-
-pub fn load(
-    query: Query<Entity, Or<(With<BezierParent>, With<GroupParent>)>>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
-    // mut groups: ResMut<Assets<Group>>,
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    // mut my_shader_params: ResMut<Assets<BezierMat>>,
-    clearcolor_struct: Res<ClearColor>,
-    mut globals: ResMut<Globals>,
-    mut selection: ResMut<Selection>,
-    mut maps: ResMut<Maps>,
-    mut action_event_reader: EventReader<Action>,
-    mut loaded_event_writer: EventWriter<Loaded>,
-    mut selection_params: ResMut<Assets<SelectionMat>>,
-    mut controls_params: ResMut<Assets<BezierControlsMat>>,
-    mut ends_params: ResMut<Assets<BezierEndsMat>>,
-    mut mid_params: ResMut<Assets<BezierMidMat>>,
-    mut add_to_history_event_writer: EventWriter<HistoryAction>,
-) {
-    if action_event_reader.iter().any(|x| x == &Action::Load) {
-        let mut default_path = std::env::current_dir().unwrap();
-        default_path.push("saved");
-        default_path.push("groups");
-
-        let res = rfd::FileDialog::new()
-            .add_filter("text", &["group"])
-            .set_directory(&default_path)
-            .pick_files();
-
-        // cancel loading if user cancelled the file dialog
-        let path: std::path::PathBuf;
-        if let Some(chosen_path) = res.clone() {
-            let path_some = chosen_path.get(0);
-            if let Some(path_local) = path_some {
-                path = path_local.clone();
-            } else {
-                return ();
-            }
-        } else {
-            return ();
-        }
-
-        let clearcolor = clearcolor_struct.0;
-
-        // delete all current groups and curves before spawning the saved ones
-        for entity in query.iter() {
-            commands.entity(entity).despawn_recursive();
-        }
-
-        globals.do_hide_anchors = false;
-        globals.do_hide_bounding_boxes = true;
-
-        let mut file = std::fs::File::open(path).unwrap();
-
-        let mut contents = String::new();
-        file.read_to_string(&mut contents).unwrap();
-
-        let loaded_groups_vec: Vec<GroupSaveLoad> = serde_json::from_str(&contents).unwrap();
-
-        let id: GroupId = GroupId::default();
-
-        let mut group = Group {
-            group: HashSet::new(),
-            bezier_handles: HashSet::new(),
-            lut: Vec::new(),
-            ends: None,
-            standalone_lut: StandaloneLut {
-                path_length: 0.0,
-                lut: Vec::new(),
-            },
-            group_id: id,
-        };
-
-        for group_load_save in loaded_groups_vec {
-            for (mut bezier, anchor, t_ends, local_lut) in group_load_save.lut {
-                let (entity, handle) = spawn_bezier(
-                    &mut bezier,
-                    &mut bezier_curves,
-                    &mut commands,
-                    &mut meshes,
-                    &mut selection_params,
-                    &mut controls_params,
-                    &mut ends_params,
-                    &mut mid_params,
-                    clearcolor,
-                    &mut globals,
-                    &mut maps,
-                    &mut add_to_history_event_writer,
-                    &None, // does not have handle information
-                    true,  // do send to history
-                    false, // do not follow mouse
-                );
-                group.group.insert((entity.clone(), handle.clone()));
-                group.bezier_handles.insert(handle.clone());
-                group.standalone_lut = group_load_save.standalone_lut.clone();
-                group.lut.push((handle.clone(), anchor, t_ends, local_lut));
-            }
-        }
-        selection.selected = SelectionChoice::Group(group.clone());
-
-        // to create a group: select all the curves programmatically, and send a UiButton::Group event
-        loaded_event_writer.send(Loaded);
-        println!("{:?}", "loaded groups");
     }
 }

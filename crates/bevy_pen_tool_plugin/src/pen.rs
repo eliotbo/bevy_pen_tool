@@ -210,7 +210,7 @@ fn direct_api_calls(
                             .group
                             .insert((handle_entity.entity, handle_entity.handle.clone()));
 
-                        selection.selected = SelectionChoice::Group(new_group);
+                        selection.selected = vec![SelectionChoice::Group(new_group)];
 
                         action_event_writer
                             .send(Action::Delete(false /* do not add to history */));

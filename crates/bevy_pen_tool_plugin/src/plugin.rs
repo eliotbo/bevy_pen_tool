@@ -1,4 +1,5 @@
 use crate::actions::*;
+use crate::io::{load, save};
 use crate::moves::*;
 use crate::pen::*;
 use crate::undo::*;
@@ -13,16 +14,20 @@ pub struct BevyPenToolPlugin;
 // use once_cell::sync::Lazy;
 
 // TODO
+
+// 3) selecting multiple items
+// 7) automatically group latched curves
+
 // 1) use UI camera
 // 2) disable and hide color picking
-// 3) selecting/deleting meshes
 // 5) disable shortcuts
 // 6) make most of the structs public(crate) and
 //     leave only the API public
-// 7) automatically group latched curves
 // 8) fix save mesh
 // 9) move structs in correct files (ex: RoadMesh, FillMesh in mesh)
 // 10) wrong unselect when moving a selected mesh
+// 11) make io a feature
+// 12) replace middle quads with line segments
 
 impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {

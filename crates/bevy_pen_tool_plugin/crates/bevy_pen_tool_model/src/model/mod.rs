@@ -1,7 +1,7 @@
-mod model_bezier;
-mod model_group;
+mod bezier;
+mod group;
 pub mod util;
 
-pub use model_bezier::*;
-pub use model_group::*;
+pub use bezier::*;
+pub use group::*;
 pub use util::*;
