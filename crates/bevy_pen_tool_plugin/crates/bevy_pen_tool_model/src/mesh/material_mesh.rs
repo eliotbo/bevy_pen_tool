@@ -13,6 +13,8 @@ pub struct RoadMesh2dMaterial {
     pub road_texture: Handle<Image>,
     #[uniform(2)]
     pub center_of_mass: Vec2,
+    #[uniform(2)]
+    pub show_com: f32,
 }
 
 pub struct RoadMesh2dPlugin;

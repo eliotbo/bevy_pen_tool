@@ -19,6 +19,58 @@ use rand::{thread_rng, Rng};
 //
 //
 
+pub type MeshId = u64;
+
+#[derive(Component, Clone, Debug)]
+pub struct RoadMesh(pub MeshId);
+
+pub struct MinsMaxes {
+    pub min_x: f32,
+    pub min_y: f32,
+    pub max_x: f32,
+    pub max_y: f32,
+}
+
+impl Default for MinsMaxes {
+    fn default() -> Self {
+        MinsMaxes {
+            min_x: f32::MIN,
+            min_y: f32::MIN,
+            max_x: f32::MAX,
+            max_y: f32::MAX,
+        }
+    }
+}
+
+impl MinsMaxes {
+    pub fn update(&mut self, pos: Vec2) {
+        self.min_x = self.min_x.min(pos.x);
+        self.min_y = self.min_y.min(pos.y);
+        self.max_x = self.max_x.max(pos.x);
+        self.max_y = self.max_y.max(pos.y);
+    }
+
+    pub fn to_vec2_pair(&self) -> (Vec2, Vec2) {
+        (
+            Vec2::new(self.min_x, self.min_y),
+            Vec2::new(self.max_x, self.max_y),
+        )
+    }
+}
+
+#[derive(Component, Clone, Debug)]
+pub struct FillMesh {
+    pub id: MeshId,
+    pub bounding_box: (Vec2, Vec2),
+}
+
+#[derive(Component, Clone, Debug)]
+pub struct StartMovingMesh {
+    // pub id: MeshId,
+    pub start_position: Vec2,
+    // pub entity: Entity,
+}
+
 // spawn a road along the selected group
 //
 //
@@ -125,6 +177,7 @@ pub fn make_road(
             let mat_handle = road_materials.add(RoadMesh2dMaterial {
                 road_texture: texture_handle.clone(),
                 center_of_mass: center_of_mass,
+                show_com: 0.0,
             });
 
             let mut road_transform = Transform::from_translation(Vec3::new(
@@ -213,12 +266,16 @@ pub fn make_fill_mesh(
             let color = globals.picked_color.unwrap();
             let mut colors = Vec::new();
 
+            let mut mins_maxes = MinsMaxes::default();
+
             for position in buffers.vertices[..].iter() {
                 let pos_x = position.x - center_of_mass.x;
                 let pos_y = position.y - center_of_mass.y;
                 mesh_pos_attributes.push([pos_x, pos_y, 0.0]);
 
                 colors.push([color.r(), color.g(), color.b(), 1.0]);
+
+                mins_maxes.update(Vec2::new(pos_x, pos_y));
             }
 
             //////////////////////////// uvs ///////////////////////////////
@@ -265,12 +322,9 @@ pub fn make_fill_mesh(
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
             mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, mesh_pos_attributes.clone());
-
             mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
             mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-
             mesh.set_indices(Some(Indices::U32(new_indices)));
-
             mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, mesh_attr_uvs);
 
             let mut fill_transform =
@@ -294,7 +348,10 @@ pub fn make_fill_mesh(
                     transform: fill_transform,
                     ..default()
                 })
-                .insert(FillMesh(rng.gen()));
+                .insert(FillMesh {
+                    id: rng.gen(),
+                    bounding_box: mins_maxes.to_vec2_pair(), // bounding box relative to center of mass
+                });
         }
     }
 }

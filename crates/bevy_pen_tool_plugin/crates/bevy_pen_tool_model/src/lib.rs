@@ -31,6 +31,7 @@ impl Plugin for SpawnerPlugin {
             .add_event::<HistoryAction>()
             .add_event::<ComputeLut>()
             .add_event::<RedoDelete>()
+            .add_event::<StartMovingMesh>()
             // .add_plugin(ColoredMesh2dPlugin) // mesh making
             .add_plugin(RoadMesh2dPlugin)
             .add_plugin(FillMesh2dPlugin)
@@ -52,6 +53,7 @@ impl Plugin for SpawnerPlugin {
             .add_startup_system(spawn_selection_bounding_box)
             .add_startup_system(spawn_ui)
             .add_startup_system(spawn_selecting_bounding_box)
+            .add_system(move_fill_mesh) // TODO: move to moves
             //
             // Update spawner (conceptually part of view)
             .add_system_set(

@@ -96,14 +96,6 @@ impl Default for Maps {
     }
 }
 
-pub type MeshId = u64;
-
-#[derive(Component, Clone, Debug)]
-pub struct RoadMesh(pub MeshId);
-
-#[derive(Component, Clone, Debug)]
-pub struct FillMesh(pub MeshId);
-
 #[derive(Clone, Debug)]
 pub enum SelectionChoice {
     Group(Group),
@@ -429,21 +421,33 @@ pub fn get_close_anchor(
 }
 
 pub fn get_close_mesh(
-    fill_query: &Query<(&Transform, &Handle<FillMesh2dMaterial>, &FillMesh)>,
-    road_query: &Query<(&Transform, &RoadMesh)>,
+    max_dist: f32,
+    fill_query: &Query<(Entity, &Transform, &Handle<FillMesh2dMaterial>, &FillMesh)>,
+    road_query: &Query<(Entity, &Transform, &Handle<RoadMesh2dMaterial>, &RoadMesh)>,
     fill_mesh_materials: &mut ResMut<Assets<FillMesh2dMaterial>>,
+    road_mesh_materials: &mut ResMut<Assets<RoadMesh2dMaterial>>,
     position: Vec2,
-) -> Option<MeshId> {
-    for (transform, fill_handle, mesh) in fill_query.iter() {
+) -> Option<(Entity, MeshId, Vec2)> {
+    for (entity, transform, fill_handle, mesh) in fill_query.iter() {
         let dist = (transform.translation.truncate() - position).length();
         let mut fill_mesh_material = fill_mesh_materials.get_mut(fill_handle).unwrap();
 
-        if dist < 20.0 {
-            println!("Close fill mesh: {:?}", mesh);
+        if dist < max_dist {
             fill_mesh_material.show_com = 1.;
-            return Some(mesh.0);
+            return Some((entity, mesh.id, transform.translation.truncate()));
         } else {
             fill_mesh_material.show_com = 0.;
+        }
+    }
+    for (entity, transform, road_handle, mesh) in road_query.iter() {
+        let dist = (transform.translation.truncate() - position).length();
+        let mut road_mesh_material = road_mesh_materials.get_mut(road_handle).unwrap();
+
+        if dist < max_dist {
+            road_mesh_material.show_com = 1.;
+            return Some((entity, mesh.0, transform.translation.truncate()));
+        } else {
+            road_mesh_material.show_com = 0.;
         }
     }
     return None;

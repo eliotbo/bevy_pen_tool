@@ -1,12 +1,12 @@
 use super::buttons::{ButtonInteraction, ButtonState, UiButton};
 // use crate::cam::Cam;
 use crate::materials::ButtonMat;
+use crate::mesh::{MeshId, StartMovingMesh};
 use crate::model::util::Maps;
 use crate::model::{
     get_close_anchor, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierId,
-    BezierParent, ColorButton, CurrentlySelecting, Globals, HistoryAction, MainUi, MeshId,
-    MoveAnchorEvent, MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve, UiAction,
-    UiBoard,
+    BezierParent, ColorButton, CurrentlySelecting, Globals, HistoryAction, MainUi, MoveAnchorEvent,
+    MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve, UiAction, UiBoard,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -574,6 +574,7 @@ pub fn events_on_mouse_release(
     mut latch_event_writer: EventWriter<OfficialLatch>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
     selecting_query: Query<Entity, (With<SelectingBoxQuad>, With<CurrentlySelecting>)>,
+    mut fill_query: Query<Entity, With<StartMovingMesh>>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         //
@@ -634,6 +635,10 @@ pub fn events_on_mouse_release(
         for entity in selecting_query.iter() {
             commands.entity(entity).remove::<CurrentlySelecting>();
             action_event_writer.send(Action::Selected)
+        }
+
+        for entity in fill_query.iter() {
+            commands.entity(entity).remove::<StartMovingMesh>();
         }
     }
 }
