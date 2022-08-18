@@ -265,12 +265,15 @@ fn debug(
     {
         // println!("group_handles: {:?}", maps.id_group_handle);
         // println!("'B' currently pressed");
+        let latches: Vec<Latch> = vec![];
         for handle in query.iter() {
             let bezier = bezier_curves.get_mut(handle).unwrap();
             // action_event_writer.send(Action::ComputeLut);
 
-            println!("group id: {:?}", bezier.group);
-            println!("latches: {:#?}", BezierPrint::from_bezier(bezier).latches);
+            // latches.push()
+
+            // println!("group id: {:?}", bezier.group);
+            // println!("latches: {:#?}", BezierPrint::from_bezier(bezier).latches);
             // println!("potential latche: {:#?}", bezier.potential_latch);
         }
 
@@ -285,6 +288,7 @@ fn debug(
     if keyboard_input.just_pressed(KeyCode::G) {
         // println!("'B' currently pressed");
         println!("groups: {:#?}", groups.iter().count());
+        println!("group map: {:?}", maps.group_map);
         for (_, group) in groups.iter_mut() {
             // let bezier = bezier_curves.get_mut(handle).unwrap();
 
@@ -296,7 +300,7 @@ fn debug(
             group.group_lut(&bezier_assets, maps.bezier_map.clone());
             group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
 
-            println!("group: {:#?}", GroupPrint::from_group(group));
+            // println!("group: {:#?}", GroupPrint::from_group(group));
             // println!("");
         }
     }

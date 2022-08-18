@@ -825,7 +825,7 @@ pub struct BezierHandleEntity {
     pub anchor_entities: AnchorEntities,
 }
 
-pub fn find_chained_curves(
+pub fn find_onesided_chained_curves(
     first_bezier: &Bezier,
     bezier_curves: &BezierAssets,
     id_handle_map: HashMap<BezierId, BezierHandleEntity>,

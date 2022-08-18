@@ -653,6 +653,7 @@ struct BezierToRemoveFromGroup {
     bezier_handle_entity: BezierHandleEntity,
     color: Color,
     anchor_edge: AnchorEdge,
+    old_partner_id: BezierId,
 }
 
 // TODO: separate in two distinct groups
@@ -661,13 +662,13 @@ pub fn unlatchy(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut groups: ResMut<Assets<Group>>,
     globals: ResMut<Globals>,
-    maps: ResMut<Maps>,
+    mut maps: ResMut<Maps>,
     mut unlatch_event_reader: EventReader<UnlatchEvent>,
     audio: Res<Audio>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
-    mut spawn_mids_event_writer: EventWriter<SpawnMids>,
+    // mut spawn_mids_event_writer: EventWriter<SpawnMids>,
     mut event_writer: EventWriter<Handle<Group>>,
-    mut group_lut_event_writer: EventWriter<ComputeGroupLut>,
+    // mut group_lut_event_writer: EventWriter<ComputeGroupLut>,
 ) {
     for unlatch in unlatch_event_reader.iter() {
         let mut latch_partner: Option<(BezierId, LatchData)> = None;
@@ -677,7 +678,9 @@ pub fn unlatchy(
         if let Some(bezier_handle_entity) = maps.bezier_map.get(&unlatch.bezier_id) {
             // TODO: take care of the Anchor::All case
 
+            // curve that was clicked on
             let bezier = bezier_curves.get_mut(&bezier_handle_entity.handle).unwrap();
+            //
             // println!("Unlatching latches {:#?}", bezier.latches);
             // println!("unlatch.anchor {:#?}", unlatch.anchor);
 
@@ -688,20 +691,27 @@ pub fn unlatchy(
                         //
                         // keep the latch information in memory to unlatch the anchor's partner below
                         latch_partner = Some((bezier.id, temp_latch.clone()));
+
+                        // let old_partner_id = maps
+                        //     .bezier_map
+                        //     .get(&temp_latch.latched_to_id)
+                        //     .unwrap()
+                        //     .clone();
+
+                        // if let Some(group_id) = bezier.group {
+                        bezier_in_group = Some(BezierToRemoveFromGroup {
+                            group_id: bezier.group,
+                            bezier_handle_entity: bezier_handle_entity.clone(),
+                            color: bezier
+                                .color
+                                .unwrap_or(globals.picked_color.unwrap_or(Color::WHITE)),
+                            anchor_edge: anchor.to_edge(),
+                            old_partner_id: temp_latch.latched_to_id,
+                        });
+
+                        bezier.latches.remove(&anchor.to_edge());
+                        bezier.potential_latch = None;
                     }
-
-                    // if let Some(group_id) = bezier.group {
-                    bezier_in_group = Some(BezierToRemoveFromGroup {
-                        group_id: bezier.group,
-                        bezier_handle_entity: bezier_handle_entity.clone(),
-                        color: bezier
-                            .color
-                            .unwrap_or(globals.picked_color.unwrap_or(Color::WHITE)),
-                        anchor_edge: anchor.to_edge(),
-                    });
-
-                    bezier.latches.remove(&anchor.to_edge());
-                    bezier.potential_latch = None;
                 }
 
                 _ => {}
@@ -741,10 +751,12 @@ pub fn unlatchy(
             bezier_handle_entity,
             color: _,
             anchor_edge,
+            old_partner_id,
         }) = bezier_in_group
         {
             // let group = groups.get_mut().unwrap();
             let mut new_group = Group::default();
+            let mut new_group_id = new_group.id;
             // let bezier = bezier_curves.get_mut(&bezier_handle_entity.handle).unwrap();
             // bezier.group = new_group.group_id;
 
@@ -754,51 +766,61 @@ pub fn unlatchy(
 
             let main_bezier = bezier_assets.get(&bezier_handle_entity.handle.id).unwrap();
 
-            let curve_chain = find_chained_curves(
+            let curve_chain = find_onesided_chained_curves(
                 main_bezier,
                 &bezier_assets,
                 maps.bezier_map.clone(),
                 anchor_edge.other(),
             );
 
-            info!("anchor_edge: {:?}", anchor_edge.other());
-
-            let group_handle = maps.group_map.get(&group_id).unwrap();
-            let group = groups.get_mut(&group_handle).unwrap();
-
-            // change group of each bezier curve in the chain for the new group id
-            for bezier_from_chain in curve_chain.iter() {
-                let bezier = bezier_curves.get_mut(&bezier_from_chain.handle).unwrap();
-                bezier.group = new_group.id;
-            }
-
-            let bezier_assets = bezier_curves
+            let chain_ids = curve_chain
                 .iter()
-                .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
+                .map(|x| x.handle.id.into())
+                .collect::<Vec<BezierId>>();
 
-            for bezier_from_chain in curve_chain.iter() {
-                // TODO: too much compute! find_connected_ends, group_lut and compute_standalone_lut
-                // are computed at each iteration. Only need to be computed at the end
-                group.remove_curve(&bezier_from_chain, &bezier_assets, maps.bezier_map.clone());
-                new_group.add_curve(bezier_from_chain.entity, bezier_from_chain.handle.clone());
+            // If the chain is unchanged after unlatching, no need to take group-related actions
+            if !chain_ids.contains(&old_partner_id) {
+                //
+
+                info!("CURVES NOT PART OF SAME CHAIN");
+
+                let group_handle = maps.group_map.get(&group_id).unwrap();
+                let group = groups.get_mut(&group_handle).unwrap();
+
+                // change group of each bezier curve in the chain for the new group id
+                for bezier_from_chain in curve_chain.iter() {
+                    let bezier = bezier_curves.get_mut(&bezier_from_chain.handle).unwrap();
+                    bezier.group = new_group.id;
+                }
+
+                let bezier_assets = bezier_curves
+                    .iter()
+                    .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
+
+                for bezier_from_chain in curve_chain.iter() {
+                    // TODO: too much compute! find_connected_ends, group_lut and compute_standalone_lut
+                    // are computed at each iteration. Only need to be computed at the end
+                    group.remove_curve(&bezier_from_chain, &bezier_assets, maps.bezier_map.clone());
+                    new_group.add_curve(bezier_from_chain.entity, bezier_from_chain.handle.clone());
+                }
+
+                // group_lut_event_writer.send(ComputeGroupLut(group.group_id));
+
+                let bezier_assets = bezier_curves
+                    .iter()
+                    .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
+
+                new_group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
+                new_group.group_lut(&bezier_assets, maps.bezier_map.clone());
+                new_group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
+
+                let new_group_handle = groups.add(new_group);
+
+                maps.group_map
+                    .insert(new_group_id, new_group_handle.clone());
+
+                event_writer.send(new_group_handle);
             }
-
-            // group_lut_event_writer.send(ComputeGroupLut(group.group_id));
-
-            let bezier_assets = bezier_curves
-                .iter()
-                .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
-
-            new_group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
-            new_group.group_lut(&bezier_assets, maps.bezier_map.clone());
-            new_group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
-
-            // group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
-            // group.group_lut(&bezier_assets, maps.bezier_map.clone());
-            // group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
-
-            let new_group_handle = groups.add(new_group);
-            event_writer.send(new_group_handle);
         }
     }
 }
@@ -816,6 +838,9 @@ pub fn officiate_latch_partnership(
     mut group_lut_event_writer: EventWriter<ComputeGroupLut>,
 ) {
     for OfficialLatch(latch, bezier_1_handle) in latch_event_reader.iter() {
+        //
+        //
+        // curve 1 is the curve that was being manipulated by the user
         let bezier_1 = bezier_curves.get_mut(bezier_1_handle).unwrap();
 
         bezier_1.latches.insert(latch.self_edge, latch.clone());
@@ -826,6 +851,7 @@ pub fn officiate_latch_partnership(
 
         ///////////// partner //////////////////////////////////
         //
+        // curve 2 is the curve that was latched to
         let handle_entity_2 = maps.bezier_map[&latch.latched_to_id.into()].clone();
         let bezier_2 = bezier_curves.get_mut(&handle_entity_2.handle).unwrap();
         bezier_2.potential_latch = None;
@@ -858,32 +884,69 @@ pub fn officiate_latch_partnership(
             }
         }
         //
+        // if the two curves are already in the same group, do no group-related actions
+        if group_id_to_delete == bezier_2_group {
+            //
+        } else {
+            //
+            // if the two curves are not in the same group, merge the two groups
+            //
 
-        let group_1_handle = maps.group_map.get(&group_id_to_delete).unwrap();
-        groups.remove(group_1_handle);
+            let group_1_handle = maps.group_map.get(&group_id_to_delete).unwrap();
+            groups.remove(group_1_handle);
 
-        // TODO: add entity to group_map to avoid looping here
-        for (entity, queried_group_handle) in group_query.iter() {
-            if queried_group_handle == group_1_handle {
-                commands.entity(entity).despawn_recursive();
+            // TODO: add entity to group_map to avoid looping here
+            //
+            // despawn the mid quads belonging to group_1
+            for (entity, queried_group_handle) in group_query.iter() {
+                if queried_group_handle == group_1_handle {
+                    commands.entity(entity).despawn_recursive();
+                }
             }
+
+            let bezier_1 = bezier_curves.get_mut(bezier_1_handle).unwrap();
+            bezier_1.group = bezier_2_group;
+
+            // delete the latcher's group from group_map
+            maps.group_map.remove(&group_id_to_delete);
+
+            // // add bezier_1 to bezier_2's group
+            // let curve_handle_entity = maps.bezier_map.get(&bezier_1_id).unwrap().clone();
+            // group.add_curve(curve_handle_entity.entity, bezier_1_handle.clone());
+
+            // Add curves latched to bezier_1 to bezier_2's group
+            let bezier_assets = bezier_curves
+                .iter()
+                .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
+
+            let bezier_1 = bezier_curves.get(bezier_1_handle).unwrap();
+
+            let bezier_chain = find_onesided_chained_curves(
+                &bezier_1,
+                &bezier_assets,
+                maps.bezier_map.clone(),
+                latch.self_edge.other(),
+            );
+
+            // perform modifications to group 2
+            let group = groups.get_mut(&maps.group_map[&bezier_2_group]).unwrap();
+            for bez in bezier_chain.iter() {
+                let bez = bezier_curves.get_mut(&bez.handle).unwrap();
+
+                // change the group ids for all the curves that are latched to curve 1
+                bez.group = bezier_2_group;
+                let curve_handle_entity = maps.bezier_map.get(&bez.id).unwrap().clone();
+
+                // add the curves to group_2
+                group.add_curve(
+                    curve_handle_entity.entity,
+                    curve_handle_entity.handle.clone(),
+                );
+            }
+
+            // Compute new look-up tables
+            group_lut_event_writer.send(ComputeGroupLut(bezier_2_group));
         }
-
-        let bezier_1 = bezier_curves.get_mut(bezier_1_handle).unwrap();
-
-        bezier_1.group = bezier_2_group;
-
-        // add the latcher's curve to the latchee's group
-        let group = groups.get_mut(&maps.group_map[&bezier_2_group]).unwrap();
-
-        // delete the latcher's group from group_map
-        maps.group_map.remove(&group_id_to_delete);
-
-        // add bezier_1 to bezier_2's group
-        let curve_handle_entity = maps.bezier_map.get(&bezier_1.id).unwrap().clone();
-        group.add_curve(curve_handle_entity.entity, bezier_1_handle.clone());
-
-        group_lut_event_writer.send(ComputeGroupLut(bezier_2_group));
     }
 }
 
@@ -899,15 +962,16 @@ pub fn compute_group_lut(
     // On demand look-up table computation using the ComputeGroupLut event
     for group_lut_event in group_lut_event_reader.iter() {
         if let Some(group_handle) = maps.group_map.get(&group_lut_event.0) {
-            let group = groups.get_mut(group_handle).unwrap();
+            // let group = groups.get_mut(group_handle).unwrap();
+            if let Some(group) = groups.get_mut(group_handle) {
+                let bezier_assets = bezier_curves
+                    .iter()
+                    .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
 
-            let bezier_assets = bezier_curves
-                .iter()
-                .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
-
-            group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
-            group.group_lut(&bezier_assets, maps.bezier_map.clone());
-            group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
+                group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
+                group.group_lut(&bezier_assets, maps.bezier_map.clone());
+                group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
+            }
         }
     }
 
@@ -930,20 +994,25 @@ pub fn compute_group_lut(
         }
     }
 
-    // Every time a bezier curve is created, compute its group's look-up table
+    // Every time a bezier curve is modified, compute its group's look-up table
     for ev in bezier_asset_event.iter() {
         match ev {
-            AssetEvent::Created { handle } => {
+            AssetEvent::Modified { handle } => {
                 if let Some(bezier) = bezier_curves.get(handle) {
                     let bezier_assets = bezier_curves
                         .iter()
                         .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
 
-                    let group = groups.get_mut(&maps.group_map[&bezier.group]).unwrap();
-
-                    group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
-                    group.group_lut(&bezier_assets, maps.bezier_map.clone());
-                    group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
+                    if let Some(group_handle) = maps.group_map.get(&bezier.group) {
+                        if let Some(group) = groups.get_mut(&group_handle) {
+                            group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
+                            group.group_lut(&bezier_assets, maps.bezier_map.clone());
+                            group.compute_standalone_lut(
+                                &bezier_assets,
+                                globals.group_lut_num_points,
+                            );
+                        }
+                    }
                 }
             }
             _ => {}
