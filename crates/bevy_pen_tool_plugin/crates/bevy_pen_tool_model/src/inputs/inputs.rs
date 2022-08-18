@@ -6,9 +6,9 @@ use crate::mesh::{FillMesh2dMaterial, MeshId, PenMesh, RoadMesh2dMaterial, Start
 use crate::model::util::Maps;
 use crate::model::{
     get_close_anchor, get_close_mesh, get_close_still_anchor, AchorEdgeQuad, Anchor, AnchorEdge,
-    Bezier, BezierId, BezierParent, ColorButton, CurrentlySelecting, Globals, HistoryAction,
-    MainUi, MoveAnchorEvent, MovingAnchor, OfficialLatch, SelectingBoxQuad, SpawningCurve,
-    UiAction, UiBoard,
+    Bezier, BezierId, BezierParent, ColorButton, CurrentlySelecting, Globals, GroupId,
+    HistoryAction, MainUi, MoveAnchorEvent, MovingAnchor, OfficialLatch, SelectingBoxQuad,
+    SpawningCurve, UiAction, UiBoard,
 };
 
 use bevy::render::camera::OrthographicProjection;
@@ -62,6 +62,7 @@ pub struct Latch {
     pub latchee_id: BezierId,
     pub latcher_id: BezierId,
     pub latchee_edge: AnchorEdge,
+    pub group_id: GroupId,
 }
 
 #[derive(PartialEq, Debug)]
@@ -75,7 +76,7 @@ pub enum Action {
     Ungroup,
     Select,
     Unselect,
-    Detach,
+    Unlatch,
     SpawnCurve,
     HideAnchors,
     ToggleSound,

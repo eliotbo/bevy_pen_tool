@@ -14,6 +14,8 @@ use lyon::tessellation::path::Path;
 use lyon::tessellation::{FillOptions, FillTessellator, VertexBuffers};
 
 use rand::{thread_rng, Rng};
+
+use std::collections::HashMap;
 //
 //
 //
@@ -78,7 +80,7 @@ pub struct StartMovingMesh {
 pub fn make_road(
     mut action_event_reader: EventReader<Action>,
     mut commands: Commands,
-    mut curves: ResMut<Assets<Bezier>>,
+    mut curves: Res<Assets<Bezier>>,
     globals: Res<Globals>,
     selection: ResMut<Selection>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -91,12 +93,16 @@ pub fn make_road(
             let temp = selection.selected.clone();
             let selected = temp.iter().next().unwrap().clone();
             if let SelectionChoice::Group(mut group) = selected {
-                group.find_connected_ends(&mut curves, maps.bezier_map.clone());
+                let bezier_assets = curves
+                    .iter()
+                    .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
 
-                group.group_lut(&mut curves, maps.bezier_map.clone());
-                group.compute_standalone_lut(&curves, globals.group_lut_num_points);
+                group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
 
-                let center_of_mass = group.center_of_mass(&curves);
+                group.group_lut(&bezier_assets, maps.bezier_map.clone());
+                group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
+
+                let center_of_mass = group.center_of_mass(&bezier_assets);
 
                 let num_points = globals.group_lut_num_points;
 
@@ -110,7 +116,7 @@ pub fn make_road(
                 for t in t_range {
                     let position = group.compute_position_with_lut(t) - center_of_mass;
                     let normal = group
-                        .compute_normal_with_bezier(&curves, t as f64)
+                        .compute_normal_with_bezier(&bezier_assets, t as f64)
                         .normalize();
 
                     let v1 = Vec3::new(
@@ -227,7 +233,7 @@ pub fn make_fill_mesh(
     mut action_event_reader: EventReader<Action>,
     mut commands: Commands,
     globals: Res<Globals>,
-    mut curves: ResMut<Assets<Bezier>>,
+    mut curves: Res<Assets<Bezier>>,
     mut fill_materials: ResMut<Assets<FillMesh2dMaterial>>,
     selection: ResMut<Selection>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -238,12 +244,16 @@ pub fn make_fill_mesh(
             let temp = selection.selected.clone();
             let selected = temp.iter().next().unwrap().clone();
             if let SelectionChoice::Group(mut group) = selected.clone() {
-                group.find_connected_ends(&mut curves, maps.bezier_map.clone());
+                let bezier_assets = curves
+                    .iter()
+                    .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
 
-                group.group_lut(&mut curves, maps.bezier_map.clone());
-                group.compute_standalone_lut(&curves, globals.group_lut_num_points);
+                group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
 
-                let center_of_mass = group.center_of_mass(&curves);
+                group.group_lut(&bezier_assets, maps.bezier_map.clone());
+                group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
+
+                let center_of_mass = group.center_of_mass(&bezier_assets);
 
                 let mut path_builder = Path::builder();
 

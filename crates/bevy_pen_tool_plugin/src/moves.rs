@@ -6,8 +6,10 @@ use bevy_pen_tool_model::mesh::{FillMesh2dMaterial, RoadMesh2dMaterial, StartMov
 use bevy_pen_tool_model::model::{
     AchorEdgeQuad, AnchorEdge, Bezier, BezierParent, BoundingBoxQuad, ControlPointQuad,
     FollowBezierAnimation, Globals, Group, GroupMiddleQuad, MainUi, MiddlePointQuad, MovingAnchor,
-    TurnRoundAnimation, UiAction, UiBoard,
+    OfficialLatch, TurnRoundAnimation, UiAction, UiBoard,
 };
+
+use std::collections::HashMap;
 
 pub fn move_ui(
     cursor: ResMut<Cursor>,
@@ -69,7 +71,7 @@ pub fn move_middle_quads(
 
 pub fn move_group_middle_quads(
     time: Res<Time>,
-    bezier_curves: ResMut<Assets<Bezier>>,
+    bezier_curves: Res<Assets<Bezier>>,
     mut my_shader_params: ResMut<Assets<BezierMidMat>>,
     mut query: Query<(
         &mut Transform,
@@ -80,40 +82,51 @@ pub fn move_group_middle_quads(
     // globals: ResMut<Globals>,
     groups: ResMut<Assets<Group>>,
     mut action_event_reader: EventReader<Action>,
+    mut latch_event_reader: EventReader<OfficialLatch>,
 ) {
     let mut t = 0.0;
-    // During the exact frame where the ungroup action takes places, the middle quads
-    // do not have time to be despawned before this system runs
-    if !action_event_reader.iter().any(|x| x == &Action::Ungroup) {
-        if let Some(last_handle_tuple) = groups.iter().next() {
-            let mut last_handle_id = last_handle_tuple.0;
-            // println!("mids: {:?}", query.iter().count());
-            for (mut transform, group_handle, shader_params_handle, GroupMiddleQuad(num_quads)) in
-                query.iter_mut()
-            {
-                if group_handle.id != last_handle_id {
-                    t = 0.0;
-                    last_handle_id = group_handle.id;
-                }
-                t = t + 1.0 / (num_quads.clone() as f32);
+    // During the exact frame where either the ungroup action or the OfficialLatch event
+    // takes places, the middle quads do not have time to be despawned before this system runs.
+    // Instead of using this hack (checking whether these events take place), we could
+    // simply use an "if let Some(group) = groups.get_mut(group_handle.id)" statement
 
-                let mut shader_params = my_shader_params.get_mut(shader_params_handle).unwrap();
+    // if latch_event_reader.iter().next().is_none() {
+    //     if !action_event_reader
+    //         .iter()
+    //         .any(|x| x == &Action::Ungroup || x == &Action::Latch)
+    //     {
+    if let Some(last_handle_tuple) = groups.iter().next() {
+        let mut last_handle_id = last_handle_tuple.0;
+        // println!("mids: {:?}", query.iter().count());
+        let bezier_assets = bezier_curves
+            .iter()
+            .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
 
-                // TODO: this unwrap produces an error when two groups have been spawned and
-                // one gets despawned (ungrouped)
-                let group = groups.get(group_handle).unwrap();
+        for (mut transform, group_handle, shader_params_handle, GroupMiddleQuad(num_quads)) in
+            query.iter_mut()
+        {
+            if group_handle.id != last_handle_id {
+                t = 0.0;
+                last_handle_id = group_handle.id;
+            }
+            t = t + 1.0 / (num_quads.clone() as f32);
 
+            let mut shader_params = my_shader_params.get_mut(shader_params_handle).unwrap();
+
+            if let Some(group) = groups.get(group_handle) {
                 let t_time = (t as f64 + time.seconds_since_startup() * 0.02) % 1.0;
                 shader_params.t = t_time as f32;
                 // println!("time: {:?}", t_time);
 
-                let pos = group.compute_position_with_bezier(&bezier_curves, t_time);
+                let pos = group.compute_position_with_bezier(&bezier_assets, t_time);
 
                 let z = transform.translation.z;
                 transform.translation = Vec3::new(pos.x, pos.y, z);
             }
         }
     }
+    //     }
+    // }
 }
 
 pub fn move_bb_quads(
@@ -337,7 +350,7 @@ pub fn follow_bezier_group(
         Or<(With<FollowBezierAnimation>, With<TurnRoundAnimation>)>,
     >,
     groups: Res<Assets<Group>>,
-    curves: ResMut<Assets<Bezier>>,
+    curves: Res<Assets<Bezier>>,
     time: Res<Time>,
     globals: ResMut<Globals>,
 ) {
@@ -345,6 +358,10 @@ pub fn follow_bezier_group(
         for mut visible in visible_query.iter_mut() {
             visible.is_visible = true;
         }
+
+        let bezier_assets = curves
+            .iter()
+            .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
 
         for (mut transform, bezier_animation) in query.iter_mut() {
             let path_length = group.1.standalone_lut.path_length as f64;
@@ -358,7 +375,7 @@ pub fn follow_bezier_group(
             let road_line_offset = 4.0;
             let normal = group
                 .1
-                .compute_normal_with_bezier(&curves, t_time as f64)
+                .compute_normal_with_bezier(&bezier_assets, t_time as f64)
                 .normalize();
             pos += normal * road_line_offset;
 
@@ -371,7 +388,10 @@ pub fn follow_bezier_group(
                 .compute_position_with_lut(((t_time + 0.05 * multiplier) % 1.0) as f32);
             let further_normal = group
                 .1
-                .compute_normal_with_bezier(&curves, ((t_time + 0.05 * multiplier) % 1.0) as f64)
+                .compute_normal_with_bezier(
+                    &bezier_assets,
+                    ((t_time + 0.05 * multiplier) % 1.0) as f64,
+                )
                 .normalize();
 
             let forward_direction =

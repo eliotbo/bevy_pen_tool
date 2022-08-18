@@ -9,6 +9,8 @@ use crate::inputs::Action;
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
+use std::collections::HashMap;
+
 pub fn spawn_selection_bounding_box(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -93,12 +95,13 @@ pub fn spawn_group_entities(
     mut mids_shader_params: ResMut<Assets<BezierMidMat>>,
     clearcolor_struct: Res<ClearColor>,
     mut group_event_reader: EventReader<Handle<Group>>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
+    bezier_curves: ResMut<Assets<Bezier>>,
     maps: ResMut<Maps>,
     mut groups: ResMut<Assets<Group>>,
 ) {
     // Bounding Box for group
     for group_handle in group_event_reader.iter() {
+        println!("group_handle: {:?}", group_handle);
         let bb_group_size = Vec2::new(10.0, 10.0);
 
         let shader_params_handle_group_bb = my_shader_params.add(SelectionMat {
@@ -154,8 +157,12 @@ pub fn spawn_group_entities(
 
         let num_mid_quads = 50;
 
+        let bezier_assets = bezier_curves
+            .iter()
+            .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
+
         let group = groups.get_mut(&group_handle.clone()).unwrap();
-        group.group_lut(&mut bezier_curves, maps.bezier_map.clone());
+        group.group_lut(&bezier_assets, maps.bezier_map.clone());
 
         let first_bezier_handle = group.bezier_handles.iter().next().unwrap();
         let first_bezier = bezier_curves.get(first_bezier_handle).unwrap();

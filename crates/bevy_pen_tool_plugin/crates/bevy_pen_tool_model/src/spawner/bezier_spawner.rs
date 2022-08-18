@@ -1,18 +1,17 @@
 use crate::inputs::{Cursor, Latch};
 
-use crate::materials::{BezierControlsMat, BezierEndsMat, BezierMidMat, SelectionMat};
+use crate::materials::{BezierControlsMat, BezierEndsMat, SelectionMat};
 
 use crate::model::{
     AchorEdgeQuad, Anchor, AnchorEdge, Bezier, BezierHandleEntity, BezierHist, BezierId,
-    BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, Globals, HistoryAction,
-    LatchData, MainUi, Maps, MiddlePointQuad, MovingAnchor, SpawnMids, SpawningCurve,
+    BezierParent, BezierPositions, BoundingBoxQuad, ControlPointQuad, Globals, Group, GroupId,
+    HistoryAction, LatchData, MainUi, Maps, MovingAnchor, SpawningCurve,
 };
 
 use bevy::{asset::HandleId, prelude::*, sprite::MaterialMesh2dBundle};
 
 use std::collections::HashMap;
 
-// TODO: merge spawn_bezier_system and spawn_bezier
 pub fn spawn_bezier_system(
     mut bezier_curves: ResMut<Assets<Bezier>>,
     mut commands: Commands,
@@ -21,24 +20,16 @@ pub fn spawn_bezier_system(
     mut selection_params: ResMut<Assets<SelectionMat>>,
     mut controls_params: ResMut<Assets<BezierControlsMat>>,
     mut ends_params: ResMut<Assets<BezierEndsMat>>,
-    mut mid_params: ResMut<Assets<BezierMidMat>>,
     clearcolor_struct: Res<ClearColor>,
     mut globals: ResMut<Globals>,
     mut maps: ResMut<Maps>,
     mut latch_event_reader: EventReader<Latch>,
-    // mut user_state: ResMut<UserState>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
     mut spawn_curve_event_reader: EventReader<SpawningCurve>,
-    // mut move_quad_event_writer: EventWriter<MoveAnchorEvent>,
-    // cam_query: Query<&Transform, With<OrthographicProjection>>,
+    mut groups: ResMut<Assets<Group>>,
+    mut group_event_writer: EventWriter<Handle<Group>>,
 ) {
     let mut do_send_to_history = true;
-    // let mut do_move_anchor = false;
-    // let mut do_nothing = false;
-    // if let UserState::SpawningCurve {
-    //     bezier_hist: maybe_bezier_hist,
-    //     maybe_bezier_id,
-    // } = &*user_state
 
     for SpawningCurve {
         bezier_hist: maybe_bezier_hist,
@@ -69,9 +60,13 @@ pub fn spawn_bezier_system(
 
         let mut latches: HashMap<AnchorEdge, LatchData> = HashMap::new();
 
+        let mut group_id = GroupId::default();
+
+        let mut latch_received_bool: bool = false;
         for latch_received in latch_event_reader.iter() {
             //
-
+            latch_received_bool = true;
+            println!("latch received: {:?}", latch_received);
             start = latch_received.position;
             control_start = latch_received.control_point;
 
@@ -86,6 +81,8 @@ pub fn spawn_bezier_system(
             };
 
             latches.insert(AnchorEdge::Start, latch_local);
+
+            group_id = latch_received.group_id;
         }
 
         cursor.latch = Vec::new();
@@ -98,9 +95,10 @@ pub fn spawn_bezier_system(
                 control_end,
             },
             previous_positions: BezierPositions::default(),
+            latches,
             // move_quad: Anchor::End,
             id: default_spawner_id,
-            latches,
+            group: group_id,
             ..Default::default()
         };
 
@@ -116,16 +114,14 @@ pub fn spawn_bezier_system(
 
         bezier.update_previous_pos();
 
-        spawn_bezier(
+        let (entity, handle) = spawn_bezier(
             &mut bezier,
             &mut bezier_curves,
             &mut commands,
             &mut meshes,
-            // &mut my_shader_params,
             &mut selection_params,
             &mut controls_params,
             &mut ends_params,
-            &mut mid_params,
             clearcolor,
             &mut globals,
             &mut maps,
@@ -134,15 +130,37 @@ pub fn spawn_bezier_system(
             do_send_to_history,
             *follow_mouse,
         );
-    }
 
-    // // TODO: remove this
-    // let us = user_state.as_mut();
-    // if do_move_anchor {
-    //     *us = UserState::MovingAnchor;
-    // } else if do_nothing {
-    //     *us = UserState::Idle;
-    // }
+        if latch_received_bool {
+            //
+            // add curve to already existing group
+            //
+            let group_handle = maps
+                .group_map
+                .get(&bezier.group)
+                .expect("Could not find group id in group_map");
+            let group = groups.get_mut(&group_handle).unwrap();
+
+            group.add_curve(entity, handle);
+
+            group_event_writer.send(group_handle.clone());
+        } else {
+            //
+            // produce a new group
+            let mut group = Group::default();
+            group.add_curve(entity, handle.clone());
+
+            group.ends = Some(vec![
+                (handle.clone(), AnchorEdge::Start),
+                (handle.clone(), AnchorEdge::End),
+            ]);
+
+            let group_handle = groups.add(group);
+            maps.group_map.insert(bezier.group, group_handle.clone());
+
+            group_event_writer.send(group_handle.clone());
+        }
+    }
 }
 
 pub fn spawn_bezier(
@@ -153,7 +171,6 @@ pub fn spawn_bezier(
     selection_params: &mut ResMut<Assets<SelectionMat>>,
     controls_params: &mut ResMut<Assets<BezierControlsMat>>,
     ends_params: &mut ResMut<Assets<BezierEndsMat>>,
-    mid_params: &mut ResMut<Assets<BezierMidMat>>,
     clearcolor: Color,
     globals: &mut ResMut<Globals>,
     maps: &mut ResMut<Maps>,
@@ -166,9 +183,6 @@ pub fn spawn_bezier(
 
     let ends_controls_mesh_handle = maps.mesh_handles["ends_controls"].clone();
     let ends_mesh_handle = maps.mesh_handles["ends"].clone();
-    let middle_mesh_handle = maps.mesh_handles["middles"].clone();
-
-    let num_mid_quads = globals.num_points_on_curve;
 
     let mut color = Color::hex("3CB44B").unwrap();
 
@@ -198,26 +212,21 @@ pub fn spawn_bezier(
     let bb_size = bound1 - bound0;
     let bb_pos = (bound1 + bound0) / 2.0;
 
-    // let mut start_pt_pos = bezier.positions.start - bb_pos;
-    // let mut end_pt_pos = bezier.positions.end - bb_pos;
-
     let mut start_pt_pos = bezier.positions.start;
     let mut end_pt_pos = bezier.positions.end;
 
-    let ctr0_pos = bezier.positions.control_start; // - bb_pos;
-                                                   // let ctr1_pos = bezier.positions.control_end - bb_pos;
+    let ctr0_pos = bezier.positions.control_start;
+    // let ctr1_pos = bezier.positions.control_end - bb_pos;
     let ctr1_pos = bezier.positions.control_end;
 
     let mesh_handle_bb =
         bevy::sprite::Mesh2dHandle(meshes.add(Mesh::from(shape::Quad::new(bigger_size))));
 
-    // since bezier is cloned, be careful about modifying it after the cloning, it won't have any side-effects
+    // since bezier is cloned, be careful about modifying it after the cloning,
+    // it won't have any side-effects
     let bezier_handle = if let Some(b_id) = maybe_bezier_id {
-        // handle.clone()
-        // let handle_entity = maps.bezier_map.get(b_id).unwrap().clone();
         bezier_curves.set(b_id.0, bezier.clone())
     } else {
-        // bezier_curves.add(bezier.clone())
         let handle_id: HandleId = bezier.id.0.into();
         bezier_curves.set(handle_id, bezier.clone())
     };
@@ -254,8 +263,6 @@ pub fn spawn_bezier(
 
     init_pos.scale = Vec3::new(globals.scale, globals.scale, 1.0);
 
-    // TODO: remove BezierGrandParent and replace by BezierParent everywhere
-    // This is the parent of every entity belonging to a rendered bezier curve.
     let parent = commands
         .spawn_bundle((
             BezierParent,
@@ -270,11 +277,8 @@ pub fn spawn_bezier(
 
     if do_send_to_history {
         add_to_history_event_writer.send(HistoryAction::SpawnedCurve {
-            // bezier_handle: bezier_handle.clone(),
             bezier_id: bezier.id.into(),
             bezier_hist: BezierHist::from(&bezier.clone()),
-            // entity: parent,
-            // id: bezier.id,
         });
 
         // send the latch to history
@@ -293,8 +297,6 @@ pub fn spawn_bezier(
             });
         }
     }
-
-    // println!("spawned bezier curve with id: {:?}", bezier.latches);
 
     let bbquad_entity = commands
         // let parent = commands
@@ -340,7 +342,6 @@ pub fn spawn_bezier(
         .spawn_bundle(MaterialMesh2dBundle {
             mesh: ends_mesh_handle.clone(),
             visibility: visible_anchors.clone(),
-            // render_pipelines: render_piplines_ends.clone(),
             transform: start_pt_transform,
             material: ends_params_handle.clone(),
             ..Default::default()
@@ -352,7 +353,6 @@ pub fn spawn_bezier(
             once: true,
             follow_mouse: false,
         })
-        // .insert(shader_params_handle_bb.clone())
         .id();
 
     commands.entity(parent).push_children(&[child_start]);
@@ -363,10 +363,7 @@ pub fn spawn_bezier(
             visibility: visible_anchors.clone(),
             transform: end_pt_transform,
             material: ends_params_handle.clone(),
-            // render_pipelines: render_piplines_ends.clone(),
-            // RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-            //     pipeline_handle.clone(),
-            // )]),
+
             ..Default::default()
         })
         .insert(AchorEdgeQuad(AnchorEdge::End))
@@ -378,18 +375,11 @@ pub fn spawn_bezier(
             follow_mouse,
         })
         .insert(bezier_handle.clone())
-        // .insert(shader_params_handle_bb.clone())
         .id();
 
     commands.entity(parent).push_children(&[child_end]);
 
-    // let ctrl_render_piplines =
-    //     RenderPipelines::from_pipelines(vec![RenderPipeline::new(ctrl_pipeline_handle)]);
-
-    let mut visible_ctrl = Visibility {
-        is_visible: true,
-        // is_transparent: true,
-    };
+    let mut visible_ctrl = Visibility { is_visible: true };
     if globals.hide_control_points {
         visible_ctrl.is_visible = true;
     };
@@ -486,99 +476,99 @@ pub fn spawn_bezier(
         },
     );
 
-    //////////////////// Small moving rings aka middle quads ////////////////////
-    let visible = Visibility { is_visible: true };
+    // //////////////////// Small moving rings aka middle quads ////////////////////
+    // let visible = Visibility { is_visible: true };
 
-    let vrange: Vec<f32> = (0..num_mid_quads)
-        .map(|x| ((x as f32) / (num_mid_quads as f32 - 1.0) - 0.5) * 2.0 * 50.0)
-        .collect();
+    // let vrange: Vec<f32> = (0..num_mid_quads)
+    //     .map(|x| ((x as f32) / (num_mid_quads as f32 - 1.0) - 0.5) * 2.0 * 50.0)
+    //     .collect();
 
-    let mut z = 0.0;
-    let mut x = -20.0;
+    // let mut z = 0.0;
+    // let mut x = -20.0;
 
-    for _t in vrange {
-        let mid_shader_params_handle = mid_params.add(BezierMidMat {
-            color: color.into(),
-            t: 0.5,
-            zoom: 1.0 / globals.scale,
-            size: Vec2::new(1.0, 1.0) * globals.scale,
-            clearcolor: clearcolor.clone().into(),
-            ..Default::default()
-        });
+    // for _t in vrange {
+    //     let mid_shader_params_handle = mid_params.add(BezierMidMat {
+    //         color: color.into(),
+    //         t: 0.5,
+    //         zoom: 1.0 / globals.scale,
+    //         size: Vec2::new(1.0, 1.0) * globals.scale,
+    //         clearcolor: clearcolor.clone().into(),
+    //         ..Default::default()
+    //     });
 
-        x = x + 2.0;
-        z = z + 10.0;
-        let child = commands
-            // // left
-            .spawn_bundle(MaterialMesh2dBundle {
-                mesh: middle_mesh_handle.clone(),
-                visibility: visible.clone(),
-                // render_pipelines: render_piplines.clone(),
-                transform: Transform::from_translation(start_pt_pos.extend(globals.z_pos.middles)),
-                material: mid_shader_params_handle,
-                ..Default::default()
-            })
-            .insert(MiddlePointQuad)
-            .insert(bezier_handle.clone())
-            // .insert(mid_shader_params_handle.clone())
-            .id();
+    //     x = x + 2.0;
+    //     z = z + 10.0;
+    //     let child = commands
+    //         // // left
+    //         .spawn_bundle(MaterialMesh2dBundle {
+    //             mesh: middle_mesh_handle.clone(),
+    //             visibility: visible.clone(),
+    //             // render_pipelines: render_piplines.clone(),
+    //             transform: Transform::from_translation(start_pt_pos.extend(globals.z_pos.middles)),
+    //             material: mid_shader_params_handle,
+    //             ..Default::default()
+    //         })
+    //         .insert(MiddlePointQuad)
+    //         .insert(bezier_handle.clone())
+    //         // .insert(mid_shader_params_handle.clone())
+    //         .id();
 
-        commands.entity(parent).push_children(&[child]);
-    }
+    //     commands.entity(parent).push_children(&[child]);
+    // }
 
     return (parent, bezier_handle);
 }
 
-pub fn spawn_middle_quads(
-    mut commands: Commands,
-    globals: Res<Globals>,
-    mut mid_params: ResMut<Assets<BezierMidMat>>,
-    clearcolor: Res<ClearColor>,
-    maps: Res<Maps>,
-    mut spawn_mids_event: EventReader<SpawnMids>,
-) {
-    for spawn_mids in spawn_mids_event.iter() {
-        let middle_mesh_handle = maps.mesh_handles["middles"].clone();
-        let num_mid_quads = globals.num_points_on_curve;
+// pub fn spawn_middle_quads(
+//     mut commands: Commands,
+//     globals: Res<Globals>,
+//     mut mid_params: ResMut<Assets<BezierMidMat>>,
+//     clearcolor: Res<ClearColor>,
+//     maps: Res<Maps>,
+//     mut spawn_mids_event: EventReader<SpawnMids>,
+// ) {
+//     for spawn_mids in spawn_mids_event.iter() {
+//         // let middle_mesh_handle = maps.mesh_handles["middles"].clone();
+//         // let num_mid_quads = globals.num_points_on_curve;
 
-        let visible = Visibility { is_visible: true };
+//         // let visible = Visibility { is_visible: true };
 
-        let vrange: Vec<f32> = (0..num_mid_quads)
-            .map(|x| ((x as f32) / (num_mid_quads as f32 - 1.0) - 0.5) * 2.0 * 50.0)
-            .collect();
+//         // let vrange: Vec<f32> = (0..num_mid_quads)
+//         //     .map(|x| ((x as f32) / (num_mid_quads as f32 - 1.0) - 0.5) * 2.0 * 50.0)
+//         //     .collect();
 
-        let mut z = 0.0;
-        let mut x = -20.0;
-        for _t in vrange {
-            let mid_shader_params_handle = mid_params.add(BezierMidMat {
-                color: spawn_mids.color.into(),
-                t: 0.5,
-                zoom: 1.0 / globals.scale,
-                size: Vec2::new(1.0, 1.0) * globals.scale,
-                clearcolor: clearcolor.0.clone().into(),
-                ..Default::default()
-            });
+//         // let mut z = 0.0;
+//         // let mut x = -20.0;
+//         // for _t in vrange {
+//         //     let mid_shader_params_handle = mid_params.add(BezierMidMat {
+//         //         color: spawn_mids.color.into(),
+//         //         t: 0.5,
+//         //         zoom: 1.0 / globals.scale,
+//         //         size: Vec2::new(1.0, 1.0) * globals.scale,
+//         //         clearcolor: clearcolor.0.clone().into(),
+//         //         ..Default::default()
+//         //     });
 
-            x = x + 2.0;
-            z = z + 10.0;
-            let child = commands
-                // // left
-                .spawn_bundle(MaterialMesh2dBundle {
-                    mesh: middle_mesh_handle.clone(),
-                    visibility: visible.clone(),
-                    // render_pipelines: render_piplines.clone(),
-                    transform: Transform::from_xyz(0.0, 0.0, globals.z_pos.middles),
-                    material: mid_shader_params_handle,
-                    ..Default::default()
-                })
-                .insert(MiddlePointQuad)
-                .insert(spawn_mids.bezier_handle.clone())
-                // .insert(mid_shader_params_handle.clone())
-                .id();
+//         //     x = x + 2.0;
+//         //     z = z + 10.0;
+//         //     let child = commands
+//         //         // // left
+//         //         .spawn_bundle(MaterialMesh2dBundle {
+//         //             mesh: middle_mesh_handle.clone(),
+//         //             visibility: visible.clone(),
+//         //             // render_pipelines: render_piplines.clone(),
+//         //             transform: Transform::from_xyz(0.0, 0.0, globals.z_pos.middles),
+//         //             material: mid_shader_params_handle,
+//         //             ..Default::default()
+//         //         })
+//         //         .insert(MiddlePointQuad)
+//         //         .insert(spawn_mids.bezier_handle.clone())
+//         //         // .insert(mid_shader_params_handle.clone())
+//         //         .id();
 
-            commands
-                .entity(spawn_mids.parent_entity)
-                .push_children(&[child]);
-        }
-    }
-}
+//         //     commands
+//         //         .entity(spawn_mids.parent_entity)
+//         //         .push_children(&[child]);
+//         // }
+//     }
+// }

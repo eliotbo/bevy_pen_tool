@@ -21,6 +21,8 @@ pub type LutDistance = Vec<f64>;
 // map from t-values (between 0 and 1) to point on Bezier curve
 type LutPosition = Vec<Vec2>;
 
+pub struct ComputeGroupLut(pub GroupId);
+
 #[derive(Component)]
 pub struct GroupMiddleQuad(pub usize);
 
@@ -61,7 +63,7 @@ pub struct Group {
     // the AnchorEdge is the starting
     pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), LutDistance)>,
     pub standalone_lut: StandaloneLut,
-    pub group_id: GroupId,
+    pub id: GroupId,
 }
 
 impl Default for Group {
@@ -76,14 +78,35 @@ impl Default for Group {
                 path_length: 0.0,
                 lut: Vec::new(),
             },
-            group_id: GroupId::default(),
+            id: GroupId::default(),
             // ..Default::default() // group_id: HandleId::default(),
         }
     }
 }
 
 impl Group {
-    pub fn into_group_save(&self, bezier_curves: &mut ResMut<Assets<Bezier>>) -> GroupSaveLoad {
+    pub fn add_curve(&mut self, curve_entity: Entity, curve_handle: Handle<Bezier>) {
+        self.group.insert((curve_entity, curve_handle.clone()));
+        self.bezier_handles.insert(curve_handle.clone());
+    }
+
+    pub fn remove_curve(
+        &mut self,
+        bezier_handle_entity: &BezierHandleEntity,
+        bezier_curves: &BezierAssets, //&Res<Assets<Bezier>>,
+        id_handle_map: HashMap<BezierId, BezierHandleEntity>,
+    ) {
+        self.bezier_handles.remove(&bezier_handle_entity.handle);
+        self.group.remove(&(
+            bezier_handle_entity.entity,
+            bezier_handle_entity.handle.clone(),
+        ));
+        self.find_connected_ends(bezier_curves, id_handle_map.clone());
+        self.group_lut(bezier_curves, id_handle_map.clone());
+        self.compute_standalone_lut(bezier_curves, 1000);
+    }
+
+    pub fn into_group_save(&self, bezier_curves: &Res<Assets<Bezier>>) -> GroupSaveLoad {
         let mut lut = Vec::new();
         for (handle, anchor, t_ends, local_lut) in self.lut.iter() {
             let mut bezier = bezier_curves.get(&handle.clone()).unwrap().clone();
@@ -103,7 +126,7 @@ impl Group {
 
     pub fn find_connected_ends(
         &mut self,
-        bezier_curves: &mut ResMut<Assets<Bezier>>,
+        bezier_curves: &BezierAssets, //&Res<Assets<Bezier>>,
         id_handle_map: HashMap<BezierId, BezierHandleEntity>,
     ) {
         //
@@ -117,12 +140,13 @@ impl Group {
         handles.remove(&handle);
 
         // TODO: is this really a good way of clone assets?
-        let bezier_curve_hack = bezier_curves
-            .iter()
-            .map(|(s, x)| (s.clone(), x.clone()))
-            .collect::<HashMap<HandleId, Bezier>>();
+        let bezier_curve_hack = bezier_curves.clone();
+        // bezier_curves
+        //     .iter()
+        //     .map(|(s, x)| (s.clone(), x.clone()))
+        //     .collect::<HashMap<HandleId, Bezier>>();
 
-        let initial_bezier = bezier_curves.get_mut(&handle.clone()).unwrap();
+        let initial_bezier = bezier_curves.get(&handle.id).unwrap();
 
         let anchors_temp = vec![AnchorEdge::Start, AnchorEdge::End];
         let anchors = anchors_temp
@@ -180,7 +204,8 @@ impl Group {
 
     pub fn group_lut(
         &mut self,
-        bezier_curves: &mut ResMut<Assets<Bezier>>,
+        // bezier_curves: HashMap<bevy::asset::HandleId, &Bezier>,
+        bezier_curves: &BezierAssets,
         id_handle_map: HashMap<BezierId, BezierHandleEntity>,
     ) {
         // if the group is connected with latches, then go ahead and group
@@ -198,7 +223,7 @@ impl Group {
 
             let mut sorted_handles: Vec<Handle<Bezier>> = vec![starting_handle.clone()];
 
-            let initial_bezier = bezier_curves.get(&starting_handle.clone()).unwrap();
+            let initial_bezier = bezier_curves.get(&starting_handle.id).unwrap();
             //
             luts.push((
                 initial_bezier.lut.clone(),
@@ -229,7 +254,7 @@ impl Group {
                         break;
                     }
 
-                    let bezier_next = bezier_curves.get(&next_curve_handle.clone()).unwrap();
+                    let bezier_next = bezier_curves.get(&next_curve_handle.id).unwrap();
                     sorted_handles.push(next_curve_handle.clone());
                     luts.push((
                         bezier_next.lut.clone(),
@@ -273,11 +298,7 @@ impl Group {
         }
     }
 
-    pub fn compute_position_with_bezier(
-        &self,
-        bezier_curves: &ResMut<Assets<Bezier>>,
-        t: f64,
-    ) -> Vec2 {
+    pub fn compute_position_with_bezier(&self, bezier_curves: &BezierAssets, t: f64) -> Vec2 {
         let mut curve_index = 0;
         let mut pos: Vec2 = Vec2::ZERO;
         //
@@ -292,7 +313,7 @@ impl Group {
         //
         if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
             //
-            let bezier = bezier_curves.get(&handle.clone()).unwrap();
+            let bezier = bezier_curves.get(&handle.id).unwrap();
 
             // some of this code is shared with move_middle_quads()
             let curve = bezier.to_curve();
@@ -320,11 +341,7 @@ impl Group {
         return pos;
     }
 
-    pub fn compute_normal_with_bezier(
-        &self,
-        bezier_curves: &ResMut<Assets<Bezier>>,
-        t: f64,
-    ) -> Vec2 {
+    pub fn compute_normal_with_bezier(&self, bezier_curves: &BezierAssets, t: f64) -> Vec2 {
         let mut curve_index = 0;
 
         #[allow(unused_assignments)]
@@ -339,7 +356,7 @@ impl Group {
         }
         let mut s = 1.0;
         if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
-            let bezier = bezier_curves.get(&handle.clone()).unwrap();
+            let bezier = bezier_curves.get(&handle.id).unwrap();
 
             // some of this code is shared with move_middle_quads()
             let curve = bezier.to_curve();
@@ -373,14 +390,10 @@ impl Group {
         return normal;
     }
 
-    pub fn compute_standalone_lut(
-        &mut self,
-        bezier_curves: &ResMut<Assets<Bezier>>,
-        num_points: u32,
-    ) {
+    pub fn compute_standalone_lut(&mut self, bezier_curves: &BezierAssets, num_points: u32) {
         let mut total_length: f32 = 0.0;
         for lut in self.lut.clone() {
-            let bezier = bezier_curves.get(&lut.0).unwrap();
+            let bezier = bezier_curves.get(&lut.0.id).unwrap();
             total_length += bezier.length();
         }
 
@@ -413,10 +426,10 @@ impl Group {
     }
 
     // compute the average position of the anchors making up the group
-    pub fn center_of_mass(&self, bezier_curves: &ResMut<Assets<Bezier>>) -> Vec2 {
+    pub fn center_of_mass(&self, bezier_curves: &BezierAssets) -> Vec2 {
         let mut center_of_mass = Vec2::ZERO;
         for (handle, anchor, _t_range, _lut) in &self.lut {
-            let bezier = bezier_curves.get(&handle.clone()).unwrap();
+            let bezier = bezier_curves.get(&handle.id).unwrap();
             // center_of_mass += bezier.center_of_mass();
             let pos = match anchor {
                 AnchorEdge::Start => bezier.positions.start,

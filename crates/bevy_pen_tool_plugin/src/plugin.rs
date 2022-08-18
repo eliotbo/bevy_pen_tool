@@ -15,8 +15,10 @@ pub struct BevyPenToolPlugin;
 
 // TODO
 
-// 3) selecting multiple items
-// 7) automatically group latched curves
+// 0) unlatch bezier that is part of group
+// 7) automatically group latched curves --
+//      every chain is a group, even when it is just one curve
+//      unlatching produces two new groups
 
 // 1) use UI camera
 // 2) disable and hide color picking
@@ -29,6 +31,8 @@ pub struct BevyPenToolPlugin;
 // 11) make io a feature
 // 12) replace middle quads with line segments
 
+// 13) scale meshes
+
 impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(PenApiPlugin)
@@ -37,12 +41,15 @@ impl Plugin for BevyPenToolPlugin {
             .add_event::<GroupBoxEvent>()
             .add_event::<SpawningCurve>()
             .add_event::<SpawnCurve>()
+            .add_event::<UnlatchEvent>()
             .insert_resource(History::default())
             .add_startup_system(set_window_position)
             //
             .add_system(debug)
             .add_system(remove_all_moving_quad)
             .add_system(check_mouse_on_meshes)
+            .add_system(unlatchy)
+            .add_system(compute_group_lut)
             //
             // Update model
             .add_system_set(
@@ -59,7 +66,7 @@ impl Plugin for BevyPenToolPlugin {
                     .with_system(delete)
                     .with_system(hide_control_points)
                     .with_system(unselect)
-                    .with_system(ungroup)
+                    .with_system(ungroupy)
                     .with_system(undo)
                     .with_system(redo)
                     .with_system(redo_effects)
@@ -216,11 +223,37 @@ impl GroupPrint {
 //     });
 // }
 
+// pub fn compute_group_lut(
+//     // mut commands: Commands,
+//     bezier_curves: Res<Assets<Bezier>>,
+//     mut groups: ResMut<Assets<Group>>,
+//     mut group_lut_event_reader: EventReader<ComputeGroupLut>,
+//     maps: Res<Maps>,
+//     globals: Res<Globals>,
+// ) {
+//     for group_lut_event in group_lut_event_reader.iter() {
+//         if let Some(group_handle) = maps.group_map.get(&group_lut_event.0) {
+//             let group = groups.get_mut(group_handle).unwrap();
+
+//             let bezier_assets = bezier_curves
+//                 .iter()
+//                 .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
+
+//             group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
+//             group.group_lut(&bezier_assets, maps.bezier_map.clone());
+//             group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
+//             println!("group lut computed");
+//         }
+//     }
+// }
+
 fn debug(
     keyboard_input: Res<Input<KeyCode>>,
     query: Query<&Handle<Bezier>, With<BezierParent>>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    groups: Res<Assets<Group>>,
+    maps: Res<Maps>,
+    globals: Res<Globals>,
+    mut groups: ResMut<Assets<Group>>,
     // mids_groups: Query<&GroupMiddleQuad>,
     // maps: Res<Maps>,
     // history: Res<History>,
@@ -236,9 +269,9 @@ fn debug(
             let bezier = bezier_curves.get_mut(handle).unwrap();
             // action_event_writer.send(Action::ComputeLut);
 
-            // println!("group id: {:?}", bezier.group);
-            // println!("latches: {:#?}", BezierPrint::from_bezier(bezier).latches);
-            println!("potential latche: {:#?}", bezier.potential_latch);
+            println!("group id: {:?}", bezier.group);
+            println!("latches: {:#?}", BezierPrint::from_bezier(bezier).latches);
+            // println!("potential latche: {:#?}", bezier.potential_latch);
         }
 
         // println!("mids: {:?}", mids_groups.iter().count());
@@ -252,10 +285,18 @@ fn debug(
     if keyboard_input.just_pressed(KeyCode::G) {
         // println!("'B' currently pressed");
         println!("groups: {:#?}", groups.iter().count());
-        for (_, _group) in groups.iter() {
+        for (_, group) in groups.iter_mut() {
             // let bezier = bezier_curves.get_mut(handle).unwrap();
 
-            // println!("group: {:#?}", GroupPrint::from_group(group));
+            let bezier_assets = bezier_curves
+                .iter()
+                .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
+
+            group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
+            group.group_lut(&bezier_assets, maps.bezier_map.clone());
+            group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
+
+            println!("group: {:#?}", GroupPrint::from_group(group));
             // println!("");
         }
     }

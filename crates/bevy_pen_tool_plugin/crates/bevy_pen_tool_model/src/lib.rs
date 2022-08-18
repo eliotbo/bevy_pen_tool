@@ -31,6 +31,7 @@ impl Plugin for SpawnerPlugin {
             .add_event::<HistoryAction>()
             .add_event::<ComputeLut>()
             .add_event::<RedoDelete>()
+            .add_event::<ComputeGroupLut>()
             // .add_plugin(ColoredMesh2dPlugin) // mesh making
             .add_plugin(RoadMesh2dPlugin)
             .add_plugin(FillMesh2dPlugin)
@@ -58,7 +59,7 @@ impl Plugin for SpawnerPlugin {
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
                     .label("spawner")
-                    .with_system(spawn_middle_quads)
+                    // .with_system(spawn_middle_quads)
                     .with_system(spawn_bezier_system)
                     .with_system(spawn_group_entities)
                     .with_system(spawn_heli)

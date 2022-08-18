@@ -6,6 +6,7 @@ use bevy_pen_tool_model::spawn_bezier;
 
 use bevy::prelude::*;
 
+use std::collections::HashMap;
 use std::collections::HashSet;
 
 use std::fs::File;
@@ -13,7 +14,7 @@ use std::io::Read;
 use std::io::Write;
 
 pub fn save(
-    mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut bezier_curves: Res<Assets<Bezier>>,
     group_query: Query<&Handle<Group>, With<GroupParent>>,
     // // mesh_query: Query<(&Handle<Mesh>, &GroupMesh)>,
     // road_mesh_query: Query<(&Handle<Mesh>, &RoadMesh)>,
@@ -52,7 +53,11 @@ pub fn save(
             ////////////// start. Save Group look-up table
             let lut_dialog_result = open_file_dialog("my_group", "look_up_tables", ".lut");
             if let Some(lut_path) = lut_dialog_result {
-                group.compute_standalone_lut(&mut bezier_curves, globals.group_lut_num_points);
+                let bezier_assets = bezier_curves
+                    .iter()
+                    .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
+
+                group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
                 let lut_serialized = serde_json::to_string_pretty(&group.standalone_lut).unwrap();
                 // let lut_path = "assets/lut/my_group_lut.txt";
                 let mut lut_output = File::create(&lut_path).unwrap();
@@ -62,7 +67,7 @@ pub fn save(
             ////////////// start. Save Group
             let group_dialog_result = open_file_dialog("my_group", "groups", ".group");
             if let Some(group_path) = group_dialog_result {
-                group_vec.push(group.into_group_save(&mut bezier_curves).clone());
+                group_vec.push(group.into_group_save(&bezier_curves).clone());
                 // }
 
                 let serialized = serde_json::to_string_pretty(&group_vec).unwrap();
@@ -111,7 +116,7 @@ pub fn load(
     mut selection_params: ResMut<Assets<SelectionMat>>,
     mut controls_params: ResMut<Assets<BezierControlsMat>>,
     mut ends_params: ResMut<Assets<BezierEndsMat>>,
-    mut mid_params: ResMut<Assets<BezierMidMat>>,
+    // mut mid_params: ResMut<Assets<BezierMidMat>>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Load) {
@@ -165,7 +170,7 @@ pub fn load(
                 path_length: 0.0,
                 lut: Vec::new(),
             },
-            group_id: id,
+            id,
         };
 
         for group_load_save in loaded_groups_vec {
@@ -178,7 +183,7 @@ pub fn load(
                     &mut selection_params,
                     &mut controls_params,
                     &mut ends_params,
-                    &mut mid_params,
+                    // &mut mid_params,
                     clearcolor,
                     &mut globals,
                     &mut maps,

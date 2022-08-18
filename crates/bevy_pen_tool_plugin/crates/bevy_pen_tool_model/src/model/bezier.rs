@@ -17,6 +17,8 @@ use flo_curves::*;
 
 use bevy_inspector_egui::Inspectable;
 
+pub type BezierAssets<'a> = HashMap<bevy::asset::HandleId, &'a Bezier>;
+
 pub struct SpawnCurve {
     pub positions: BezierPositions,
 }
@@ -68,6 +70,12 @@ pub struct MoveAnchorEvent {
     pub anchor: Anchor,
     pub unlatch: bool,
     pub once: bool, // if true, MovingQuad will be removed after a single frame
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnlatchEvent {
+    pub bezier_id: BezierId,
+    pub anchor: Anchor,
 }
 
 pub struct RemoveMovingQuadEvent(Anchor);
@@ -382,22 +390,22 @@ pub struct Bezier {
     pub id: BezierId,
     pub latches: HashMap<AnchorEdge, LatchData>,
     pub potential_latch: Option<LatchData>,
-    pub group: Option<GroupId>,
+    pub group: GroupId,
 }
 
 impl Default for Bezier {
     fn default() -> Self {
         Bezier {
             do_compute_lut: true,
+            // move_quad: Anchor::default(),
+            color: None,
+            potential_latch: None,
+            group: GroupId::default(),
+            lut: LutDistance::default(),
             latches: HashMap::new(),
             id: BezierId::default(),
             positions: BezierPositions::default(),
             previous_positions: BezierPositions::default(),
-            // move_quad: Anchor::default(),
-            color: None,
-            lut: LutDistance::default(),
-            potential_latch: None,
-            group: None,
             // ..Default::default()
         }
     }
@@ -657,6 +665,7 @@ impl Bezier {
                 latchee_id: self.id,
                 latcher_id: BezierId::default(),
                 latchee_edge: AnchorEdge::Start,
+                group_id: self.group,
             },
             AnchorEdge::End => Latch {
                 position: self.positions.end,
@@ -664,6 +673,7 @@ impl Bezier {
                 latchee_id: self.id,
                 latcher_id: BezierId::default(),
                 latchee_edge: AnchorEdge::End,
+                group_id: self.group,
             },
         }
     }
@@ -789,6 +799,23 @@ impl Bezier {
     }
 }
 
+// let mut visited = HashSet::new();
+// let mut queue = VecDeque::new();
+// queue.push_back(self.id);
+// while let Some(id) = queue.pop_front() {
+//     if visited.contains(&id) {
+//         continue;
+//     }
+//     visited.insert(id);
+//     let curve = &bezier_curves[id];
+//     for edge in [AnchorEdge::Start, AnchorEdge::End].iter() {
+//         if let Some(latch) = curve.latches.get(edge) {
+//             queue.push_back(latch.latched_to_id);
+//         }
+//     }
+// }
+// self.chained_curves = visited;
+
 pub type AnchorEntities = HashMap<Anchor, Entity>;
 
 #[derive(Clone, Debug)]
@@ -797,3 +824,47 @@ pub struct BezierHandleEntity {
     pub entity: Entity,
     pub anchor_entities: AnchorEntities,
 }
+
+pub fn find_chained_curves(
+    first_bezier: &Bezier,
+    bezier_curves: &BezierAssets,
+    id_handle_map: HashMap<BezierId, BezierHandleEntity>,
+    mut next_anchor_edge: AnchorEdge,
+) -> Vec<BezierHandleEntity> {
+    //
+    let self_handle_entity = id_handle_map[&first_bezier.id].clone();
+    let mut chained_curves = vec![self_handle_entity];
+    let mut current_curve = first_bezier.clone();
+    //
+    loop {
+        let maybe_latch = current_curve.latches.get(&next_anchor_edge);
+
+        if let Some(latch) = maybe_latch {
+            // the next anchor edge is the anchor edge opposite to known latched edge
+            next_anchor_edge = latch.partners_edge.other();
+
+            let next_handle_entity = id_handle_map[&latch.latched_to_id].clone();
+
+            // find the next curve
+            let next_curve = bezier_curves
+                .get(&next_handle_entity.handle.id)
+                .unwrap()
+                .clone();
+
+            // add next curve to the list
+            chained_curves.push(next_handle_entity);
+
+            current_curve = next_curve.clone();
+        } else {
+            break;
+        }
+    }
+
+    return chained_curves;
+}
+
+// pub struct LatchData {
+//     pub latched_to_id: BezierId,
+//     pub self_edge: AnchorEdge,
+//     pub partners_edge: AnchorEdge,
+// }
