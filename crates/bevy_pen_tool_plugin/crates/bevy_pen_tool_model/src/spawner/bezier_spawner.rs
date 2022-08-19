@@ -160,7 +160,7 @@ pub fn spawn_bezier_system(
             // group.group_lut(&bezier_assets, maps.bezier_map.clone());
             // group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
 
-            group_event_writer.send(group_handle.clone());
+            // group_event_writer.send(group_handle.clone());
             // group_lut_event_writer.send(ComputeGroupLut(group.id));
         } else {
             // produce a new group
