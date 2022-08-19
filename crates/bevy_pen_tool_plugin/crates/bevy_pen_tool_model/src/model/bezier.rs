@@ -208,7 +208,7 @@ pub struct BezierParent;
 #[derive(Component)]
 pub struct GroupParent;
 
-pub struct Loaded;
+pub struct Loaded(pub Group);
 
 #[derive(Component)]
 pub struct AchorEdgeQuad(pub AnchorEdge);
@@ -391,6 +391,7 @@ pub struct Bezier {
     pub latches: HashMap<AnchorEdge, LatchData>,
     pub potential_latch: Option<LatchData>,
     pub group: GroupId,
+    pub entity: Option<Entity>,
 }
 
 impl Default for Bezier {
@@ -406,6 +407,7 @@ impl Default for Bezier {
             id: BezierId::default(),
             positions: BezierPositions::default(),
             previous_positions: BezierPositions::default(),
+            entity: None,
             // ..Default::default()
         }
     }

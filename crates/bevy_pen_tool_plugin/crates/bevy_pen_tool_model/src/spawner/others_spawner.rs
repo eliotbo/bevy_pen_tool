@@ -162,6 +162,8 @@ pub fn spawn_group_entities(
             .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
 
         let group = groups.get_mut(&group_handle.clone()).unwrap();
+        group.entity = Some(parent_id);
+
         group.group_lut(&bezier_assets, maps.bezier_map.clone());
 
         let first_bezier_handle = group.bezier_handles.iter().next().unwrap();

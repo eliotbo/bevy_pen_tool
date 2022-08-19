@@ -32,6 +32,7 @@ pub struct BevyPenToolPlugin;
 // 12) replace middle quads with line segments
 
 // 13) scale meshes
+// 14) no_std
 
 impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {
@@ -54,9 +55,8 @@ impl Plugin for BevyPenToolPlugin {
             // Update model
             .add_system_set(
                 SystemSet::on_update("ModelViewController")
-                    .with_system(groupy.label("group"))
-                    .with_system(load.after("group"))
-                    .with_system(save)
+                    // .with_system(groupy)
+                    // .with_system(ungroupy)
                     .with_system(latchy)
                     .with_system(update_lut)
                     .with_system(officiate_latch_partnership)
@@ -66,13 +66,18 @@ impl Plugin for BevyPenToolPlugin {
                     .with_system(delete)
                     .with_system(hide_control_points)
                     .with_system(unselect)
-                    .with_system(ungroupy)
                     .with_system(undo)
                     .with_system(redo)
                     .with_system(redo_effects)
                     .with_system(add_to_history)
                     .with_system(update_anchors.exclusive_system().at_end())
                     .label("model"),
+            )
+            .add_system_set(
+                SystemSet::on_update("ModelViewController")
+                    .with_system(load)
+                    .with_system(save)
+                    .after("model"),
             )
             //
             // Update view

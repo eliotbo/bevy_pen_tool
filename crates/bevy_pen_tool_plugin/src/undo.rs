@@ -8,6 +8,8 @@ use bevy::prelude::*;
 
 use bevy_inspector_egui::Inspectable;
 
+use std::collections::HashSet;
+
 #[derive(Debug, Clone, Inspectable)]
 pub struct HistoryLenInspector {
     pub length: usize,
@@ -182,6 +184,7 @@ pub fn undo(
     mut commands: Commands,
     mut history: ResMut<History>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
+    mut groups: ResMut<Assets<Group>>,
     mut action_event_reader: EventReader<Action>,
     maps: ResMut<Maps>,
     mut spawn_curve_event_writer: EventWriter<SpawningCurve>,
@@ -218,6 +221,15 @@ pub fn undo(
                 bezier_hist: _,
             } => {
                 if let Some(handle_entity) = maps.bezier_map.get(&bezier_id.into()) {
+                    if let Some(bezier) = bezier_curves.get_mut(&handle_entity.handle) {
+                        if let Some(group_handle) = maps.group_map.get(&bezier.group) {
+                            let group = groups.get(group_handle).unwrap();
+
+                            if let Some(group_entity) = group.entity {
+                                commands.entity(group_entity).despawn_recursive();
+                            }
+                        }
+                    }
                     commands.entity(handle_entity.entity).despawn_recursive();
                 }
             }
@@ -323,11 +335,9 @@ pub fn redo_effects(
         // to delete a curve, we programmatically select the curve and send
         // an Action::Delete event
         if let Some(handle_entity) = maps.bezier_map.get(&redo_delete.bezier_id) {
-            let mut new_group = Group::default();
-            new_group
-                .group
-                .insert((handle_entity.entity, handle_entity.handle.clone()));
-            selection.selected = vec![SelectionChoice::Group(new_group)];
+            let mut curve_set = HashSet::new();
+            curve_set.insert(handle_entity.handle.id.into());
+            selection.selected = vec![SelectionChoice::CurveSet(curve_set)];
             //     .group
             //     .insert((handle_entity.entity, handle_entity.handle.clone()));
             action_event_writer.send(Action::Delete(true));

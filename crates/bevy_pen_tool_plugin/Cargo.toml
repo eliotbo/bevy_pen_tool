@@ -23,6 +23,7 @@ bevy-inspector-egui = "0.12"
 once_cell = "1.13.0"
 bevy_egui = "0.15"
 
+
 [[example]]
 name = "blank"
 path = "examples/blank.rs"

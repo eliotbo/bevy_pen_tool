@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use bevy_pen_tool_model::*;
 
 use rand::prelude::*;
+use std::collections::HashSet;
 
 pub(crate) enum PenCommand {
     Spawn {
@@ -205,12 +206,10 @@ fn direct_api_calls(
                 }
                 PenCommand::Delete { id } => {
                     if let Some(handle_entity) = maps.bezier_map.get(&id) {
-                        let mut new_group = Group::default();
-                        new_group
-                            .group
-                            .insert((handle_entity.entity, handle_entity.handle.clone()));
+                        let mut new_set = HashSet::new();
+                        new_set.insert((handle_entity.handle.id.into()));
 
-                        selection.selected = vec![SelectionChoice::Group(new_group)];
+                        selection.selected = vec![SelectionChoice::CurveSet(new_set)];
 
                         action_event_writer
                             .send(Action::Delete(false /* do not add to history */));

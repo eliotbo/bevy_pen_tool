@@ -46,6 +46,12 @@ pub struct GroupSaveLoad {
     pub standalone_lut: StandaloneLut,
 }
 
+// #[derive(Debug, Clone)]
+// pub struct GroupHandleEntity {
+//     pub handle: Handle<Group>,
+//     pub entity: Entity,
+// }
+
 #[derive(Debug, Clone, TypeUuid, PartialEq)]
 #[uuid = "b16f31ff-a594-4fca-a0e3-85e626d3d01a"] // do not change this uuid without changing the Default impl for GroupId
 pub struct Group {
@@ -64,6 +70,7 @@ pub struct Group {
     pub lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), LutDistance)>,
     pub standalone_lut: StandaloneLut,
     pub id: GroupId,
+    pub entity: Option<Entity>,
 }
 
 impl Default for Group {
@@ -79,6 +86,7 @@ impl Default for Group {
                 lut: Vec::new(),
             },
             id: GroupId::default(),
+            entity: None,
             // ..Default::default() // group_id: HandleId::default(),
         }
     }
@@ -93,17 +101,20 @@ impl Group {
     pub fn remove_curve(
         &mut self,
         bezier_handle_entity: &BezierHandleEntity,
-        bezier_curves: &BezierAssets, //&Res<Assets<Bezier>>,
-        id_handle_map: HashMap<BezierId, BezierHandleEntity>,
+        // bezier_curves: &BezierAssets, //&Res<Assets<Bezier>>,
+        // id_handle_map: &HashMap<BezierId, BezierHandleEntity>,
     ) {
         self.bezier_handles.remove(&bezier_handle_entity.handle);
         self.group.remove(&(
             bezier_handle_entity.entity,
             bezier_handle_entity.handle.clone(),
         ));
-        self.find_connected_ends(bezier_curves, id_handle_map.clone());
-        self.group_lut(bezier_curves, id_handle_map.clone());
-        self.compute_standalone_lut(bezier_curves, 1000);
+
+        // if self.bezier_handles.len() > 0 {
+        //     self.find_connected_ends(bezier_curves, id_handle_map.clone());
+        //     self.group_lut(bezier_curves, id_handle_map.clone());
+        //     self.compute_standalone_lut(bezier_curves, 1000);
+        // }
     }
 
     pub fn into_group_save(&self, bezier_curves: &Res<Assets<Bezier>>) -> GroupSaveLoad {
@@ -130,9 +141,26 @@ impl Group {
         id_handle_map: HashMap<BezierId, BezierHandleEntity>,
     ) {
         //
-        if self.bezier_handles.len() == 0 {
-            return ();
-        };
+        match self.bezier_handles.len() {
+            //
+            // case of the empty group
+            0 => return (),
+            //
+            // case of the single curve group
+            1 => {
+                let handle = self.bezier_handles.iter().next().unwrap();
+                self.ends = Some(vec![
+                    (handle.clone(), AnchorEdge::Start),
+                    (handle.clone(), AnchorEdge::End),
+                ]);
+                return ();
+            }
+            _ => (),
+        }
+
+        //
+        //
+        // case of the multiple curve group
 
         let mut handles = self.bezier_handles.clone();
         let num_curves = handles.len();
@@ -179,19 +207,19 @@ impl Group {
                 // let (partner_id, partners_edge) = (latch.latched_to_id, );
                 let next_edge = latch.partners_edge.other();
 
-                let next_curve_handle = id_handle_map
-                    .get(&latch.latched_to_id.into())
-                    .unwrap()
-                    .clone();
+                if let Some(next_curve_handle) = id_handle_map.get(&latch.latched_to_id.into()) {
+                    let bezier_next = bezier_curve_hack.get(&next_curve_handle.handle.id).unwrap();
 
-                let bezier_next = bezier_curve_hack.get(&next_curve_handle.handle.id).unwrap();
-
-                if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
-                    latch = next_latch.clone();
-                    num_con += 1;
+                    if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
+                        latch = next_latch.clone();
+                        num_con += 1;
+                    } else {
+                        ends.push((next_curve_handle.handle.clone(), next_edge));
+                        break;
+                    }
                 } else {
-                    ends.push((next_curve_handle.handle, next_edge));
-                    break;
+                    info!("Could not find ends");
+                    return;
                 }
             }
             // }
@@ -223,178 +251,205 @@ impl Group {
 
             let mut sorted_handles: Vec<Handle<Bezier>> = vec![starting_handle.clone()];
 
-            let initial_bezier = bezier_curves.get(&starting_handle.id).unwrap();
-            //
-            luts.push((
-                initial_bezier.lut.clone(),
-                starting_anchor.other(),
-                initial_bezier.length(),
-                starting_handle.clone(),
-            ));
-
-            if let Some(mut latch) = initial_bezier.latches.get(&starting_anchor.other()) {
+            if let Some(initial_bezier) = bezier_curves.get(&starting_handle.id) {
                 //
-                let mut found_connection = true;
+                luts.push((
+                    initial_bezier.lut.clone(),
+                    starting_anchor.other(),
+                    initial_bezier.length(),
+                    starting_handle.clone(),
+                ));
 
-                // traverse a latched selection
-                // return None if traversal cannot be done through all curves
-                while found_connection {
-                    //&& !returned_to_initial_latch {
+                if let Some(mut latch) = initial_bezier.latches.get(&starting_anchor.other()) {
                     //
-                    let next_edge = latch.partners_edge.other();
+                    let mut found_connection = true;
 
-                    let next_curve_handle = id_handle_map
-                        .get(&latch.latched_to_id)
-                        .unwrap()
-                        .clone()
-                        .handle;
+                    // traverse a latched selection
+                    // return None if traversal cannot be done through all curves
+                    while found_connection {
+                        //&& !returned_to_initial_latch {
+                        //
+                        let next_edge = latch.partners_edge.other();
 
-                    if next_curve_handle == starting_handle {
-                        // returned to initial latch -> true
-                        break;
-                    }
-
-                    let bezier_next = bezier_curves.get(&next_curve_handle.id).unwrap();
-                    sorted_handles.push(next_curve_handle.clone());
-                    luts.push((
-                        bezier_next.lut.clone(),
-                        next_edge.clone(),
-                        bezier_next.length(),
-                        next_curve_handle.clone(),
-                    ));
-
-                    if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
-                        if self
-                            .bezier_handles
-                            .contains(&id_handle_map.get(&next_latch.latched_to_id).unwrap().handle)
+                        if let Some(next_curve_entity_handle) =
+                            id_handle_map.get(&latch.latched_to_id)
                         {
-                            latch = next_latch;
+                            // .clone()
+                            let next_curve_handle = &next_curve_entity_handle.handle;
+
+                            if next_curve_handle == &starting_handle {
+                                // returned to initial latch -> true
+                                break;
+                            }
+
+                            if let Some(bezier_next) = bezier_curves.get(&next_curve_handle.id) {
+                                sorted_handles.push(next_curve_handle.clone());
+                                luts.push((
+                                    bezier_next.lut.clone(),
+                                    next_edge.clone(),
+                                    bezier_next.length(),
+                                    next_curve_handle.clone(),
+                                ));
+
+                                if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
+                                    if self.bezier_handles.contains(
+                                        &id_handle_map
+                                            .get(&next_latch.latched_to_id)
+                                            .unwrap()
+                                            .handle,
+                                    ) {
+                                        latch = next_latch;
+                                    } else {
+                                        found_connection = false;
+                                    }
+                                } else {
+                                    found_connection = false;
+                                }
+                            } else {
+                                info!("Could not find next_curve_handle.id in bezier_curves");
+                                return;
+                            }
                         } else {
-                            found_connection = false;
+                            info!("Could not find latch.latched_to_id in bezier_map");
+                            return;
                         }
-                    } else {
-                        found_connection = false;
                     }
+                } else {
+                    // info!("Could not find ends 3333");
+                    // return;
                 }
+
+                let total_length = luts
+                    .iter()
+                    .fold(0.0, |acc, (_lut, _anchor, len, _handle)| acc + len);
+                let mut min_t = 0.0;
+                let mut group_lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), LutDistance)> =
+                    Vec::new();
+                // println!("luts : {:?}", luts);
+                for (lut, anchor, length, handle) in luts.clone() {
+                    let max_t = min_t + length / total_length;
+
+                    let t_m = (min_t as f64, max_t as f64);
+                    group_lut.push((handle, anchor, t_m, lut));
+                    min_t = max_t;
+                }
+
+                // update the look-up table
+                self.lut = group_lut.clone();
             }
-
-            let total_length = luts
-                .iter()
-                .fold(0.0, |acc, (_lut, _anchor, len, _handle)| acc + len);
-            let mut min_t = 0.0;
-            let mut group_lut: Vec<(Handle<Bezier>, AnchorEdge, (f64, f64), LutDistance)> =
-                Vec::new();
-            // println!("luts : {:?}", luts);
-            for (lut, anchor, length, handle) in luts.clone() {
-                let max_t = min_t + length / total_length;
-
-                let t_m = (min_t as f64, max_t as f64);
-                group_lut.push((handle, anchor, t_m, lut));
-                min_t = max_t;
-            }
-
-            // update the look-up table
-            self.lut = group_lut.clone();
         }
     }
 
     pub fn compute_position_with_bezier(&self, bezier_curves: &BezierAssets, t: f64) -> Vec2 {
-        let mut curve_index = 0;
-        let mut pos: Vec2 = Vec2::ZERO;
-        //
-        for (_handle, _anchor, (t_min, t_max), _lut) in &self.lut {
-            // println!("t: {}, t_min: {}, t_max: {}, ", t, t_min, t_max);
-            if &t >= t_min && &t <= &(t_max + 0.000001) {
-                break;
-            } else {
-                curve_index += 1;
-            }
-        }
-        //
-        if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
+        if self.lut.len() > 0 {
+            let mut curve_index = 0;
+            let mut pos: Vec2 = Vec2::ZERO;
             //
-            let bezier = bezier_curves.get(&handle.id).unwrap();
+            for (_handle, _anchor, (t_min, t_max), _lut) in &self.lut {
+                // println!("t: {}, t_min: {}, t_max: {}, ", t, t_min, t_max);
+                if &t >= t_min && &t <= &(t_max + 0.000001) {
+                    break;
+                } else {
+                    curve_index += 1;
+                }
+            }
+            //
+            if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
+                //
+                if let Some(bezier) = bezier_curves.get(&handle.id) {
+                    // some of this code is shared with move_middle_quads()
+                    let curve = bezier.to_curve();
+                    let mut t_0_1 = (t as f64 - t_min) / (t_max - t_min);
 
-            // some of this code is shared with move_middle_quads()
-            let curve = bezier.to_curve();
-            let mut t_0_1 = (t as f64 - t_min) / (t_max - t_min);
+                    if anchor == &AnchorEdge::Start {
+                        t_0_1 = 1.0 - t_0_1;
+                    }
 
-            if anchor == &AnchorEdge::Start {
-                t_0_1 = 1.0 - t_0_1;
+                    t_0_1 = t_0_1.clamp(0.00000000001, 0.9999);
+
+                    let idx_f64 = t_0_1 * (lut.len() - 1) as f64;
+                    let p1 = lut[(idx_f64 as usize)];
+                    let p2 = lut[idx_f64 as usize + 1];
+
+                    let rem = idx_f64 % 1.0;
+                    let t_distance = interpolate(p1, p2, rem);
+                    let pos_coord2 = curve.point_at_pos(t_distance);
+
+                    pos = Vec2::new(pos_coord2.0 as f32, pos_coord2.1 as f32);
+                } else {
+                    println!("no bezier found");
+                }
+            } else {
+                println!("couldn't get a curve at index: {}. ", curve_index);
             }
 
-            t_0_1 = t_0_1.clamp(0.00000000001, 0.9999);
-
-            let idx_f64 = t_0_1 * (lut.len() - 1) as f64;
-            let p1 = lut[(idx_f64 as usize)];
-            let p2 = lut[idx_f64 as usize + 1];
-
-            let rem = idx_f64 % 1.0;
-            let t_distance = interpolate(p1, p2, rem);
-            let pos_coord2 = curve.point_at_pos(t_distance);
-
-            pos = Vec2::new(pos_coord2.0 as f32, pos_coord2.1 as f32);
+            return pos;
         } else {
-            println!("couldn't get a curve at index: {}. ", curve_index);
+            return Vec2::ZERO;
         }
-
-        return pos;
     }
 
     pub fn compute_normal_with_bezier(&self, bezier_curves: &BezierAssets, t: f64) -> Vec2 {
-        let mut curve_index = 0;
+        if self.lut.len() > 0 {
+            let mut curve_index = 0;
 
-        #[allow(unused_assignments)]
-        let mut normal = Vec2::ZERO;
-        for (_handle, _anchor, (t_min, t_max), _lut) in &self.lut {
-            // println!("t: {}, t_min: {}, t_max: {}, ", t, t_min, t_max);
-            if &t >= t_min && &t <= &(t_max + 0.000001) {
-                break;
+            #[allow(unused_assignments)]
+            let mut normal = Vec2::ZERO;
+            for (_handle, _anchor, (t_min, t_max), _lut) in &self.lut {
+                // println!("t: {}, t_min: {}, t_max: {}, ", t, t_min, t_max);
+                if &t >= t_min && &t <= &(t_max + 0.000001) {
+                    break;
+                } else {
+                    curve_index += 1;
+                }
+            }
+            let mut s = 1.0;
+            if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
+                if let Some(bezier) = bezier_curves.get(&handle.id) {
+                    // some of this code is shared with move_middle_quads()
+                    let curve = bezier.to_curve();
+                    let mut t_0_1 = (t as f64 - t_min) / (t_max - t_min);
+
+                    if anchor == &AnchorEdge::Start {
+                        t_0_1 = 1.0 - t_0_1;
+
+                        // this sign is important for road mesh generation
+                        s = -1.0;
+                    }
+
+                    t_0_1 = t_0_1.clamp(0.00000000001, 0.9999);
+
+                    let idx_f64 = t_0_1 * (lut.len() - 1) as f64;
+                    let p1 = lut[(idx_f64 as usize)];
+                    let p2 = lut[idx_f64 as usize + 1];
+
+                    let rem = idx_f64 % 1.0;
+                    let t_distance = interpolate(p1, p2, rem);
+
+                    use flo_curves::bezier::NormalCurve;
+
+                    let normal_coord2 = curve.normal_at_pos(t_distance).to_unit_vector();
+
+                    normal = Vec2::new(normal_coord2.x() as f32, normal_coord2.y() as f32) * s;
+                } else {
+                    println!("no bezier found");
+                }
             } else {
-                curve_index += 1;
-            }
-        }
-        let mut s = 1.0;
-        if let Some((handle, anchor, (t_min, t_max), lut)) = self.lut.get(curve_index) {
-            let bezier = bezier_curves.get(&handle.id).unwrap();
-
-            // some of this code is shared with move_middle_quads()
-            let curve = bezier.to_curve();
-            let mut t_0_1 = (t as f64 - t_min) / (t_max - t_min);
-
-            if anchor == &AnchorEdge::Start {
-                t_0_1 = 1.0 - t_0_1;
-
-                // this sign is important for road mesh generation
-                s = -1.0;
+                panic!("couldn't get a curve at index: {}. ", curve_index);
             }
 
-            t_0_1 = t_0_1.clamp(0.00000000001, 0.9999);
-
-            let idx_f64 = t_0_1 * (lut.len() - 1) as f64;
-            let p1 = lut[(idx_f64 as usize)];
-            let p2 = lut[idx_f64 as usize + 1];
-
-            let rem = idx_f64 % 1.0;
-            let t_distance = interpolate(p1, p2, rem);
-
-            use flo_curves::bezier::NormalCurve;
-
-            let normal_coord2 = curve.normal_at_pos(t_distance).to_unit_vector();
-
-            normal = Vec2::new(normal_coord2.x() as f32, normal_coord2.y() as f32) * s;
+            return normal;
         } else {
-            panic!("couldn't get a curve at index: {}. ", curve_index);
+            return Vec2::ZERO;
         }
-
-        return normal;
     }
 
     pub fn compute_standalone_lut(&mut self, bezier_curves: &BezierAssets, num_points: u32) {
         let mut total_length: f32 = 0.0;
         for lut in self.lut.clone() {
-            let bezier = bezier_curves.get(&lut.0.id).unwrap();
-            total_length += bezier.length();
+            if let Some(bezier) = bezier_curves.get(&lut.0.id) {
+                total_length += bezier.length();
+            }
         }
 
         let t_range: Vec<f64> = (0..num_points)
@@ -417,25 +472,30 @@ impl Group {
     // an application where the look-up table (lut) would be loaded
     pub fn compute_position_with_lut(&self, t: f32) -> Vec2 {
         let lut = self.standalone_lut.lut.clone();
-        let idx_f64 = t * (lut.len() - 1) as f32;
-        let p1 = lut[(idx_f64 as usize)];
-        let p2 = lut[idx_f64 as usize + 1];
-        let rem = idx_f64 % 1.0;
-        let position = interpolate_vec2(p1, p2, rem);
-        return position;
+        if lut.len() > 0 {
+            let idx_f64 = t * (lut.len() - 1) as f32;
+            let p1 = lut[(idx_f64 as usize)];
+            let p2 = lut[idx_f64 as usize + 1];
+            let rem = idx_f64 % 1.0;
+            let position = interpolate_vec2(p1, p2, rem);
+            return position;
+        } else {
+            return Vec2::ZERO;
+        }
     }
 
     // compute the average position of the anchors making up the group
     pub fn center_of_mass(&self, bezier_curves: &BezierAssets) -> Vec2 {
         let mut center_of_mass = Vec2::ZERO;
         for (handle, anchor, _t_range, _lut) in &self.lut {
-            let bezier = bezier_curves.get(&handle.id).unwrap();
-            // center_of_mass += bezier.center_of_mass();
-            let pos = match anchor {
-                AnchorEdge::Start => bezier.positions.start,
-                AnchorEdge::End => bezier.positions.end,
-            };
-            center_of_mass += pos;
+            if let Some(bezier) = bezier_curves.get(&handle.id) {
+                // center_of_mass += bezier.center_of_mass();
+                let pos = match anchor {
+                    AnchorEdge::Start => bezier.positions.start,
+                    AnchorEdge::End => bezier.positions.end,
+                };
+                center_of_mass += pos;
+            }
         }
         center_of_mass /= self.lut.len() as f32;
         return center_of_mass;

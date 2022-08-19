@@ -7,11 +7,11 @@ use crate::model::group::*;
 use bevy::{asset::HandleId, prelude::*, sprite::Mesh2dHandle, utils::Uuid};
 
 // use rand::distributions::Open01;
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use rand::prelude::*;
-
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use bevy_inspector_egui::Inspectable;
 
@@ -100,7 +100,7 @@ impl Default for Maps {
 
 #[derive(Clone, Debug)]
 pub enum SelectionChoice {
-    Group(Group),
+    CurveSet(HashSet<BezierId>),
     Mesh(PenMesh, Vec2), // Vec2 is translation
     None,
 }
@@ -573,24 +573,27 @@ pub fn adjust_selection_attributes(
     bezier_curves: ResMut<Assets<Bezier>>,
     mut meshes: ResMut<Assets<Mesh>>,
     selection: ResMut<Selection>,
+    maps: Res<Maps>,
 ) {
     let (mut minx, mut maxx, mut miny, mut maxy) = (f32::MAX, f32::MIN, f32::MAX, f32::MIN);
 
     for selected_item in selection.selected.clone().iter() {
         match selected_item {
-            SelectionChoice::Group(group) => {
+            SelectionChoice::CurveSet(bezier_set) => {
                 // We set the mesh attributes as a function of the bounding box.
                 // This could be done by removing the mesh from the mesh asset
                 // and adding a brand new  = mesh
 
-                for (_entity, selected_handle) in group.group.clone() {
-                    let bezier = bezier_curves.get(&selected_handle).unwrap();
+                for bezier_id in bezier_set.iter() {
+                    if let Some(bezier_entity_handle) = maps.bezier_map.get(bezier_id) {
+                        let bezier = bezier_curves.get(&bezier_entity_handle.handle).unwrap();
 
-                    let (bound0, bound1) = bezier.bounding_box();
-                    minx = minx.min(bound0.x);
-                    maxx = maxx.max(bound1.x);
-                    miny = miny.min(bound0.y);
-                    maxy = maxy.max(bound1.y);
+                        let (bound0, bound1) = bezier.bounding_box();
+                        minx = minx.min(bound0.x);
+                        maxx = maxx.max(bound1.x);
+                        miny = miny.min(bound0.y);
+                        maxy = maxy.max(bound1.y);
+                    }
                 }
             }
             SelectionChoice::Mesh(pen_mesh, translation) => {

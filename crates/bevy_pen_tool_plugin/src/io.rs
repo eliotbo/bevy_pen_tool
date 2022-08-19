@@ -171,7 +171,10 @@ pub fn load(
                 lut: Vec::new(),
             },
             id,
+            entity: None,
         };
+
+        let mut curve_set: HashSet<BezierId> = HashSet::new();
 
         for group_load_save in loaded_groups_vec {
             for (mut bezier, anchor, t_ends, local_lut) in group_load_save.lut {
@@ -196,12 +199,14 @@ pub fn load(
                 group.bezier_handles.insert(handle.clone());
                 group.standalone_lut = group_load_save.standalone_lut.clone();
                 group.lut.push((handle.clone(), anchor, t_ends, local_lut));
+
+                curve_set.insert(handle.id.into());
             }
         }
-        selection.selected = vec![SelectionChoice::Group(group.clone())];
+        selection.selected = vec![SelectionChoice::CurveSet(curve_set)];
 
         // to create a group: select all the curves programmatically, and send a UiButton::Group event
-        loaded_event_writer.send(Loaded);
+        loaded_event_writer.send(Loaded(group));
         println!("{:?}", "loaded groups");
     }
 }

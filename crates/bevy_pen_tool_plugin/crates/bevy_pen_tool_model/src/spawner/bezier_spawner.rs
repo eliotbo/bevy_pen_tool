@@ -146,7 +146,6 @@ pub fn spawn_bezier_system(
             *follow_mouse,
         );
 
-        // TODO group: DO not spawn mid quads
         if latch_received_bool {
             let group_handle = maps
                 .group_map
@@ -166,6 +165,7 @@ pub fn spawn_bezier_system(
         } else {
             // produce a new group
             let mut group = Group::default();
+            group.id = bezier.group;
             group.add_curve(entity, handle.clone());
 
             // group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
@@ -185,11 +185,17 @@ pub fn spawn_bezier_system(
             group.find_connected_ends(&bezier_assets, maps.bezier_map.clone());
             group.group_lut(&bezier_assets, maps.bezier_map.clone());
             group.compute_standalone_lut(&bezier_assets, globals.group_lut_num_points);
+            // group.id = group_handle.id.into();
+            // let group_handle = groups.add(group);
+            let mut group_handle: Handle<Group> = bevy::asset::Handle::weak(group.id.0);
+            group_handle.make_strong(&groups);
+            group.id = group_handle.id.into();
+            let strong_handle = groups.set(group_handle.clone(), group);
+            // bezier.group = strong_handle.id.into();
 
-            let group_handle = groups.add(group);
-            maps.group_map.insert(bezier.group, group_handle.clone());
+            maps.group_map.insert(bezier.group, strong_handle.clone());
 
-            group_event_writer.send(group_handle.clone());
+            group_event_writer.send(strong_handle.clone());
         }
     }
 }
@@ -316,6 +322,8 @@ pub fn spawn_bezier(
             ComputedVisibility::not_visible(), // the parent entity is not a rendered object
         ))
         .id();
+
+    bezier_got.entity = Some(parent);
 
     if do_send_to_history {
         add_to_history_event_writer.send(HistoryAction::SpawnedCurve {
