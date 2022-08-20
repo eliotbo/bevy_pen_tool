@@ -207,7 +207,7 @@ fn direct_api_calls(
                 PenCommand::Delete { id } => {
                     if let Some(handle_entity) = maps.bezier_map.get(&id) {
                         let mut new_set = HashSet::new();
-                        new_set.insert((handle_entity.handle.id.into()));
+                        new_set.insert(handle_entity.handle.id.into());
 
                         selection.selected = vec![SelectionChoice::CurveSet(new_set)];
 

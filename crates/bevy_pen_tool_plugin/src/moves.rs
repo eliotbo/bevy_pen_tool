@@ -1,12 +1,12 @@
 use bevy::math::Vec3A;
 use bevy::prelude::*;
-use bevy_pen_tool_model::inputs::{Action, Cursor};
+use bevy_pen_tool_model::inputs::Cursor;
 use bevy_pen_tool_model::materials::{BezierMidMat, SelectionMat};
 use bevy_pen_tool_model::mesh::{FillMesh2dMaterial, RoadMesh2dMaterial, StartMovingMesh};
 use bevy_pen_tool_model::model::{
     AchorEdgeQuad, AnchorEdge, Bezier, BezierParent, BoundingBoxQuad, ControlPointQuad,
     FollowBezierAnimation, Globals, Group, GroupMiddleQuad, MainUi, MiddlePointQuad, MovingAnchor,
-    OfficialLatch, TurnRoundAnimation, UiAction, UiBoard,
+    TurnRoundAnimation, UiAction, UiBoard,
 };
 
 use std::collections::HashMap;
@@ -81,8 +81,8 @@ pub fn move_group_middle_quads(
     )>,
     // globals: ResMut<Globals>,
     groups: ResMut<Assets<Group>>,
-    mut action_event_reader: EventReader<Action>,
-    mut latch_event_reader: EventReader<OfficialLatch>,
+    // mut action_event_reader: EventReader<Action>,
+    // mut latch_event_reader: EventReader<OfficialLatch>,
 ) {
     let mut t = 0.0;
     // During the exact frame where either the ungroup action or the OfficialLatch event

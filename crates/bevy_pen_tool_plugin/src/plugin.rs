@@ -1,10 +1,11 @@
 use crate::actions::*;
-use crate::io::{load, save};
+use crate::io::{load, load_mesh, save};
 use crate::moves::*;
 use crate::pen::*;
 use crate::undo::*;
 
 use bevy::prelude::*;
+use bevy_obj::*;
 use bevy_pen_tool_model::*;
 pub struct BevyPenToolPlugin;
 
@@ -25,7 +26,7 @@ pub struct BevyPenToolPlugin;
 // 5) disable shortcuts
 // 6) make most of the structs public(crate) and
 //     leave only the API public
-// 8) fix save mesh
+// 8) fix save all
 // 9) move structs in correct files (ex: RoadMesh, FillMesh in mesh)
 // 10) wrong unselect when moving a selected mesh
 // 11) make io a feature
@@ -37,6 +38,7 @@ pub struct BevyPenToolPlugin;
 impl Plugin for BevyPenToolPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(PenApiPlugin)
+            .add_plugin(ObjPlugin)
             .add_plugin(SpawnerPlugin)
             .add_event::<RemoveMovingQuadEvent>()
             .add_event::<GroupBoxEvent>()
@@ -51,6 +53,7 @@ impl Plugin for BevyPenToolPlugin {
             .add_system(check_mouse_on_meshes)
             .add_system(unlatchy)
             .add_system(compute_group_lut)
+            .add_system(load_mesh)
             //
             // Update model
             .add_system_set(
@@ -255,7 +258,7 @@ impl GroupPrint {
 fn debug(
     keyboard_input: Res<Input<KeyCode>>,
     query: Query<&Handle<Bezier>, With<BezierParent>>,
-    mut bezier_curves: ResMut<Assets<Bezier>>,
+    bezier_curves: ResMut<Assets<Bezier>>,
     maps: Res<Maps>,
     globals: Res<Globals>,
     mut groups: ResMut<Assets<Group>>,
@@ -270,9 +273,9 @@ fn debug(
     {
         // println!("group_handles: {:?}", maps.id_group_handle);
         // println!("'B' currently pressed");
-        let latches: Vec<Latch> = vec![];
-        for handle in query.iter() {
-            let bezier = bezier_curves.get_mut(handle).unwrap();
+        // let latches: Vec<Latch> = vec![];
+        for _handle in query.iter() {
+            // let bezier = bezier_curves.get_mut(handle).unwrap();
             // action_event_writer.send(Action::ComputeLut);
 
             // latches.push()

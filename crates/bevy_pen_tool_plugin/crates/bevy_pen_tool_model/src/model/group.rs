@@ -1,6 +1,6 @@
 use crate::model::*;
 
-use bevy::{asset::HandleId, prelude::*, reflect::TypeUuid};
+use bevy::{prelude::*, reflect::TypeUuid};
 
 use serde::{Deserialize, Serialize};
 
@@ -148,7 +148,7 @@ impl Group {
             //
             // case of the single curve group
             1 => {
-                let handle = self.bezier_handles.iter().next().unwrap();
+                let handle = self.bezier_handles.iter().next().unwrap(); // never fails
                 self.ends = Some(vec![
                     (handle.clone(), AnchorEdge::Start),
                     (handle.clone(), AnchorEdge::End),
@@ -164,7 +164,7 @@ impl Group {
 
         let mut handles = self.bezier_handles.clone();
         let num_curves = handles.len();
-        let handle = handles.iter().next().unwrap().clone();
+        let handle = handles.iter().next().unwrap().clone(); // unwap never fails
         handles.remove(&handle);
 
         // TODO: is this really a good way of clone assets?
@@ -174,65 +174,78 @@ impl Group {
         //     .map(|(s, x)| (s.clone(), x.clone()))
         //     .collect::<HashMap<HandleId, Bezier>>();
 
-        let initial_bezier = bezier_curves.get(&handle.id).unwrap();
-
-        let anchors_temp = vec![AnchorEdge::Start, AnchorEdge::End];
-        let anchors = anchors_temp
-            .iter()
-            .filter(|anchor| initial_bezier.quad_is_latched(anchor))
-            .collect::<Vec<&AnchorEdge>>();
-
-        let mut ends: Vec<(Handle<Bezier>, AnchorEdge)> = Vec::new();
-
-        // if a curve is completely disconnected form other curves, a group cannot be created
-        if anchors.len() == 0 && handles.len() > 1 {
-            self.ends = None;
-            return ();
-        } else if anchors.len() == 1 {
-            // println!("Anchors len : 1");
-            ends.push((handle.clone(), anchors[0].clone().other()));
-        }
-
-        let mut num_con = 0;
-
-        // TODO: only consider curves that are selected
-        for anchor in anchors.clone() {
-            num_con += 1;
-            // let mut latch = initial_bezier.latches[&anchor].get(0).unwrap();
-            let mut latch = initial_bezier.latches.get(&anchor).unwrap().clone();
-            // if let Some(latch) = initial_bezier.latches.get_mut(&anchor) {
+        if let Some(initial_bezier) = bezier_curves.get(&handle.id) {
             //
-            while num_con <= num_curves {
-                //
-                // let (partner_id, partners_edge) = (latch.latched_to_id, );
-                let next_edge = latch.partners_edge.other();
+            let anchors_temp = vec![AnchorEdge::Start, AnchorEdge::End];
+            let anchors = anchors_temp
+                .iter()
+                .filter(|anchor| initial_bezier.quad_is_latched(anchor))
+                .collect::<Vec<&AnchorEdge>>();
 
-                if let Some(next_curve_handle) = id_handle_map.get(&latch.latched_to_id.into()) {
-                    let bezier_next = bezier_curve_hack.get(&next_curve_handle.handle.id).unwrap();
+            let mut ends: Vec<(Handle<Bezier>, AnchorEdge)> = Vec::new();
 
-                    if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
-                        latch = next_latch.clone();
-                        num_con += 1;
-                    } else {
-                        ends.push((next_curve_handle.handle.clone(), next_edge));
-                        break;
+            // if a curve is completely disconnected form other curves, a group cannot be created
+            if anchors.len() == 0 && handles.len() > 1 {
+                self.ends = None;
+                return ();
+            } else if anchors.len() == 1 {
+                // println!("Anchors len : 1");
+                ends.push((handle.clone(), anchors[0].clone().other()));
+            }
+
+            let mut num_con = 0;
+
+            // TODO: only consider curves that are selected
+
+            // for each ancchor of the starting curve,
+            // finds the latched curve to the current curve until it reaches the end
+            for anchor in anchors.clone() {
+                num_con += 1;
+
+                if let Some(latch) = initial_bezier.latches.get(&anchor) {
+                    let mut latch = latch.clone();
+                    // if let Some(latch) = initial_bezier.latches.get_mut(&anchor) {
+                    //
+                    // careful of infinite loops
+                    while num_con <= num_curves {
+                        //
+                        // let (partner_id, partners_edge) = (latch.latched_to_id, );
+                        let next_edge = latch.partners_edge.other();
+
+                        if let Some(next_curve_handle) =
+                            id_handle_map.get(&latch.latched_to_id.into())
+                        {
+                            if let Some(bezier_next) =
+                                bezier_curve_hack.get(&next_curve_handle.handle.id)
+                            {
+                                if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
+                                    latch = next_latch.clone();
+                                    num_con += 1;
+                                } else {
+                                    ends.push((next_curve_handle.handle.clone(), next_edge));
+                                    break;
+                                }
+                            } else {
+                                info!("Could not find next curve");
+                                return;
+                            }
+                        } else {
+                            info!("Could not latched curve");
+                            return;
+                        }
                     }
-                } else {
-                    info!("Could not find ends");
-                    return;
+                    // }
                 }
             }
-            // }
-        }
 
-        if num_con + 2 > num_curves {
-            self.ends = Some(ends.clone());
+            if num_con + 2 > num_curves {
+                self.ends = Some(ends.clone());
+            }
         }
     }
 
     pub fn group_lut(
         &mut self,
-        // bezier_curves: HashMap<bevy::asset::HandleId, &Bezier>,
         bezier_curves: &BezierAssets,
         id_handle_map: HashMap<BezierId, BezierHandleEntity>,
     ) {
@@ -292,15 +305,14 @@ impl Group {
                                 ));
 
                                 if let Some(next_latch) = bezier_next.latches.get(&next_edge) {
-                                    if self.bezier_handles.contains(
-                                        &id_handle_map
-                                            .get(&next_latch.latched_to_id)
-                                            .unwrap()
-                                            .handle,
-                                    ) {
-                                        latch = next_latch;
-                                    } else {
-                                        found_connection = false;
+                                    if let Some(bezier_partner_id) =
+                                        id_handle_map.get(&next_latch.latched_to_id)
+                                    {
+                                        if self.bezier_handles.contains(&bezier_partner_id.handle) {
+                                            latch = next_latch;
+                                        } else {
+                                            found_connection = false;
+                                        }
                                     }
                                 } else {
                                     found_connection = false;

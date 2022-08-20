@@ -1,7 +1,7 @@
-use crate::inputs::{Cursor, MouseClickEvent};
+use crate::inputs::Cursor;
 use crate::materials::ButtonMat;
-use crate::mesh::{FillMesh2dMaterial, PenMesh, RoadMesh2dMaterial, StartMovingMesh};
-use crate::model::{get_close_mesh, Globals, MainUi, OnOffMaterial, UiAction, UiBoard};
+
+use crate::model::{Globals, MainUi, OnOffMaterial, UiAction, UiBoard};
 
 use bevy::prelude::*;
 

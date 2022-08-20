@@ -351,6 +351,7 @@ pub fn check_mouseclick_on_objects(
             &bezier_query,
             // globals.scale,
         ) {
+            info!("anchor clicked UPPPER hmmmm");
             anchor_event = Some(MouseClickEvent::OnAnchor((anchor, handle, false)));
         }
 
@@ -362,6 +363,7 @@ pub fn check_mouseclick_on_objects(
             &bezier_curves,
             &non_moving_edge_query,
         ) {
+            info!("anchor edge clicked UPPPER");
             anchor_edge_event = Some(MouseClickEvent::OnAnchorEdge((
                 anchor_edge,
                 handle,
@@ -413,10 +415,11 @@ pub fn check_mouseclick_on_objects(
             (Some(_event), Some(MouseClickEvent::OnAnchorEdge(info)), false, false, false)
                 if !globals.do_hide_anchors && !spawn_button_on && !unlatch_button_on =>
             {
+                info!("control point clicked: {:?}", info);
                 mouse_event_writer.send(MouseClickEvent::OnAnchor((
                     info.0.to_anchor(),
                     info.1,
-                    info.2,
+                    false,
                 )));
             }
 
@@ -424,6 +427,7 @@ pub fn check_mouseclick_on_objects(
             (_, Some(MouseClickEvent::OnAnchorEdge(info)), false, false, true)
                 if !globals.do_hide_anchors =>
             {
+                info!("anchor unlatching");
                 mouse_event_writer.send(MouseClickEvent::OnAnchor((
                     info.0.to_anchor(),
                     info.1,
@@ -438,7 +442,7 @@ pub fn check_mouseclick_on_objects(
                 mouse_event_writer.send(MouseClickEvent::OnAnchor((
                     info.0.to_anchor(),
                     info.1,
-                    info.2,
+                    true,
                 )));
             }
 
@@ -619,7 +623,7 @@ pub fn events_on_mouse_release(
     mut latch_event_writer: EventWriter<OfficialLatch>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
     selecting_query: Query<Entity, (With<SelectingBoxQuad>, With<CurrentlySelecting>)>,
-    mut fill_query: Query<Entity, With<StartMovingMesh>>,
+    fill_query: Query<Entity, With<StartMovingMesh>>,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         //

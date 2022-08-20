@@ -184,7 +184,7 @@ pub fn undo(
     mut commands: Commands,
     mut history: ResMut<History>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
-    mut groups: ResMut<Assets<Group>>,
+    groups: Res<Assets<Group>>,
     mut action_event_reader: EventReader<Action>,
     maps: ResMut<Maps>,
     mut spawn_curve_event_writer: EventWriter<SpawningCurve>,

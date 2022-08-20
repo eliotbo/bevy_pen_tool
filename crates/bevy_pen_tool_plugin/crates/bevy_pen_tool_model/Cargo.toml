@@ -18,5 +18,6 @@ lyon = "0.17.5"
 obj-exporter = "0.2.0"
 rfd = "0.5.1"
 bevy-inspector-egui = "0.12"
+bevy_obj = "0.8"
 
 

@@ -1,17 +1,11 @@
 use bevy_pen_tool_model::inputs::{Action, Cursor};
-use bevy_pen_tool_model::materials::*;
 use bevy_pen_tool_model::mesh::PenMesh;
 use bevy_pen_tool_model::model::*;
-use bevy_pen_tool_model::spawn_bezier;
 
 use bevy::prelude::*;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
-
-use std::fs::File;
-use std::io::Read;
-use std::io::Write;
 
 pub fn update_lut(
     mut bezier_curves: ResMut<Assets<Bezier>>,
@@ -115,8 +109,8 @@ pub fn bezier_anchor_order(
     maps: ResMut<Maps>,
     mut move_anchor_event_reader: EventReader<MoveAnchorEvent>,
     mut unlatch_event_writer: EventWriter<UnlatchEvent>,
-    audio: Res<Audio>,
-    mut add_to_history_event_writer: EventWriter<HistoryAction>,
+    // audio: Res<Audio>,
+    // mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {
     let mut latched_chain_whole_curve: Vec<Handle<Bezier>>; // = Vec::new();
 
@@ -138,6 +132,8 @@ pub fn bezier_anchor_order(
             let bezier = bezier_curves.get_mut(&bezier_handle_entity.handle).unwrap();
 
             // TODO: This "if" should be moved earlier: before the MoveAnchorEvent is sent
+            //
+            // cannot move a control point if it's hidden
             if !(chose_a_control_point && hidden_controls) {
                 bezier.update_previous_pos();
 
@@ -229,7 +225,6 @@ pub fn selection_box_init(
         .iter()
         .any(|x| x == &Action::SelectionBox)
     {
-        info!("selection_box_init");
         if let Some((_distance, _anchor, _entity, _selected_handle)) =
             get_close_anchor_entity(2.0 * globals.scale, cursor.position, &bezier_curves, &query)
         {
@@ -251,19 +246,18 @@ pub fn selection_area_finalize(
     mut selection: ResMut<Selection>,
     cursor: ResMut<Cursor>,
     bezier_curves: ResMut<Assets<Bezier>>,
-    groups: ResMut<Assets<Group>>,
+    // groups: ResMut<Assets<Group>>,
     mut query_set: ParamSet<(
         Query<&mut Visibility, With<SelectingBoxQuad>>,
         Query<&mut Visibility, With<SelectedBoxQuad>>,
         Query<&mut Visibility, With<GroupBoxQuad>>,
     )>,
-    group_query: Query<&Handle<Group>>,
+    // group_query: Query<&Handle<Group>>,
     bezier_query: Query<(Entity, &Handle<Bezier>), With<BezierParent>>,
     mesh_query: Query<(&Transform, &PenMesh)>,
     mut action_event_reader: EventReader<Action>,
     globals: Res<Globals>,
-
-    mut group_box_event_writer: EventWriter<GroupBoxEvent>,
+    // mut group_box_event_writer: EventWriter<GroupBoxEvent>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Selected) {
         selection.selected.clear();
@@ -285,7 +279,7 @@ pub fn selection_area_finalize(
         let mut found_anchor_in_box = false;
 
         // check for anchors inside selection area
-        for (entity, bezier_handle) in bezier_query.iter() {
+        for (_entity, bezier_handle) in bezier_query.iter() {
             let bezier = bezier_curves.get(bezier_handle).unwrap();
 
             if cursor.anchor_is_within_selection_box(bezier.positions.start * globals.scale)
@@ -446,7 +440,7 @@ pub fn unselect(
 // }
 
 pub fn latchy(
-    mut commands: Commands,
+    // mut commands: Commands,
     cursor: ResMut<Cursor>,
     mut bezier_curves: ResMut<Assets<Bezier>>,
     query: Query<(&Handle<Bezier>, &AchorEdgeQuad), With<MovingAnchor>>,
@@ -454,9 +448,9 @@ pub fn latchy(
     globals: ResMut<Globals>,
     mut action_event_reader: EventReader<Action>,
     non_moving_edge_query: Query<(&Handle<Bezier>, &AchorEdgeQuad), Without<MovingAnchor>>,
-    mut groups: ResMut<Assets<Group>>,
-    group_query: Query<(Entity, &Handle<Group>), With<GroupParent>>,
-    mut maps: ResMut<Maps>,
+    // mut groups: ResMut<Assets<Group>>,
+    // group_query: Query<(Entity, &Handle<Group>), With<GroupParent>>,
+    maps: Res<Maps>,
 ) {
     if action_event_reader.iter().any(|x| x == &Action::Latch) {
         // let latching_distance = globals.anchor_clicking_dist;
@@ -543,7 +537,7 @@ pub fn latchy(
         }
 
         // setup the latcher if a partner has been found
-        if let Some((partner_id, mover_anchor, pa_edge, mover_handle, partner_handle, group_id)) =
+        if let Some((partner_id, mover_anchor, pa_edge, mover_handle, partner_handle, _group_id)) =
             potential_partner
         {
             let partner_bezier = bezier_curves.get(&partner_handle).unwrap().clone();
@@ -629,7 +623,7 @@ pub fn latchy(
 struct BezierToRemoveFromGroup {
     group_id: GroupId,
     bezier_handle_entity: BezierHandleEntity,
-    color: Color,
+    // color: Color,
     anchor_edge: AnchorEdge,
     old_partner_id: BezierId,
 }
@@ -680,9 +674,9 @@ pub fn unlatchy(
                         bezier_in_group = Some(BezierToRemoveFromGroup {
                             group_id: bezier.group,
                             bezier_handle_entity: bezier_handle_entity.clone(),
-                            color: bezier
-                                .color
-                                .unwrap_or(globals.picked_color.unwrap_or(Color::WHITE)),
+                            // color: bezier
+                            //     .color
+                            //     .unwrap_or(globals.picked_color.unwrap_or(Color::WHITE)),
                             anchor_edge: anchor.to_edge(),
                             old_partner_id: temp_latch.latched_to_id,
                         });
@@ -727,14 +721,14 @@ pub fn unlatchy(
         if let Some(BezierToRemoveFromGroup {
             group_id,
             bezier_handle_entity,
-            color: _,
+            // color: _,
             anchor_edge,
             old_partner_id,
         }) = bezier_in_group
         {
             // let group = groups.get_mut().unwrap();
             let mut new_group = Group::default();
-            let mut new_group_id = new_group.id;
+            let new_group_id = new_group.id;
             // let bezier = bezier_curves.get_mut(&bezier_handle_entity.handle).unwrap();
             // bezier.group = new_group.group_id;
 
@@ -768,10 +762,6 @@ pub fn unlatchy(
                     let bezier = bezier_curves.get_mut(&bezier_from_chain.handle).unwrap();
                     bezier.group = new_group.id;
                 }
-
-                let bezier_assets = bezier_curves
-                    .iter()
-                    .collect::<HashMap<bevy::asset::HandleId, &Bezier>>();
 
                 for bezier_from_chain in curve_chain.iter() {
                     // TODO: too much compute! find_connected_ends, group_lut and compute_standalone_lut
@@ -1119,15 +1109,15 @@ pub fn delete(
 
     mut groups: ResMut<Assets<Group>>,
     mut visible_query: Query<&mut Visibility, With<SelectedBoxQuad>>,
-    query: Query<&Handle<Bezier>, With<BezierParent>>,
-    query2: Query<&Handle<Group>, With<GroupParent>>, // TODO: change to GroupParent
+    // query: Query<&Handle<Bezier>, With<BezierParent>>,
+    // query2: Query<&Handle<Group>, With<GroupParent>>, // TODO: change to GroupParent
     mut action_event_reader: EventReader<Action>,
     mut add_to_history_event_writer: EventWriter<HistoryAction>,
 ) {
     // if action_event_reader.iter().any(|x| x == &Action::Delete) {
     for action in action_event_reader.iter() {
         if let Action::Delete(is_from_redo) = action {
-            info!("MAPS: {:?}", maps.group_map);
+            // info!("MAPS: {:?}", maps.group_map);
             // list of partners that need to be unlatched
 
             //
@@ -1196,8 +1186,6 @@ pub fn delete(
 
                         for group_id in delete_groups.iter() {
                             //
-                            info!("MAPS AFTER: {:?}", maps.group_map);
-                            info!("id: {:?}", group_id);
                             let group_handle = maps.group_map.get(group_id).unwrap().clone();
                             let group = groups.get(&group_handle).unwrap();
                             //

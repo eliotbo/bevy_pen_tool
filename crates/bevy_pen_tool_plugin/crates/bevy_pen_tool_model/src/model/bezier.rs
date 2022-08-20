@@ -730,7 +730,7 @@ impl Bezier {
 
         let handle_entities = maps.bezier_map[&id.into()].clone();
 
-        info!("moving anchor {:?}", anchor);
+        // info!("moving anchor {:?}", anchor);
 
         let anchor_entity = handle_entities.anchor_entities[&anchor];
 
